@@ -7,13 +7,13 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.2.0">
+  <link rel="stylesheet" href="style.css?v=1.2.1">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
   <script>
     (function() {
-      const APP_VER = '1.2.0';
+      const APP_VER = '1.2.1';
       if (localStorage.getItem('app_version') !== APP_VER) {
         localStorage.setItem('app_version', APP_VER);
         if ('caches' in window) {
@@ -499,7 +499,7 @@
       </div>
       
       <!-- User Ranking Info Summary -->
-      <div class="my-rank-detail-card" style="background: rgba(124, 58, 237, 0.08); border: 1px dashed var(--accent-purple); padding: 0.85rem 1rem; border-radius: 12px; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; width: 100%;">
+      <div class="my-rank-detail-card" style="background: var(--accent-purple-glow); border: 1px dashed var(--accent-purple); padding: 0.85rem 1rem; border-radius: 12px; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; width: 100%;">
         <div style="text-align: left;">
           <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">나의 현재 순위</div>
           <div id="popupMyRankText" style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin-top: 0.15rem;">- 위</div>
@@ -537,7 +537,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
-  <script src="bible_data.js?v=1.2.0"></script>
-  <script src="app.js?v=1.2.0"></script>
+  <script src="bible_data.js?v=1.2.1"></script>
+  <script src="app.js?v=1.2.1"></script>
 </body>
 </html>

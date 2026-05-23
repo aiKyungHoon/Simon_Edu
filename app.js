@@ -1076,7 +1076,7 @@ class SimonEduApp {
       item.innerHTML = `
         <div class="${rankBadgeClass}">${rank}</div>
         <div class="all-ranking-avatar">${user.name.charAt(0)}</div>
-        <div class="all-ranking-name">${user.name} ${isMe ? '<span style="color:#d8b4fe; font-size:0.75rem; font-weight:normal;">(나)</span>' : ''}</div>
+        <div class="all-ranking-name">${user.name} ${isMe ? '<span style="color:var(--text-muted); font-size:0.75rem; font-weight:normal;">(나)</span>' : ''}</div>
         <div class="all-ranking-points">${user.points.toLocaleString()} P</div>
       `;
       

@@ -1427,12 +1427,12 @@ main {
   gap: 1rem;
 }
 
-/* Custom Styles for Rankings Popup (v1.2.0) */
+/* Custom Styles for Rankings Popup (v1.2.1) */
 .btn-all-rankings {
   width: 100%;
   margin-top: 1rem;
   padding: 0.65rem;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--leaderboard-item-bg);
   border: 1px dashed var(--glass-border);
   border-radius: 8px;
   color: var(--text-secondary);
@@ -1447,10 +1447,10 @@ main {
 }
 
 .btn-all-rankings:hover {
-  background: rgba(124, 58, 237, 0.08);
+  background: var(--accent-purple-glow);
   border-color: var(--accent-purple);
   color: var(--text-primary);
-  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
+  box-shadow: 0 4px 12px rgba(184, 134, 11, 0.15);
 }
 
 .all-rankings-list {
@@ -1484,28 +1484,28 @@ main {
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--leaderboard-item-bg);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
   transition: all var(--transition-fast);
 }
 
 .all-ranking-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-focus);
 }
 
 .all-ranking-item.me {
-  background: rgba(124, 58, 237, 0.1);
+  background: var(--accent-purple-glow);
   border-color: var(--accent-purple);
-  box-shadow: 0 0 10px rgba(124, 58, 237, 0.15);
+  box-shadow: 0 0 10px rgba(184, 134, 11, 0.15);
 }
 
 .all-ranking-item .rank-badge {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(184, 134, 11, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1545,6 +1545,22 @@ main {
   font-size: 0.9rem;
   color: var(--accent-purple);
   flex-shrink: 0;
+}
+
+#rankingSearchInput {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid var(--glass-border) !important;
+  color: var(--text-primary) !important;
+}
+
+#rankingSearchInput::placeholder {
+  color: var(--text-muted) !important;
+}
+
+#rankingSearchInput:focus {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: var(--accent-purple) !important;
+  box-shadow: var(--neon-shadow-purple) !important;
 }
 
 .all-ranking-name {
