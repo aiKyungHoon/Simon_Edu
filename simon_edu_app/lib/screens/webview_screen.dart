@@ -30,7 +30,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   int _currentIndex = 0;
   bool _isLoggedIn = false;
 
-  final String _targetUrl = 'https://simon-edu-bible-game.web.app?v=1.3.4';
+  final String _targetUrl = 'https://simon-edu-bible-game.web.app?v=1.3.5';
 
   @override
   void initState() {

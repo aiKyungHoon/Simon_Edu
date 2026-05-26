@@ -630,6 +630,20 @@ class SimonEduApp {
 
   // 4. View Router & Screen Renders
   switchView(viewName) {
+    if (viewName !== 'game') {
+      this.clearIntervals();
+      this.gameActive = false;
+      this.isTestMode = false;
+      // Close game-related modals immediately to prevent overlay issues
+      ['modalComplete', 'modalFail', 'modalReviewConfirm'].forEach(mId => {
+        const modal = document.getElementById(mId);
+        if (modal) {
+          modal.classList.remove('active');
+          modal.style.display = 'none';
+        }
+      });
+    }
+
     const gridContainer = document.querySelector('.dashboard-grid-container');
     if (gridContainer) {
       if (['dashboard', 'attendance', 'ranking'].includes(viewName)) {
