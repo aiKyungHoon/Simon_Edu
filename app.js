@@ -1298,6 +1298,11 @@ class SimonEduApp {
 
   toggleNotifications(event) {
     if (event) event.stopPropagation();
+    
+    // Close theme switcher if open
+    const switcher = document.getElementById('themeSwitcher');
+    if (switcher) switcher.classList.remove('expanded');
+
     const dropdown = document.getElementById('notificationDropdown');
     if (!dropdown) return;
     const isVisible = dropdown.style.display === 'block';
@@ -1317,6 +1322,11 @@ class SimonEduApp {
 
   toggleThemeSwitcher(event) {
     if (event) event.stopPropagation();
+
+    // Close notification dropdown if open
+    const dropdown = document.getElementById('notificationDropdown');
+    if (dropdown) dropdown.style.display = 'none';
+
     const switcher = document.getElementById('themeSwitcher');
     if (!switcher) return;
     const isExpanded = switcher.classList.contains('expanded');
