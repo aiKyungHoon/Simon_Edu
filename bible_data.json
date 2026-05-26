@@ -1,5 +1,4 @@
-// 요한계시록 1장 1절 ~ 22장 21절 말씀 데이터 (개역한글)
-window.BIBLE_DATA = [
+[
   {
     "chapter": 1,
     "verse": 1,
@@ -4479,4 +4478,4 @@ window.BIBLE_DATA = [
       "있을지어다"
     ]
   }
-];
+]

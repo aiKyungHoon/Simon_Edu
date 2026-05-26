@@ -112,8 +112,10 @@ class SimonEduApp {
           });
       } else {
         this.currentUser = null;
-        document.getElementById('userNav').style.display = 'none';
-        document.getElementById('btnNavAdmin').style.display = 'none';
+        const userNav = document.getElementById('userNav');
+        if (userNav) userNav.style.display = 'none';
+        const btnNavAdmin = document.getElementById('btnNavAdmin');
+        if (btnNavAdmin) btnNavAdmin.style.display = 'none';
         this.switchView('auth');
       }
     });
@@ -132,18 +134,21 @@ class SimonEduApp {
         const freshUser = this.users.find(u => u.id === this.currentUser.id);
         if (freshUser) {
           this.currentUser = freshUser;
-          document.getElementById('navPoints').textContent = this.currentUser.points;
+          const navPoints = document.getElementById('navPoints');
+          if (navPoints) navPoints.textContent = this.currentUser.points;
         }
       }
 
       // Re-render UI widgets if dashboard is active
-      if (document.getElementById('dashboardView').classList.contains('active')) {
+      const dashboardView = document.getElementById('dashboardView');
+      if (dashboardView && dashboardView.classList.contains('active')) {
         this.renderLeaderboardWidget();
         this.renderDashboard();
       }
       
       // Re-render admin panel if active
-      if (document.getElementById('adminView').classList.contains('active')) {
+      const adminView = document.getElementById('adminView');
+      if (adminView && adminView.classList.contains('active')) {
         this.renderAdmin();
       }
     }, error => {
@@ -580,9 +585,12 @@ class SimonEduApp {
     auth.signOut()
       .then(() => {
         this.currentUser = null;
-        document.getElementById('authForm').reset();
-        document.getElementById('userNav').style.display = 'none';
-        document.getElementById('btnNavAdmin').style.display = 'none';
+        const authForm = document.getElementById('authForm');
+        if (authForm) authForm.reset();
+        const userNav = document.getElementById('userNav');
+        if (userNav) userNav.style.display = 'none';
+        const btnNavAdmin = document.getElementById('btnNavAdmin');
+        if (btnNavAdmin) btnNavAdmin.style.display = 'none';
         this.switchView('auth');
       })
       .catch(err => {
@@ -611,17 +619,26 @@ class SimonEduApp {
   }
 
   renderAppForUser() {
-    // Show logged in elements in header
-    document.getElementById('userNav').style.display = 'flex';
-    document.getElementById('navUsername').textContent = this.currentUser.name;
-    document.getElementById('navPoints').textContent = this.currentUser.points;
-    document.getElementById('navAvatar').textContent = this.currentUser.name.charAt(0);
+    const userNav = document.getElementById('userNav');
+    if (userNav) userNav.style.display = 'flex';
+    
+    const navUsername = document.getElementById('navUsername');
+    if (navUsername) navUsername.textContent = this.currentUser.name;
+    
+    const navPoints = document.getElementById('navPoints');
+    if (navPoints) navPoints.textContent = this.currentUser.points;
+    
+    const navAvatar = document.getElementById('navAvatar');
+    if (navAvatar) navAvatar.textContent = this.currentUser.name.charAt(0);
 
     // Show Admin button if the user is an admin
-    if (this.currentUser.role === 'admin') {
-      document.getElementById('btnNavAdmin').style.display = 'inline-flex';
-    } else {
-      document.getElementById('btnNavAdmin').style.display = 'none';
+    const btnNavAdmin = document.getElementById('btnNavAdmin');
+    if (btnNavAdmin) {
+      if (this.currentUser.role === 'admin') {
+        btnNavAdmin.style.display = 'inline-flex';
+      } else {
+        btnNavAdmin.style.display = 'none';
+      }
     }
 
     this.switchView('dashboard');
@@ -635,8 +652,14 @@ class SimonEduApp {
 
     // 5.1 Points and Info
     // Always refresh currentUser details from memory array to stay synced
-    this.currentUser = this.users.find(u => u.id === this.currentUser.id);
-    document.getElementById('navPoints').textContent = this.currentUser.points;
+    const freshUser = this.users.find(u => u.id === this.currentUser.id);
+    if (freshUser) {
+      this.currentUser = freshUser;
+    }
+    const navPoints = document.getElementById('navPoints');
+    if (navPoints) {
+      navPoints.textContent = this.currentUser.points;
+    }
 
     // 5.2 Render Daily Mission Details
     const bibleData = window.BIBLE_DATA;
@@ -644,47 +667,59 @@ class SimonEduApp {
     
     // Calculate and update Progress Ring
     const progressPercent = Math.min(Math.round((curIdx / bibleData.length) * 100), 100);
-    document.getElementById('progressPct').textContent = `${progressPercent}%`;
+    const progressPct = document.getElementById('progressPct');
+    if (progressPct) progressPct.textContent = `${progressPercent}%`;
     
     const circle = document.getElementById('missionCircle');
-    // Circumference of r=45 circle is 2 * PI * 45 = 282.74 (approx 283)
-    const offset = 283 - (progressPercent / 100) * 283;
-    circle.style.strokeDashoffset = offset;
+    if (circle) {
+      // Circumference of r=45 circle is 2 * PI * 45 = 282.74 (approx 283)
+      const offset = 283 - (progressPercent / 100) * 283;
+      circle.style.strokeDashoffset = offset;
+    }
 
     const startBtn = document.querySelector('.btn-start-mission');
     const todayStr = this.getRelativeDateStr(0);
     const hasDoneMissionToday = this.currentUser.lastMissionDate === todayStr;
 
+    const titleEl = document.getElementById('currentVerseTitle');
+    const previewEl = document.getElementById('currentVersePreview');
+
     if (curIdx < bibleData.length) {
       const currentVerse = bibleData[curIdx];
-      document.getElementById('currentVerseTitle').textContent = `요한계시록 7장 ${currentVerse.verse}절`;
+      if (titleEl) titleEl.textContent = `요한계시록 ${currentVerse.chapter}장 ${currentVerse.verse}절`;
       
       if (hasDoneMissionToday) {
-        document.getElementById('currentVersePreview').textContent = `오늘의 암송 미션을 완료하셨습니다! 내일 다음 구절 시험이 해금됩니다. (현재 본문: "${currentVerse.text}")`;
-        startBtn.style.display = 'inline-flex';
-        startBtn.disabled = true;
-        startBtn.style.background = 'rgba(255, 255, 255, 0.05)';
-        startBtn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-        startBtn.style.color = 'var(--text-muted)';
-        startBtn.innerHTML = `오늘 미션 완료 (내일 오픈) <span class="material-icons-round">lock</span>`;
+        if (previewEl) previewEl.textContent = `오늘의 암송 미션을 완료하셨습니다! 내일 다음 구절 시험이 해금됩니다. (현재 본문: "${currentVerse.text}")`;
+        if (startBtn) {
+          startBtn.style.display = 'inline-flex';
+          startBtn.disabled = true;
+          startBtn.style.background = 'rgba(255, 255, 255, 0.05)';
+          startBtn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+          startBtn.style.color = 'var(--text-muted)';
+          startBtn.innerHTML = `오늘 미션 완료 (내일 오픈) <span class="material-icons-round">lock</span>`;
+        }
       } else {
-        document.getElementById('currentVersePreview').textContent = `"${currentVerse.text}"`;
-        startBtn.style.display = 'inline-flex';
-        startBtn.disabled = false;
-        startBtn.style.background = ''; // Revert to stylesheet default
-        startBtn.style.borderColor = '';
-        startBtn.style.color = '';
-        startBtn.innerHTML = `암송 챌린지 시작 <span class="material-icons-round">play_arrow</span>`;
+        if (previewEl) previewEl.textContent = `"${currentVerse.text}"`;
+        if (startBtn) {
+          startBtn.style.display = 'inline-flex';
+          startBtn.disabled = false;
+          startBtn.style.background = ''; // Revert to stylesheet default
+          startBtn.style.borderColor = '';
+          startBtn.style.color = '';
+          startBtn.innerHTML = `암송 챌린지 시작 <span class="material-icons-round">play_arrow</span>`;
+        }
       }
     } else {
-      document.getElementById('currentVerseTitle').textContent = `축하합니다!`;
-      document.getElementById('currentVersePreview').textContent = `요한계시록 7장 1절~17절 전 구절 암송 마스터 달성!`;
-      startBtn.style.display = 'inline-flex';
-      startBtn.disabled = false;
-      startBtn.style.background = '';
-      startBtn.style.borderColor = '';
-      startBtn.style.color = '';
-      startBtn.innerHTML = `처음부터 다시 복습 <span class="material-icons-round">replay</span>`;
+      if (titleEl) titleEl.textContent = `축하합니다!`;
+      if (previewEl) previewEl.textContent = `요한계시록 전 구절 암송 마스터 달성!`;
+      if (startBtn) {
+        startBtn.style.display = 'inline-flex';
+        startBtn.disabled = false;
+        startBtn.style.background = '';
+        startBtn.style.borderColor = '';
+        startBtn.style.color = '';
+        startBtn.innerHTML = `처음부터 다시 복습 <span class="material-icons-round">replay</span>`;
+      }
     }
 
     // 5.3 Render Attendance Widget
@@ -941,6 +976,7 @@ class SimonEduApp {
   // 5.4.1 Leaderboard Logic
   renderLeaderboardWidget() {
     const list = document.getElementById('leaderboardList');
+    if (!list) return;
     list.innerHTML = '';
 
     // Sort all users by points descending
@@ -956,38 +992,42 @@ class SimonEduApp {
     }
 
     // Find current user's rank
-    const myUser = sortedUsers.find(u => u.id === this.currentUser.id);
-    const myRank = myUser ? myUser.rank : 1;
-    const totalCount = sortedUsers.length;
-    const rankPercentage = totalCount > 0 ? Math.round((myRank / totalCount) * 100) : 0;
+    if (this.currentUser) {
+      const myUser = sortedUsers.find(u => u.id === this.currentUser.id);
+      const myRank = myUser ? myUser.rank : 1;
+      const totalCount = sortedUsers.length;
+      const rankPercentage = totalCount > 0 ? Math.round((myRank / totalCount) * 100) : 0;
 
-    // Update rank summary badge
-    document.getElementById('userRankingText').textContent = `현재 ${myRank}위입니다!`;
-    document.getElementById('userRankingPct').textContent = `전체 ${totalCount}명 중 상위 ${rankPercentage}%`;
+      // Update rank summary badge
+      const rankTextEl = document.getElementById('userRankingText');
+      if (rankTextEl) rankTextEl.textContent = `현재 ${myRank}위입니다!`;
+      const rankPctEl = document.getElementById('userRankingPct');
+      if (rankPctEl) rankPctEl.textContent = `전체 ${totalCount}명 중 상위 ${rankPercentage}%`;
 
-    // Render Top 10 users
-    sortedUsers.slice(0, 10).forEach((user) => {
-      const rank = user.rank;
-      const isMe = user.id === this.currentUser.id;
-      
-      const item = document.createElement('div');
-      item.className = `leaderboard-item ${isMe ? 'me' : ''}`;
+      // Render Top 10 users
+      sortedUsers.slice(0, 10).forEach((user) => {
+        const rank = user.rank;
+        const isMe = user.id === this.currentUser.id;
+        
+        const item = document.createElement('div');
+        item.className = `leaderboard-item ${isMe ? 'me' : ''}`;
 
-      // Rank Badge styling
-      let rankBadgeClass = 'rank-badge';
-      if (rank === 1) rankBadgeClass += ' rank-1';
-      else if (rank === 2) rankBadgeClass += ' rank-2';
-      else if (rank === 3) rankBadgeClass += ' rank-3';
+        // Rank Badge styling
+        let rankBadgeClass = 'rank-badge';
+        if (rank === 1) rankBadgeClass += ' rank-1';
+        else if (rank === 2) rankBadgeClass += ' rank-2';
+        else if (rank === 3) rankBadgeClass += ' rank-3';
 
-      item.innerHTML = `
-        <div class="${rankBadgeClass}">${rank}</div>
-        <div class="leaderboard-avatar">${user.name.charAt(0)}</div>
-        <div class="leaderboard-name">${user.name} ${isMe ? '<span style="color:#d8b4fe; font-size:0.75rem;">(나)</span>' : ''}</div>
-        <div class="leaderboard-points">${user.points.toLocaleString()} P</div>
-      `;
-      
-      list.appendChild(item);
-    });
+        item.innerHTML = `
+          <div class="${rankBadgeClass}">${rank}</div>
+          <div class="leaderboard-avatar">${user.name.charAt(0)}</div>
+          <div class="leaderboard-name">${user.name} ${isMe ? '<span style="color:#d8b4fe; font-size:0.75rem;">(나)</span>' : ''}</div>
+          <div class="leaderboard-points">${user.points.toLocaleString()} P</div>
+        `;
+        
+        list.appendChild(item);
+      });
+    }
 
     // Re-render popup if it is open
     const modal = document.getElementById('modalAllRankings');
@@ -1231,7 +1271,7 @@ class SimonEduApp {
     bibleData.forEach((verseData, index) => {
       const opt = document.createElement('option');
       opt.value = index;
-      opt.textContent = `요한계시록 7장 ${verseData.verse}절`;
+      opt.textContent = `요한계시록 ${verseData.chapter}장 ${verseData.verse}절`;
       select.appendChild(opt);
     });
   }
@@ -1315,7 +1355,7 @@ class SimonEduApp {
     this.currentQuizBlanks = [];
 
     // Header Setup
-    document.getElementById('gameVerseTitle').textContent = `요한계시록 7장 ${this.currentQuizVerse.verse}절 시험` + (this.isTestMode ? ' [테스트]' : '');
+    document.getElementById('gameVerseTitle').textContent = `요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 시험` + (this.isTestMode ? ' [테스트]' : '');
     document.getElementById('gameTimer').textContent = this.gameTimeRemaining;
     this.renderHearts();
 
@@ -1494,7 +1534,7 @@ class SimonEduApp {
     if (this.isTestMode) {
       const modalBody = document.getElementById('modalCompleteBody');
       modalBody.innerHTML = `
-        요한계시록 7장 ${this.currentQuizVerse.verse}절 [테스트 모드] 시험을 완료했습니다!<br><br>
+        요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 [테스트 모드] 시험을 완료했습니다!<br><br>
         기본 포인트: <strong>+${basePoints} P (테스트 모드 - 미지급)</strong><br>
         남은 시간 보너스 (${this.gameTimeRemaining}s): <strong>+${timeBonus} P (테스트 모드 - 미지급)</strong><br>
         <hr style="margin: 0.75rem 0; border:0; border-top:1px solid var(--glass-border);">
@@ -1527,7 +1567,7 @@ class SimonEduApp {
       // Populate Success Modal
       const modalBody = document.getElementById('modalCompleteBody');
       let htmlContent = `
-        요한계시록 7장 ${this.currentQuizVerse.verse}절 암송 시험을 완료했습니다!<br><br>
+        요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 시험을 완료했습니다!<br><br>
         기본 포인트: <strong>+${basePoints} P</strong><br>
         남은 시간 보너스 (${this.gameTimeRemaining}s): <strong>+${timeBonus} P</strong><br>
       `;
@@ -1651,38 +1691,43 @@ class SimonEduApp {
     const avgCleared = totalUsers > 0 ? (totalClearedVerses / totalUsers).toFixed(1) : "0.0";
 
     // Set stat fields
-    document.getElementById('adminStatUsers').textContent = totalUsers;
-    document.getElementById('adminStatAvgPoints').textContent = avgPoints.toLocaleString();
-    document.getElementById('adminStatTotalCleared').textContent = `${avgCleared} 절`;
+    const statUsers = document.getElementById('adminStatUsers');
+    if (statUsers) statUsers.textContent = totalUsers;
+    const statAvgPoints = document.getElementById('adminStatAvgPoints');
+    if (statAvgPoints) statAvgPoints.textContent = avgPoints.toLocaleString();
+    const statTotalCleared = document.getElementById('adminStatTotalCleared');
+    if (statTotalCleared) statTotalCleared.textContent = `${avgCleared} 절`;
 
     // Render User Management Table
     const tableBody = document.getElementById('adminUserTableBody');
-    tableBody.innerHTML = '';
+    if (tableBody) {
+      tableBody.innerHTML = '';
 
-    this.users.forEach(u => {
-      const tr = document.createElement('tr');
-      
-      const lastCheck = u.lastCheckInDate ? u.lastCheckInDate : '출석 없음';
-      const maxVerse = window.BIBLE_DATA.length;
-      const progressStr = u.currentVerseIndex >= maxVerse ? '완독 완료' : `${u.currentVerseIndex + 1}절 진행 중`;
+      this.users.forEach(u => {
+        const tr = document.createElement('tr');
+        
+        const lastCheck = u.lastCheckInDate ? u.lastCheckInDate : '출석 없음';
+        const maxVerse = window.BIBLE_DATA.length;
+        const progressStr = u.currentVerseIndex >= maxVerse ? '완독 완료' : `${u.currentVerseIndex + 1}절 진행 중`;
 
-      tr.innerHTML = `
-        <td style="font-family:var(--font-en); font-weight:600; color:var(--accent-purple);">${u.username || u.id}</td>
-        <td style="font-weight:700;">${u.name}</td>
-        <td>${u.email}</td>
-        <td><span class="btn-admin-action edit" style="cursor:default; background:${u.role === 'admin'?'rgba(147, 51, 234, 0.15)':'rgba(255,255,255,0.05)'}; color:${u.role==='admin'?'var(--accent-purple)':'var(--text-secondary)'}">${u.role.toUpperCase()}</span></td>
-        <td style="font-family:var(--font-en); font-weight:700; color:var(--accent-amber);">${u.points.toLocaleString()} P</td>
-        <td>🔥 ${u.consecutiveCheckIns}일 (${lastCheck})</td>
-        <td>${progressStr}</td>
-        <td class="actions">
-          <button class="btn-admin-action edit" onclick="app.adminGivePoints('${u.id}')">보너스 100P</button>
-          <button class="btn-admin-action reset" onclick="app.adminResetProgress('${u.id}')">진도 리셋</button>
-          ${u.id !== this.currentUser.id ? `<button class="btn-admin-action reset" style="background:rgba(244,63,94,0.1); border-color:rgba(244,63,94,0.2)" onclick="app.adminDeleteUser('${u.id}')">삭제</button>` : ''}
-        </td>
-      `;
+        tr.innerHTML = `
+          <td style="font-family:var(--font-en); font-weight:600; color:var(--accent-purple);">${u.username || u.id}</td>
+          <td style="font-weight:700;">${u.name}</td>
+          <td>${u.email}</td>
+          <td><span class="btn-admin-action edit" style="cursor:default; background:${u.role === 'admin'?'rgba(147, 51, 234, 0.15)':'rgba(255,255,255,0.05)'}; color:${u.role==='admin'?'var(--accent-purple)':'var(--text-secondary)'}">${u.role.toUpperCase()}</span></td>
+          <td style="font-family:var(--font-en); font-weight:700; color:var(--accent-amber);">${u.points.toLocaleString()} P</td>
+          <td>🔥 ${u.consecutiveCheckIns}일 (${lastCheck})</td>
+          <td>${progressStr}</td>
+          <td class="actions">
+            <button class="btn-admin-action edit" onclick="app.adminGivePoints('${u.id}')">보너스 100P</button>
+            <button class="btn-admin-action reset" onclick="app.adminResetProgress('${u.id}')">진도 리셋</button>
+            ${u.id !== this.currentUser.id ? `<button class="btn-admin-action reset" style="background:rgba(244,63,94,0.1); border-color:rgba(244,63,94,0.2)" onclick="app.adminDeleteUser('${u.id}')">삭제</button>` : ''}
+          </td>
+        `;
 
-      tableBody.appendChild(tr);
-    });
+        tableBody.appendChild(tr);
+      });
+    }
   }
 
   // Admin Action Methods
@@ -1773,7 +1818,7 @@ class SimonEduApp {
         alert(`치트: 다음 절이 성공적으로 해금되었습니다. (현재 ${nextIdx + 1}절 진행 중)`);
       }).catch(err => console.error(err));
     } else {
-      alert('이미 요한계시록 7장 마지막 절까지 완료 상태입니다.');
+      alert('이미 요한계시록 마지막 절까지 완료 상태입니다.');
     }
   }
 
@@ -1795,6 +1840,59 @@ class SimonEduApp {
 
 // Instantiate and bind to window
 window.app = new SimonEduApp();
+
+// Global Deep Link Handler for hybrid mobile app
+window.handleDeepLink = function(urlOrPath) {
+  console.log("handleDeepLink received url/path:", urlOrPath);
+  if (!urlOrPath) return;
+
+  // Extract path portion, supporting both simonedu://<path> and http(s)://<domain>/<path>
+  let path = urlOrPath;
+  if (path.includes('://')) {
+    const parts = path.split('://');
+    path = parts[1] || '';
+  }
+  
+  // Strip query parameters
+  path = path.split('?')[0];
+  // Clean leading/trailing slashes
+  path = path.replace(/^\/+|\/+$/g, '');
+
+  console.log("Parsed deep link path:", path);
+
+  if (!window.app) {
+    console.error("SimonEduApp instance not ready yet.");
+    return;
+  }
+
+  // Handle routing
+  if (path === 'admin') {
+    if (window.app.currentUser && window.app.currentUser.role === 'admin') {
+      window.app.switchView('admin');
+    } else {
+      alert('관리자 모드로 진입하려면 관리자 계정으로 로그인해야 합니다.');
+      window.app.switchView('auth');
+    }
+  } else if (path === 'dashboard') {
+    if (window.app.currentUser) {
+      window.app.switchView('dashboard');
+    } else {
+      window.app.switchView('auth');
+    }
+  } else if (path === 'quiz' || path === 'mission') {
+    if (window.app.currentUser) {
+      window.app.startMission();
+    } else {
+      window.app.switchView('auth');
+    }
+  } else {
+    if (window.app.currentUser) {
+      window.app.switchView('dashboard');
+    } else {
+      window.app.switchView('auth');
+    }
+  }
+};
 
 // Auto Session restored check on page load
 window.addEventListener('DOMContentLoaded', () => {

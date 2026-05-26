@@ -7,13 +7,13 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.2.2">
+  <link rel="stylesheet" href="style.css?v=1.3.0">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
   <script>
     (function() {
-      const APP_VER = '1.2.2';
+      const APP_VER = '1.3.0';
       if (localStorage.getItem('app_version') !== APP_VER) {
         localStorage.setItem('app_version', APP_VER);
         if ('caches' in window) {
@@ -76,7 +76,7 @@
       <div class="auth-wrapper glass-panel">
         <div class="auth-header">
           <h2>사이먼에듀</h2>
-          <p>요한계시록 7장 말씀을 게임처럼 암송해보세요</p>
+          <p>요한계시록 말씀을 게임처럼 암송해보세요</p>
         </div>
         
         <div class="auth-tabs">
@@ -146,7 +146,7 @@
               
               <!-- Mission Info -->
               <div class="mission-details">
-                <h3 id="currentVerseTitle">요한계시록 7장 1절</h3>
+                <h3 id="currentVerseTitle">요한계시록 1장 1절</h3>
                 <p id="currentVersePreview">"이 일 후에 내가 네 천사가 땅 네 모퉁이에 선 것을 보니..."</p>
                 <div class="mission-action-group" style="display: flex; flex-direction: column; gap: 1rem; align-items: flex-start; width: 100%;">
                   <button class="btn-start-mission" onclick="app.startMission()">
@@ -359,7 +359,7 @@
           <div class="game-info-section" style="margin-top: 2rem;">
             <div class="game-info-title">학습 가이드</div>
             <p class="verse-description" id="verseGuideText">
-              하루에 한 절씩 마스터하여 요한계시록 7장 전체를 암송해 나가는 게임식 학습입니다. 성공 시 랭킹 점수가 올라갑니다.
+              하루에 한 절씩 마스터하여 요한계시록 전체를 암송해 나가는 게임식 학습입니다. 성공 시 랭킹 점수가 올라갑니다.
             </p>
           </div>
         </div>
@@ -444,7 +444,7 @@
       <div class="modal-icon">🎉</div>
       <div class="modal-title" style="color: var(--accent-emerald);">미션 통과 성공!</div>
       <div class="modal-body" id="modalCompleteBody">
-        요한계시록 7장 1절 암송 시험을 완벽하게 마스터하셨습니다!<br>
+        요한계시록 말씀을 완벽하게 마스터하셨습니다!<br>
         <strong>+100 포인트</strong>가 지급되었습니다.
       </div>
       <div class="modal-btn-container">
@@ -537,7 +537,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
-  <script src="bible_data.js?v=1.2.2"></script>
-  <script src="app.js?v=1.2.2"></script>
+  <script src="bible_data.js?v=1.3.0"></script>
+  <script src="app.js?v=1.3.0"></script>
 </body>
 </html>
