@@ -337,139 +337,28 @@ class _WebViewScreenState extends State<WebViewScreen> {
     return Stack(
       children: [
         Scaffold(
-          body: Column(
-            children: [
-              // Custom Native Header Widget (~28% of Screen Height)
-              Container(
-                height: MediaQuery.of(context).size.height * 0.28,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFFFFFDF5),
-                      Color(0xFFFDF8E6),
-                    ],
-                  ),
-                  border: Border(
-                    bottom: BorderSide(
-                      color: Color(0x22B8860B),
-                      width: 1.0,
+          backgroundColor: const Color(0xFFFDF8E6),
+          body: SafeArea(
+            bottom: false,
+            child: Stack(
+              children: [
+                if (_controller != null) WebViewWidget(controller: _controller!),
+                
+                // Linear progress bar for loading
+                if (_isLoading)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: LinearProgressIndicator(
+                      value: _loadingProgress > 0.0 ? _loadingProgress : null,
+                      color: theme.colorScheme.primary,
+                      backgroundColor: const Color(0xFFFDF8E6),
+                      minHeight: 3,
                     ),
                   ),
-                ),
-                child: Column(
-                  children: [
-                    SizedBox(height: MediaQuery.of(context).padding.top + 12),
-                    const Text(
-                      "Simon Edu 말씀 암송",
-                      style: TextStyle(
-                        color: Color(0xFF3D341C),
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Apple SD Gothic Neo',
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    
-                    // Dashboard content inside expanded area of the header
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 16.0),
-                        child: Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: const Color(0xFFB8860B).withOpacity(0.15),
-                              width: 1.0,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFB8860B).withOpacity(0.04),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 16.0),
-                                child: Icon(
-                                  Icons.auto_stories_rounded,
-                                  color: Color(0xFFB8860B),
-                                  size: 32,
-                                ),
-                              ),
-                              Expanded(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      "오늘의 말씀 구절",
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF926F15),
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    const Text(
-                                      "요한계시록 1장 ~ 22장",
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF3D341C),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      "마음속에 새기는 생명의 말씀",
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: const Color(0xFF6B5C37).withOpacity(0.8),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // The main web view (~72% of Screen Height)
-              Expanded(
-                child: Stack(
-                  children: [
-                    if (_controller != null) WebViewWidget(controller: _controller!),
-                    
-                    // Linear progress bar for loading
-                    if (_isLoading)
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        child: LinearProgressIndicator(
-                          value: _loadingProgress > 0.0 ? _loadingProgress : null,
-                          color: theme.colorScheme.primary,
-                          backgroundColor: const Color(0xFFFDF8E6),
-                          minHeight: 3,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         if (_showIntro)
