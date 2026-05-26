@@ -5,6 +5,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:vibration/vibration.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'intro_overlay.dart';
 
 class WebViewScreen extends StatefulWidget {
@@ -26,8 +27,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
   bool _canGoForward = false;
   bool _showIntro = true;
   bool _introVisible = true;
+  int _currentIndex = 0;
+  bool _isLoggedIn = false;
 
-  final String _targetUrl = 'https://simon-edu-bible-game.web.app';
+  final String _targetUrl = 'https://simon-edu-bible-game.web.app?v=1.3.3';
 
   @override
   void initState() {
@@ -60,6 +63,26 @@ class _WebViewScreenState extends State<WebViewScreen> {
               });
               _updateNavigationState();
               _injectJavaScriptBridge();
+              
+              // Synchronize auth state and active view state after page finish
+              _controller?.runJavaScript('''
+                (function() {
+                  if (window.app && window.app.currentUser && window.MobileAppChannel) {
+                    window.MobileAppChannel.postMessage(JSON.stringify({
+                      event: 'login',
+                      role: window.app.currentUser.role || 'user'
+                    }));
+                    var activeView = document.querySelector('.view-container.active');
+                    if (activeView) {
+                      window.MobileAppChannel.postMessage(JSON.stringify({
+                        event: 'view_changed',
+                        view: activeView.id.replace('View', '')
+                      }));
+                    }
+                  }
+                })();
+              ''');
+
               _isPageFinished = true;
               if (_pendingDeepLink != null) {
                 final link = _pendingDeepLink!;
@@ -87,6 +110,12 @@ class _WebViewScreenState extends State<WebViewScreen> {
           'ConsoleLog',
           onMessageReceived: (JavaScriptMessage message) {
             debugPrint('[WebView Console] ${message.message}');
+          },
+        )
+        ..addJavaScriptChannel(
+          'MobileAppChannel',
+          onMessageReceived: (JavaScriptMessage message) {
+            _handleMobileAppMessage(message.message);
           },
         )
         ..loadRequest(Uri.parse(_targetUrl));
@@ -208,6 +237,21 @@ class _WebViewScreenState extends State<WebViewScreen> {
               }
             };
             console.log("PlayConfetti and triggerQuizFail hooks attached successfully.");
+
+            // Sync auth state and view state to Flutter once window.app is ready
+            if (window.app.currentUser && window.MobileAppChannel) {
+              window.MobileAppChannel.postMessage(JSON.stringify({
+                event: 'login',
+                role: window.app.currentUser.role || 'user'
+              }));
+              var activeView = document.querySelector('.view-container.active');
+              if (activeView) {
+                window.MobileAppChannel.postMessage(JSON.stringify({
+                  event: 'view_changed',
+                  view: activeView.id.replace('View', '')
+                }));
+              }
+            }
           }
         }, 300);
       })();
@@ -229,6 +273,60 @@ class _WebViewScreenState extends State<WebViewScreen> {
       // Quiz failure: one long pulse
       Vibration.vibrate(duration: 800);
     }
+  }
+
+  void _handleMobileAppMessage(String jsonStr) {
+    try {
+      final Map<String, dynamic> data = json.decode(jsonStr);
+      final event = data['event'];
+      if (event == 'login') {
+        setState(() {
+          _isLoggedIn = true;
+        });
+      } else if (event == 'logout') {
+        setState(() {
+          _isLoggedIn = false;
+          _currentIndex = 0;
+        });
+      } else if (event == 'view_changed') {
+        final view = data['view'];
+        int newIndex = _currentIndex;
+        if (view == 'dashboard') {
+          newIndex = 0;
+        } else if (view == 'attendance') {
+          newIndex = 1;
+        } else if (view == 'ranking') {
+          newIndex = 2;
+        }
+        if (newIndex != _currentIndex) {
+          setState(() {
+            _currentIndex = newIndex;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error parsing MobileAppChannel message: $e');
+    }
+  }
+
+  void _switchWebViewTab(int index) {
+    if (_controller == null || !_isLoggedIn) return;
+    
+    // Light haptic feedback
+    HapticFeedback.lightImpact();
+    
+    setState(() {
+      _currentIndex = index;
+    });
+
+    String viewName = 'dashboard';
+    if (index == 1) {
+      viewName = 'attendance';
+    } else if (index == 2) {
+      viewName = 'ranking';
+    }
+
+    _controller!.runJavaScript('if (window.app && window.app.switchView) { window.app.switchView("$viewName"); }');
   }
 
   @override
@@ -360,6 +458,36 @@ class _WebViewScreenState extends State<WebViewScreen> {
               ],
             ),
           ),
+          bottomNavigationBar: _isLoggedIn
+              ? BottomNavigationBar(
+                  currentIndex: _currentIndex,
+                  onTap: _switchWebViewTab,
+                  backgroundColor: const Color(0xFFFDF8E6),
+                  selectedItemColor: const Color(0xFFB8860B),
+                  unselectedItemColor: const Color(0xFF96855B),
+                  selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+                  elevation: 8,
+                  type: BottomNavigationBarType.fixed,
+                  items: const [
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.menu_book_rounded),
+                      activeIcon: Icon(Icons.menu_book_rounded),
+                      label: '오늘의 말씀',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.event_available_rounded),
+                      activeIcon: Icon(Icons.event_available_rounded),
+                      label: '출석체크',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.emoji_events_rounded),
+                      activeIcon: Icon(Icons.emoji_events_rounded),
+                      label: '명예의 전당',
+                    ),
+                  ],
+                )
+              : null,
         ),
         if (_showIntro)
           Positioned.fill(

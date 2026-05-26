@@ -1777,3 +1777,237 @@ footer {
     font-size: 1.15rem;
   }
 }
+
+/* 12. Desktop Navigation & Real-time Notifications */
+.desktop-nav {
+  display: none !important;
+  gap: 0.5rem;
+  background: rgba(184, 134, 11, 0.08);
+  padding: 0.3rem;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+}
+
+.desktop-nav-item {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  padding: 0.5rem 1.2rem;
+  border-radius: 999px;
+  font-family: var(--font-kr);
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.desktop-nav-item:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.desktop-nav-item.active {
+  background: linear-gradient(135deg, var(--accent-purple), #926f15);
+  color: #fff !important;
+  box-shadow: var(--accent-purple-glow) 0 4px 10px;
+}
+
+/* Notification Bell Container */
+.nav-notification-bell-container {
+  position: relative;
+  display: inline-block;
+}
+
+.btn-notification-bell {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.btn-notification-bell:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-focus);
+  transform: scale(1.05);
+}
+
+.notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--accent-rose);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--accent-rose-glow) 0 2px 6px;
+  border: 1.5px solid var(--bg-primary);
+}
+
+/* Notification Dropdown Pane */
+.notification-dropdown {
+  position: absolute;
+  top: 45px;
+  right: 0;
+  width: 320px;
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  z-index: 1000;
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: dropdownFadeIn 0.2s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-header {
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.dropdown-header span {
+  font-family: var(--font-kr);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.btn-clear-notifications {
+  background: transparent;
+  border: none;
+  color: var(--accent-purple);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-kr);
+}
+
+.btn-clear-notifications:hover {
+  text-decoration: underline;
+}
+
+.dropdown-body {
+  overflow-y: auto;
+  flex: 1;
+  max-height: 330px;
+}
+
+.notification-empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-family: var(--font-kr);
+}
+
+.notification-item {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(184, 134, 11, 0.08);
+  transition: background var(--transition-fast);
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}
+
+.notification-item.unread {
+  background: rgba(184, 134, 11, 0.04);
+  border-left: 3px solid var(--accent-purple);
+}
+
+.notification-item.read {
+  opacity: 0.85;
+}
+
+.notification-content {
+  font-family: var(--font-kr);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.notification-item.unread .notification-content {
+  font-weight: 600;
+}
+
+.notification-time {
+  font-family: var(--font-en);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.3rem;
+}
+
+/* Hide navigation bar and other duplicate headers when running in mobile app container */
+.mobile-app .desktop-nav {
+  display: none !important;
+}
+
+/* Hybrid Grid & Tabbed View Layout */
+.dashboard-grid-container {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 2rem;
+  width: 100%;
+}
+
+.dashboard-grid-left, .dashboard-grid-right {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+/* On desktop web, all three view containers are visible simultaneously */
+body:not(.mobile-app) #dashboardView,
+body:not(.mobile-app) #attendanceView,
+body:not(.mobile-app) #rankingView {
+  display: block !important;
+}
+
+/* On mobile app, disable grid layout and show only active view-container */
+body.mobile-app .dashboard-grid-container {
+  display: block !important;
+}
+
+body.mobile-app .dashboard-grid-left,
+body.mobile-app .dashboard-grid-right {
+  display: block !important;
+  gap: 0 !important;
+}
+
+/* Desktop navigation style corrections */
+body:not(.mobile-app) .desktop-nav {
+  display: none !important;
+}
+
+@media (max-width: 900px) {
+  .dashboard-grid-container {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}

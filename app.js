@@ -91,6 +91,11 @@ class SimonEduApp {
       });
     });
 
+    this.currentUserPreviousRank = null;
+    if (this.isMobileApp) {
+      document.body.classList.add('mobile-app');
+    }
+
     // Initialize database listener
     this.initDatabase();
 
@@ -102,6 +107,13 @@ class SimonEduApp {
             if (docSnap.exists) {
               this.currentUser = docSnap.data();
               this.renderAppForUser();
+              
+              if (this.isMobileApp && window.MobileAppChannel) {
+                window.MobileAppChannel.postMessage(JSON.stringify({
+                  event: 'login',
+                  role: this.currentUser.role || 'user'
+                }));
+              }
             } else {
               this.logout();
             }
@@ -116,9 +128,22 @@ class SimonEduApp {
         if (userNav) userNav.style.display = 'none';
         const btnNavAdmin = document.getElementById('btnNavAdmin');
         if (btnNavAdmin) btnNavAdmin.style.display = 'none';
+        const desktopNav = document.getElementById('desktopNav');
+        if (desktopNav) desktopNav.style.display = 'none';
+        
+        if (this.isMobileApp && window.MobileAppChannel) {
+          window.MobileAppChannel.postMessage(JSON.stringify({
+            event: 'logout'
+          }));
+        }
+        
         this.switchView('auth');
       }
     });
+  }
+
+  get isMobileApp() {
+    return typeof window.MobileAppChannel !== 'undefined' || typeof window.Vibration !== 'undefined';
   }
 
   // 1. Database Initialization & Cloud Firestore real-time listener
@@ -136,6 +161,7 @@ class SimonEduApp {
           this.currentUser = freshUser;
           const navPoints = document.getElementById('navPoints');
           if (navPoints) navPoints.textContent = this.currentUser.points;
+          this.renderNotifications();
         }
       }
 
@@ -600,6 +626,33 @@ class SimonEduApp {
 
   // 4. View Router & Screen Renders
   switchView(viewName) {
+    if (!this.isMobileApp && ['dashboard', 'attendance', 'ranking'].includes(viewName)) {
+      // Load view data
+      if (viewName === 'dashboard') {
+        this.renderDashboard();
+      } else if (viewName === 'attendance') {
+        this.renderAttendanceWidget();
+      } else if (viewName === 'ranking') {
+        this.renderLeaderboardWidget();
+      }
+
+      // Smooth scroll to target view
+      const targetEl = document.getElementById(viewName + 'View');
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
+      // Update active tab in desktop nav
+      document.querySelectorAll('.desktop-nav-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      const activeTab = document.getElementById('navTab' + viewName.charAt(0).toUpperCase() + viewName.slice(1));
+      if (activeTab) {
+        activeTab.classList.add('active');
+      }
+      return;
+    }
+
     // Hide all views
     const containers = document.querySelectorAll('.view-container');
     containers.forEach(c => c.classList.remove('active'));
@@ -613,8 +666,29 @@ class SimonEduApp {
     // Load matching view data
     if (viewName === 'dashboard') {
       this.renderDashboard();
+    } else if (viewName === 'attendance') {
+      this.renderAttendanceWidget();
+    } else if (viewName === 'ranking') {
+      this.renderLeaderboardWidget();
     } else if (viewName === 'admin') {
       this.renderAdmin();
+    }
+
+    // Notify Flutter of view change
+    if (this.isMobileApp && window.MobileAppChannel) {
+      window.MobileAppChannel.postMessage(JSON.stringify({
+        event: 'view_changed',
+        view: viewName
+      }));
+    }
+
+    // Update active tab in desktop nav
+    document.querySelectorAll('.desktop-nav-item').forEach(item => {
+      item.classList.remove('active');
+    });
+    const activeTab = document.getElementById('navTab' + viewName.charAt(0).toUpperCase() + viewName.slice(1));
+    if (activeTab) {
+      activeTab.classList.add('active');
     }
   }
 
@@ -641,6 +715,16 @@ class SimonEduApp {
       }
     }
 
+    if (this.isMobileApp) {
+      document.body.classList.add('mobile-app');
+    }
+
+    const desktopNav = document.getElementById('desktopNav');
+    if (desktopNav) {
+      desktopNav.style.display = 'none';
+    }
+
+    this.renderNotifications();
     this.switchView('dashboard');
   }
 
@@ -998,6 +1082,16 @@ class SimonEduApp {
       const totalCount = sortedUsers.length;
       const rankPercentage = totalCount > 0 ? Math.round((myRank / totalCount) * 100) : 0;
 
+      // Rank monitoring congratulatory notification
+      if (this.currentUserPreviousRank !== undefined && this.currentUserPreviousRank !== null) {
+        if (myRank < this.currentUserPreviousRank) {
+          const oldRank = this.currentUserPreviousRank;
+          this.currentUserPreviousRank = myRank;
+          this.addNotification(`👑 축하합니다! 실시간 랭킹이 ${oldRank - myRank}등 상승하여 현재 ${myRank}위입니다!`);
+        }
+      }
+      this.currentUserPreviousRank = myRank;
+
       // Update rank summary badge
       const rankTextEl = document.getElementById('userRankingText');
       if (rankTextEl) rankTextEl.textContent = `현재 ${myRank}위입니다!`;
@@ -1142,9 +1236,114 @@ class SimonEduApp {
 
   // 6. Points system
   addPoints(userId, amount) {
+    const newNotification = {
+      id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      message: `🎁 관리자 보너스 +${amount}P`,
+      timestamp: Date.now(),
+      read: false
+    };
     db.collection('users').doc(userId).update({
-      points: firebase.firestore.FieldValue.increment(amount)
+      points: firebase.firestore.FieldValue.increment(amount),
+      notifications: firebase.firestore.FieldValue.arrayUnion(newNotification)
     }).catch(err => console.error("Error adding points:", err));
+  }
+
+  addNotification(message) {
+    if (!this.currentUser) return;
+    const newNotification = {
+      id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      message: message,
+      timestamp: Date.now(),
+      read: false
+    };
+    db.collection('users').doc(this.currentUser.id).update({
+      notifications: firebase.firestore.FieldValue.arrayUnion(newNotification)
+    }).catch(err => console.error("Error adding notification:", err));
+  }
+
+  toggleNotifications(event) {
+    if (event) event.stopPropagation();
+    const dropdown = document.getElementById('notificationDropdown');
+    if (!dropdown) return;
+    const isVisible = dropdown.style.display === 'block';
+    dropdown.style.display = isVisible ? 'none' : 'block';
+    
+    // Close dropdown when clicking outside
+    if (!isVisible) {
+      const closeDropdown = (e) => {
+        dropdown.style.display = 'none';
+        document.removeEventListener('click', closeDropdown);
+      };
+      setTimeout(() => {
+        document.addEventListener('click', closeDropdown);
+      }, 0);
+    }
+  }
+
+  clearNotifications(event) {
+    if (event) event.stopPropagation();
+    if (!this.currentUser) return;
+    
+    const notifications = this.currentUser.notifications || [];
+    const updatedNotifications = notifications.map(n => ({ ...n, read: true }));
+    
+    db.collection('users').doc(this.currentUser.id).update({
+      notifications: updatedNotifications
+    }).then(() => {
+      this.renderNotifications();
+    }).catch(err => console.error("Error clearing notifications:", err));
+  }
+
+  renderNotifications() {
+    if (!this.currentUser) return;
+    
+    const notifications = this.currentUser.notifications || [];
+    const sortedNotifs = [...notifications].sort((a, b) => b.timestamp - a.timestamp);
+    
+    const unreadCount = sortedNotifs.filter(n => !n.read).length;
+    const badge = document.getElementById('notificationBadge');
+    if (badge) {
+      if (unreadCount > 0) {
+        badge.textContent = unreadCount;
+        badge.style.display = 'inline-flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+    
+    const list = document.getElementById('notificationList');
+    if (!list) return;
+    
+    if (sortedNotifs.length === 0) {
+      list.innerHTML = '<div class="notification-empty">새로운 알림이 없습니다.</div>';
+      return;
+    }
+    
+    list.innerHTML = '';
+    sortedNotifs.forEach(n => {
+      const item = document.createElement('div');
+      item.className = `notification-item ${n.read ? 'read' : 'unread'}`;
+      
+      const timeStr = this.formatRelativeTime(n.timestamp);
+      
+      item.innerHTML = `
+        <div class="notification-content">${n.message}</div>
+        <div class="notification-time">${timeStr}</div>
+      `;
+      list.appendChild(item);
+    });
+  }
+
+  formatRelativeTime(timestamp) {
+    const now = Date.now();
+    const diff = now - timestamp;
+    if (diff < 60000) return '방금 전';
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}분 전`;
+    const hours = Math.floor(diff / 3600000);
+    if (hours < 24) return `${hours}시간 전`;
+    const days = Math.floor(diff / 86400000);
+    return `${days}일 전`;
   }
 
   // Point float popups on UI
@@ -1244,11 +1443,22 @@ class SimonEduApp {
     const { pointsAwarded, consecutiveCheckIns, gotBonus, bonusAmount } = checkInResult;
     let message = gotBonus ? `🎉 ${consecutiveCheckIns}일 연속 출석 달성! 보너스 ${bonusAmount}P 지급!` : "일일 출석 완료!";
 
+    const notifMsg = gotBonus 
+      ? `📅 ${consecutiveCheckIns}일 연속 출석 보너스! +${pointsAwarded}P`
+      : `📅 일일 출석 완료! +${pointsAwarded}P`;
+    const newNotification = {
+      id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      message: notifMsg,
+      timestamp: Date.now(),
+      read: false
+    };
+
     db.collection('users').doc(this.currentUser.id).update({
       lastCheckInDate: todayStr,
       consecutiveCheckIns: consecutiveCheckIns,
       checkInHistory: firebase.firestore.FieldValue.arrayUnion(todayStr),
-      points: firebase.firestore.FieldValue.increment(pointsAwarded)
+      points: firebase.firestore.FieldValue.increment(pointsAwarded),
+      notifications: firebase.firestore.FieldValue.arrayUnion(newNotification)
     }).then(() => {
       this.showPointsFloater(pointsAwarded, message);
       this.playConfetti('checkin');
@@ -1550,17 +1760,26 @@ class SimonEduApp {
     const checkInResult = this.calculateCheckInReward();
     const nextVerseIndex = this.currentUser.currentVerseIndex + 1;
 
+    const totalEarned = totalAward + (checkInResult ? checkInResult.pointsAwarded : 0);
+    const newNotification = {
+      id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      message: `📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 성공! +${totalEarned}P 적립`,
+      timestamp: Date.now(),
+      read: false
+    };
+
     let updateData = {
       points: firebase.firestore.FieldValue.increment(totalAward),
       lastMissionDate: todayStr,
-      currentVerseIndex: nextVerseIndex
+      currentVerseIndex: nextVerseIndex,
+      notifications: firebase.firestore.FieldValue.arrayUnion(newNotification)
     };
 
     if (checkInResult) {
       updateData.lastCheckInDate = todayStr;
       updateData.consecutiveCheckIns = checkInResult.consecutiveCheckIns;
       updateData.checkInHistory = firebase.firestore.FieldValue.arrayUnion(todayStr);
-      updateData.points = firebase.firestore.FieldValue.increment(totalAward + checkInResult.pointsAwarded);
+      updateData.points = firebase.firestore.FieldValue.increment(totalEarned);
     }
 
     db.collection('users').doc(this.currentUser.id).update(updateData).then(() => {
@@ -1800,8 +2019,16 @@ class SimonEduApp {
   demoAddPointsToMe(pts) {
     if (!this.currentUser) return;
     
+    const newNotification = {
+      id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      message: `🎁 시뮬레이터 치트 작동! +${pts}P`,
+      timestamp: Date.now(),
+      read: false
+    };
+
     db.collection('users').doc(this.currentUser.id).update({
-      points: firebase.firestore.FieldValue.increment(pts)
+      points: firebase.firestore.FieldValue.increment(pts),
+      notifications: firebase.firestore.FieldValue.arrayUnion(newNotification)
     }).then(() => {
       this.showPointsFloater(pts, "시뮬레이터 치트 작동!");
     }).catch(err => console.error(err));
@@ -1876,6 +2103,18 @@ window.handleDeepLink = function(urlOrPath) {
   } else if (path === 'dashboard') {
     if (window.app.currentUser) {
       window.app.switchView('dashboard');
+    } else {
+      window.app.switchView('auth');
+    }
+  } else if (path === 'attendance') {
+    if (window.app.currentUser) {
+      window.app.switchView('attendance');
+    } else {
+      window.app.switchView('auth');
+    }
+  } else if (path === 'ranking') {
+    if (window.app.currentUser) {
+      window.app.switchView('ranking');
     } else {
       window.app.switchView('auth');
     }

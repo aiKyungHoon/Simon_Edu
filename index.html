@@ -7,13 +7,13 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.3.0">
+  <link rel="stylesheet" href="style.css?v=1.3.3">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
   <script>
     (function() {
-      const APP_VER = '1.3.0';
+      const APP_VER = '1.3.3';
       if (localStorage.getItem('app_version') !== APP_VER) {
         localStorage.setItem('app_version', APP_VER);
         if ('caches' in window) {
@@ -40,6 +40,13 @@
       Simon<span>Edu</span>
     </div>
     
+    <!-- Desktop Navigation Menu (Hidden inside Mobile App) -->
+    <nav class="desktop-nav" id="desktopNav" style="display: none;">
+      <button class="desktop-nav-item active" id="navTabDashboard" onclick="app.switchView('dashboard')">오늘의 말씀</button>
+      <button class="desktop-nav-item" id="navTabAttendance" onclick="app.switchView('attendance')">출석체크</button>
+      <button class="desktop-nav-item" id="navTabRanking" onclick="app.switchView('ranking')">명예의 전당</button>
+    </nav>
+
     <!-- Theme Switcher -->
     <div class="theme-switcher" id="themeSwitcher">
         <span class="theme-label">테마</span>
@@ -56,6 +63,24 @@
         <span class="material-icons-round" style="font-size: 1rem; vertical-align: middle; margin-right: 2px;">admin_panel_settings</span>
         관리자 모드
       </button>
+      
+      <!-- Notification Bell -->
+      <div class="nav-notification-bell-container" id="navNotificationBellContainer">
+        <button class="btn-notification-bell" id="btnNotificationBell" onclick="app.toggleNotifications(event)">
+          <span class="material-icons-round">notifications</span>
+          <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+        </button>
+        <div class="notification-dropdown glass-panel" id="notificationDropdown" style="display: none;" onclick="event.stopPropagation()">
+          <div class="dropdown-header">
+            <span>실시간 알림</span>
+            <button class="btn-clear-notifications" onclick="app.clearNotifications(event)">모두 읽음</button>
+          </div>
+          <div class="dropdown-body" id="notificationList">
+            <div class="notification-empty">새로운 알림이 없습니다.</div>
+          </div>
+        </div>
+      </div>
+
       <div class="nav-point-badge">
         <span class="material-icons-round" style="font-size: 1.1rem; color: #f59e0b;">monetization_on</span>
         <span id="navPoints">0</span> P
@@ -112,178 +137,181 @@
       </div>
     </div>
 
-    <!-- 3. Dashboard View (Main Dashboard) -->
-    <div id="dashboardView" class="view-container">
-      <div class="dashboard-grid">
-        
-        <!-- Left Side: Mission & Attendance -->
-        <div class="dashboard-left">
-          
-          <!-- Daily Mission Card -->
-          <div class="dashboard-card glass-panel">
-            <div class="card-title">
-              <span class="material-icons-round" style="color: var(--accent-purple);">emoji_events</span>
-              오늘의 말씀 암송 미션
+    <!-- 3. Dashboard View (Main Dashboard / Daily Mission Only) -->
+    <div class="dashboard-grid-container">
+      <div class="dashboard-grid-left">
+        <div id="dashboardView" class="view-container">
+      <div class="dashboard-single-container">
+        <!-- Daily Mission Card -->
+        <div class="dashboard-card glass-panel">
+          <div class="card-title">
+            <span class="material-icons-round" style="color: var(--accent-purple);">emoji_events</span>
+            오늘의 말씀 암송 미션
+          </div>
+          <div class="mission-progress-container">
+            <!-- Circle Progress Bar -->
+            <div class="circular-progress">
+              <svg>
+                <defs>
+                  <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="var(--accent-purple)" />
+                    <stop offset="100%" stop-color="var(--accent-blue)" />
+                  </linearGradient>
+                </defs>
+                <circle class="circle-bg" cx="60" cy="60" r="45"></circle>
+                <circle class="circle-progress" id="missionCircle" cx="60" cy="60" r="45"></circle>
+              </svg>
+              <div class="progress-text">
+                <div class="progress-number" id="progressPct">0%</div>
+                <div class="progress-label">달성도</div>
+              </div>
             </div>
-            <div class="mission-progress-container">
-              <!-- Circle Progress Bar -->
-              <div class="circular-progress">
-                <svg>
-                  <defs>
-                    <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stop-color="var(--accent-purple)" />
-                      <stop offset="100%" stop-color="var(--accent-blue)" />
-                    </linearGradient>
-                  </defs>
-                  <circle class="circle-bg" cx="60" cy="60" r="45"></circle>
-                  <circle class="circle-progress" id="missionCircle" cx="60" cy="60" r="45"></circle>
-                </svg>
-                <div class="progress-text">
-                  <div class="progress-number" id="progressPct">0%</div>
-                  <div class="progress-label">달성도</div>
+            
+            <!-- Mission Info -->
+            <div class="mission-details">
+              <h3 id="currentVerseTitle">요한계시록 1장 1절</h3>
+              <p id="currentVersePreview">"이 일 후에 내가 네 천사가 땅 네 모퉁이에 선 것을 보니..."</p>
+              <div class="mission-action-group" style="display: flex; flex-direction: column; gap: 1rem; align-items: flex-start; width: 100%;">
+                <button class="btn-start-mission" onclick="app.startMission()">
+                  암송 챌린지 시작
+                  <span class="material-icons-round">play_arrow</span>
+                </button>
+                <div class="test-mode-section" style="border-top: 1px dashed var(--glass-border); padding-top: 1rem; width: 100%; margin-top: 0.5rem;">
+                  <div style="font-size: 0.85rem; font-weight: bold; color: var(--text-secondary); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.25rem;">
+                    <span class="material-icons-round" style="font-size: 1.1rem; color: var(--accent-amber);">science</span>
+                    말씀 암송 테스트 모드 (점수 미지급)
+                  </div>
+                  <div style="display: flex; gap: 0.5rem; align-items: center; width: 100%; max-width: 320px;">
+                    <select id="testVerseSelect" style="flex: 1; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--glass-border); background: var(--glass-bg); color: var(--text-primary); font-weight: bold; font-family: var(--font-kr); outline: none; cursor: pointer; height: 38px;">
+                      <!-- JS dynamic generation -->
+                    </select>
+                    <button onclick="app.startTestMode()" style="background: linear-gradient(135deg, var(--accent-amber), #d97706); color: white; border: none; padding: 0 1.2rem; border-radius: 8px; font-weight: 700; height: 38px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; font-family: var(--font-kr); font-size: 0.9rem; transition: all var(--transition-fast); box-shadow: var(--accent-amber-glow) 0 4px 10px; flex-shrink: 0;">
+                      테스트 시작 <span class="material-icons-round" style="font-size: 1rem;">quiz</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3.2. Attendance View -->
+    <div id="attendanceView" class="view-container">
+      <div class="dashboard-single-container">
+        <!-- Attendance Card -->
+        <div class="dashboard-card glass-panel">
+          <div class="card-title" style="margin-bottom: 1rem;">
+            <span class="material-icons-round" style="color: #10b981;">event_available</span>
+            출석 체크 챌린지
+          </div>
+          <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">
+            매일 출석 시 10P 지급! <strong>5일(150P) / 10일(200P) / 15일(250P) / 30일(300P)</strong> 연속 출석 시 보너스를 드립니다.
+          </p>
+          <!-- Calendar Container -->
+          <div class="calendar-widget">
+            <div class="calendar-header">
+              <button class="calendar-nav-btn" onclick="app.changeCalendarMonth(-1)">
+                <span class="material-icons-round">chevron_left</span>
+              </button>
+              <div class="calendar-title" id="calendarTitle">2026년 5월</div>
+              <button class="calendar-nav-btn" onclick="app.changeCalendarMonth(1)">
+                <span class="material-icons-round">chevron_right</span>
+              </button>
+            </div>
+            <div class="calendar-weekdays">
+              <div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div>
+            </div>
+            <div class="calendar-grid" id="calendarGrid">
+              <!-- JS dynamic generation -->
+            </div>
+            <div class="streak-status-container">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; width: 100%;">
+                <span class="streak-text" id="streakText">현재 0일 연속 출석 중! 🔥</span>
+                <span class="streak-text" id="cumulativeText" title="클릭하여 상세 출석 기록 보기" onclick="app.toggleAttendanceHistory()">총 누적 출석: 0일 📅</span>
+              </div>
+              <div class="streak-progress-wrapper">
+                <div class="streak-progress-track">
+                  <div class="streak-progress-bar" id="streakProgressBar"></div>
+                  
+                  <div class="streak-milestone" style="left: 16.67%;" id="milestone-5">
+                    <div class="milestone-dot"></div>
+                    <div class="milestone-label">5일<br>+150P</div>
+                  </div>
+                  <div class="streak-milestone" style="left: 33.33%;" id="milestone-10">
+                    <div class="milestone-dot"></div>
+                    <div class="milestone-label">10일<br>+200P</div>
+                  </div>
+                  <div class="streak-milestone" style="left: 50.00%;" id="milestone-15">
+                    <div class="milestone-dot"></div>
+                    <div class="milestone-label">15일<br>+250P</div>
+                  </div>
+                  <div class="streak-milestone" style="left: 100.00%;" id="milestone-30">
+                    <div class="milestone-dot"></div>
+                    <div class="milestone-label">30일<br>+300P</div>
+                  </div>
                 </div>
               </div>
               
-              <!-- Mission Info -->
-              <div class="mission-details">
-                <h3 id="currentVerseTitle">요한계시록 1장 1절</h3>
-                <p id="currentVersePreview">"이 일 후에 내가 네 천사가 땅 네 모퉁이에 선 것을 보니..."</p>
-                <div class="mission-action-group" style="display: flex; flex-direction: column; gap: 1rem; align-items: flex-start; width: 100%;">
-                  <button class="btn-start-mission" onclick="app.startMission()">
-                    암송 챌린지 시작
-                    <span class="material-icons-round">play_arrow</span>
+              <!-- Cumulative Check-in History Logs -->
+              <div class="attendance-history-section" id="attendanceHistorySection" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                  <span style="font-size: 0.85rem; font-weight: bold; color: var(--text-secondary); display: flex; align-items: center; gap: 0.25rem;">
+                    <span class="material-icons-round" style="font-size: 1.1rem; color: var(--accent-amber);">history</span>
+                    상세 출석 기록 (최근순)
+                  </span>
+                  <button onclick="app.toggleAttendanceHistory(false)" style="background: transparent; color: var(--text-muted); font-size: 0.8rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.1rem; font-family: var(--font-kr);">
+                    닫기 <span class="material-icons-round" style="font-size: 1.1rem;">expand_less</span>
                   </button>
-
-                  <div class="test-mode-section" style="border-top: 1px dashed var(--glass-border); padding-top: 1rem; width: 100%; margin-top: 0.5rem;">
-                    <div style="font-size: 0.85rem; font-weight: bold; color: var(--text-secondary); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.25rem;">
-                      <span class="material-icons-round" style="font-size: 1.1rem; color: var(--accent-amber);">science</span>
-                      말씀 암송 테스트 모드 (점수 미지급)
-                    </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center; width: 100%; max-width: 320px;">
-                      <select id="testVerseSelect" style="flex: 1; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--glass-border); background: var(--glass-bg); color: var(--text-primary); font-weight: bold; font-family: var(--font-kr); outline: none; cursor: pointer; height: 38px;">
-                        <!-- JS dynamic generation -->
-                      </select>
-                      <button onclick="app.startTestMode()" style="background: linear-gradient(135deg, var(--accent-amber), #d97706); color: white; border: none; padding: 0 1.2rem; border-radius: 8px; font-weight: 700; height: 38px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; font-family: var(--font-kr); font-size: 0.9rem; transition: all var(--transition-fast); box-shadow: var(--accent-amber-glow) 0 4px 10px; flex-shrink: 0;">
-                        테스트 시작 <span class="material-icons-round" style="font-size: 1rem;">quiz</span>
-                      </button>
-                    </div>
-                  </div>
+                </div>
+                <div class="attendance-history-list" id="attendanceHistoryList">
+                  <!-- Dynamically populated dates -->
                 </div>
               </div>
             </div>
           </div>
-          
-          <!-- Attendance Card -->
-          <div class="dashboard-card glass-panel">
-            <div class="card-title" style="margin-bottom: 1rem;">
-              <span class="material-icons-round" style="color: #10b981;">event_available</span>
-              출석 체크 챌린지
-            </div>
-            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">
-              매일 출석 시 10P 지급! <strong>5일(150P) / 10일(200P) / 15일(250P) / 30일(300P)</strong> 연속 출석 시 보너스를 드립니다.
-            </p>
-            <!-- Calendar Container instead of simple Grid -->
-            <div class="calendar-widget">
-              <div class="calendar-header">
-                <button class="calendar-nav-btn" onclick="app.changeCalendarMonth(-1)">
-                  <span class="material-icons-round">chevron_left</span>
-                </button>
-                <div class="calendar-title" id="calendarTitle">2026년 5월</div>
-                <button class="calendar-nav-btn" onclick="app.changeCalendarMonth(1)">
-                  <span class="material-icons-round">chevron_right</span>
-                </button>
-              </div>
-              <div class="calendar-weekdays">
-                <div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div>
-              </div>
-              <div class="calendar-grid" id="calendarGrid">
-                <!-- JS dynamic generation -->
-              </div>
-              <div class="streak-status-container">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; width: 100%;">
-                  <span class="streak-text" id="streakText">현재 0일 연속 출석 중! 🔥</span>
-                  <span class="streak-text" id="cumulativeText" title="클릭하여 상세 출석 기록 보기" onclick="app.toggleAttendanceHistory()">총 누적 출석: 0일 📅</span>
-                </div>
-                <div class="streak-progress-wrapper">
-                  <div class="streak-progress-track">
-                    <div class="streak-progress-bar" id="streakProgressBar"></div>
-                    
-                    <div class="streak-milestone" style="left: 16.67%;" id="milestone-5">
-                      <div class="milestone-dot"></div>
-                      <div class="milestone-label">5일<br>+150P</div>
-                    </div>
-                    <div class="streak-milestone" style="left: 33.33%;" id="milestone-10">
-                      <div class="milestone-dot"></div>
-                      <div class="milestone-label">10일<br>+200P</div>
-                    </div>
-                    <div class="streak-milestone" style="left: 50.00%;" id="milestone-15">
-                      <div class="milestone-dot"></div>
-                      <div class="milestone-label">15일<br>+250P</div>
-                    </div>
-                    <div class="streak-milestone" style="left: 100.00%;" id="milestone-30">
-                      <div class="milestone-dot"></div>
-                      <div class="milestone-label">30일<br>+300P</div>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- Cumulative Check-in History Logs -->
-                <div class="attendance-history-section" id="attendanceHistorySection" style="display: none;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                    <span style="font-size: 0.85rem; font-weight: bold; color: var(--text-secondary); display: flex; align-items: center; gap: 0.25rem;">
-                      <span class="material-icons-round" style="font-size: 1.1rem; color: var(--accent-amber);">history</span>
-                      상세 출석 기록 (최근순)
-                    </span>
-                    <button onclick="app.toggleAttendanceHistory(false)" style="background: transparent; color: var(--text-muted); font-size: 0.8rem; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.1rem; font-family: var(--font-kr);">
-                      닫기 <span class="material-icons-round" style="font-size: 1.1rem;">expand_less</span>
-                    </button>
-                  </div>
-                  <div class="attendance-history-list" id="attendanceHistoryList">
-                    <!-- Dynamically populated dates -->
-                  </div>
-                </div>
-              </div>
-            </div>
-            <button class="btn-attendance" id="btnAttendance" onclick="app.checkIn()">
-              <span class="material-icons-round">done_all</span>
-              오늘의 출석체크 하기
-            </button>
-          </div>
-          
+          <button class="btn-attendance" id="btnAttendance" onclick="app.checkIn()">
+            <span class="material-icons-round">done_all</span>
+            오늘의 출석체크 하기
+          </button>
         </div>
-
-        <!-- Right Side: Leaderboard & User rank status -->
-        <div class="dashboard-right">
-          
-          <!-- User Current Rank -->
-          <div class="user-rank-status glass-panel" onclick="app.openAllRankings()">
-            <p>실시간 나의 랭킹</p>
-            <h4 id="userRankingText">현재 - 위</h4>
-            <p id="userRankingPct">상위 -%</p>
-            <div class="rank-details-link" style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--accent-purple); display: flex; align-items: center; justify-content: center; gap: 4px; opacity: 0.8; font-weight: 500;">
-              <span>전체 랭킹 확인하기</span>
-              <span class="material-icons-round" style="font-size: 0.85rem;">chevron_right</span>
-            </div>
+      </div>
+    </div>
+      </div>
+      <div class="dashboard-grid-right">
+        <!-- 3.3. Ranking View -->
+        <div id="rankingView" class="view-container">
+      <div class="dashboard-single-container">
+        <!-- User Current Rank -->
+        <div class="user-rank-status glass-panel" onclick="app.openAllRankings()">
+          <p>실시간 나의 랭킹</p>
+          <h4 id="userRankingText">현재 - 위</h4>
+          <p id="userRankingPct">상위 -%</p>
+          <div class="rank-details-link" style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--accent-purple); display: flex; align-items: center; justify-content: center; gap: 4px; opacity: 0.8; font-weight: 500;">
+            <span>전체 랭킹 확인하기</span>
+            <span class="material-icons-round" style="font-size: 0.85rem;">chevron_right</span>
           </div>
-          
-          <!-- Leaderboard Card -->
-          <div class="dashboard-card glass-panel" style="padding: 1.5rem;">
-            <div class="ranking-widget-header">
-              <div class="card-title" style="margin-bottom: 0;">
-                <span class="material-icons-round" style="color: #f59e0b;">military_tech</span>
-                명예의 전당 (Top 10)
-              </div>
-            </div>
-            <div class="leaderboard-list" id="leaderboardList">
-              <!-- Dynamically populated leaderboard items -->
-            </div>
-            <button class="btn-all-rankings" onclick="app.openAllRankings()">
-              <span class="material-icons-round" style="font-size: 0.95rem;">list</span>
-              전체 랭킹 보기
-            </button>
-          </div>
-          
         </div>
+        
+        <!-- Leaderboard Card -->
+        <div class="dashboard-card glass-panel" style="padding: 1.5rem; margin-top: 1rem;">
+          <div class="ranking-widget-header">
+            <div class="card-title" style="margin-bottom: 0;">
+              <span class="material-icons-round" style="color: #f59e0b;">military_tech</span>
+              명예의 전당 (Top 10)
+            </div>
+          </div>
+          <div class="leaderboard-list" id="leaderboardList">
+            <!-- Dynamically populated leaderboard items -->
+          </div>
+          <button class="btn-all-rankings" onclick="app.openAllRankings()">
+            <span class="material-icons-round" style="font-size: 0.95rem;">list</span>
+            전체 랭킹 보기
+          </button>
+        </div>
+      </div>
+    </div>
       </div>
     </div>
 
