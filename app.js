@@ -106,6 +106,7 @@ class SimonEduApp {
           .then(docSnap => {
             if (docSnap.exists) {
               this.currentUser = docSnap.data();
+              document.body.classList.add('logged-in');
               this.renderAppForUser();
               
               if (this.isMobileApp && window.MobileAppChannel) {
@@ -115,15 +116,18 @@ class SimonEduApp {
                 }));
               }
             } else {
+              document.body.classList.remove('logged-in');
               this.logout();
             }
           })
           .catch(err => {
             console.error("Error loading user profile:", err);
+            document.body.classList.remove('logged-in');
             this.logout();
           });
       } else {
         this.currentUser = null;
+        document.body.classList.remove('logged-in');
         const userNav = document.getElementById('userNav');
         if (userNav) userNav.style.display = 'none';
         const btnNavAdmin = document.getElementById('btnNavAdmin');
@@ -626,7 +630,22 @@ class SimonEduApp {
 
   // 4. View Router & Screen Renders
   switchView(viewName) {
+    const gridContainer = document.querySelector('.dashboard-grid-container');
+    if (gridContainer) {
+      if (['dashboard', 'attendance', 'ranking'].includes(viewName)) {
+        gridContainer.style.display = '';
+      } else {
+        gridContainer.style.display = 'none';
+      }
+    }
+
     if (!this.isMobileApp && ['dashboard', 'attendance', 'ranking'].includes(viewName)) {
+      // Hide auth, game, and admin views on desktop web
+      ['auth', 'game', 'admin'].forEach(v => {
+        const el = document.getElementById(v + 'View');
+        if (el) el.classList.remove('active');
+      });
+
       // Load view data
       if (viewName === 'dashboard') {
         this.renderDashboard();

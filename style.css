@@ -1982,15 +1982,15 @@ footer {
   width: 100%;
 }
 
-/* On desktop web, all three view containers are visible simultaneously */
-body:not(.mobile-app) #dashboardView,
-body:not(.mobile-app) #attendanceView,
-body:not(.mobile-app) #rankingView {
+/* On desktop web, all three view containers are visible simultaneously when logged in */
+body.logged-in:not(.mobile-app) #dashboardView,
+body.logged-in:not(.mobile-app) #attendanceView,
+body.logged-in:not(.mobile-app) #rankingView {
   display: block !important;
 }
 
-/* On mobile app, disable grid layout and show only active view-container */
-body.mobile-app .dashboard-grid-container {
+/* On mobile app, disable grid layout and show only active view-container when logged in */
+body.mobile-app.logged-in .dashboard-grid-container {
   display: block !important;
 }
 
