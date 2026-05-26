@@ -7,13 +7,13 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.3.5">
+  <link rel="stylesheet" href="style.css?v=1.3.6">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
   <script>
     (function() {
-      const APP_VER = '1.3.5';
+      const APP_VER = '1.3.6';
       if (localStorage.getItem('app_version') !== APP_VER) {
         localStorage.setItem('app_version', APP_VER);
         if ('caches' in window) {
@@ -35,61 +35,74 @@
 
   <!-- 1. Header Bar -->
   <header>
-    <div class="logo">
-      <span class="material-icons-round" style="color: var(--accent-purple); font-size: 2rem;">auto_stories</span>
-      Simon<span>Edu</span>
+    <div class="header-left">
+      <div class="logo">
+        <span class="material-icons-round" style="color: var(--accent-purple); font-size: 1.8rem;">auto_stories</span>
+        Simon<span>Edu</span>
+      </div>
     </div>
     
-    <!-- Desktop Navigation Menu (Hidden inside Mobile App) -->
+    <!-- Desktop Navigation Menu (Hidden) -->
     <nav class="desktop-nav" id="desktopNav" style="display: none;">
       <button class="desktop-nav-item active" id="navTabDashboard" onclick="app.switchView('dashboard')">오늘의 말씀</button>
       <button class="desktop-nav-item" id="navTabAttendance" onclick="app.switchView('attendance')">출석체크</button>
       <button class="desktop-nav-item" id="navTabRanking" onclick="app.switchView('ranking')">명예의 전당</button>
     </nav>
 
-    <!-- Theme Switcher -->
-    <div class="theme-switcher" id="themeSwitcher">
-        <span class="theme-label">테마</span>
-        <button class="theme-btn" data-theme="gold" title="황금" style="background: linear-gradient(135deg, #ffd700, #b8860b);"></button>
-        <button class="theme-btn" data-theme="dark" title="다크" style="background: linear-gradient(135deg, #6366f1, #0f172a);"></button>
-        <button class="theme-btn" data-theme="dreamy" title="드리미" style="background: linear-gradient(135deg, #a78bfa, #f9a8d4);"></button>
-        <button class="theme-btn" data-theme="ocean" title="오션" style="background: linear-gradient(135deg, #38bdf8, #06b6d4);"></button>
-        <button class="theme-btn" data-theme="cherry" title="청대벗꽃" style="background: linear-gradient(135deg, #fb7185, #fda4af);"></button>
-    </div>
-    
-    <!-- User Navigation (Logged In Only) -->
-    <div class="user-nav" id="userNav" style="display: none;">
-      <button class="btn-nav-admin" id="btnNavAdmin" style="display: none;" onclick="app.switchView('admin')">
-        <span class="material-icons-round" style="font-size: 1rem; vertical-align: middle; margin-right: 2px;">admin_panel_settings</span>
-        관리자 모드
-      </button>
-      
-      <!-- Notification Bell -->
-      <div class="nav-notification-bell-container" id="navNotificationBellContainer">
-        <button class="btn-notification-bell" id="btnNotificationBell" onclick="app.toggleNotifications(event)">
-          <span class="material-icons-round">notifications</span>
-          <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+    <div class="header-right">
+      <!-- Theme Toggle -->
+      <div class="theme-toggle-container">
+        <button class="btn-icon-action" onclick="app.toggleThemeSwitcher(event)" title="테마 변경">
+          <span class="material-icons-round">palette</span>
         </button>
-        <div class="notification-dropdown glass-panel" id="notificationDropdown" style="display: none;" onclick="event.stopPropagation()">
-          <div class="dropdown-header">
-            <span>실시간 알림</span>
-            <button class="btn-clear-notifications" onclick="app.clearNotifications(event)">모두 읽음</button>
-          </div>
-          <div class="dropdown-body" id="notificationList">
-            <div class="notification-empty">새로운 알림이 없습니다.</div>
-          </div>
+        <div class="theme-switcher" id="themeSwitcher">
+          <button class="theme-btn" data-theme="gold" title="황금" style="background: linear-gradient(135deg, #ffd700, #b8860b);"></button>
+          <button class="theme-btn" data-theme="dark" title="다크" style="background: linear-gradient(135deg, #6366f1, #0f172a);"></button>
+          <button class="theme-btn" data-theme="dreamy" title="드리미" style="background: linear-gradient(135deg, #a78bfa, #f9a8d4);"></button>
+          <button class="theme-btn" data-theme="ocean" title="오션" style="background: linear-gradient(135deg, #38bdf8, #06b6d4);"></button>
+          <button class="theme-btn" data-theme="cherry" title="벚꽃" style="background: linear-gradient(135deg, #fb7185, #fda4af);"></button>
         </div>
       </div>
+      
+      <!-- User Navigation (Logged In Only) -->
+      <div class="user-nav" id="userNav" style="display: none;">
+        <button class="btn-nav-admin" id="btnNavAdmin" style="display: none;" onclick="app.switchView('admin')">
+          <span class="material-icons-round" style="font-size: 1rem; vertical-align: middle; margin-right: 2px;">admin_panel_settings</span>
+          관리자 모드
+        </button>
 
-      <div class="nav-point-badge">
-        <span class="material-icons-round" style="font-size: 1.1rem; color: #f59e0b;">monetization_on</span>
-        <span id="navPoints">0</span> P
+        <!-- Refresh Button -->
+        <button class="btn-icon-action" onclick="window.location.reload()" title="새로고침">
+          <span class="material-icons-round">refresh</span>
+        </button>
+        
+        <!-- Notification Bell -->
+        <div class="nav-notification-bell-container" id="navNotificationBellContainer">
+          <button class="btn-notification-bell" id="btnNotificationBell" onclick="app.toggleNotifications(event)">
+            <span class="material-icons-round">notifications</span>
+            <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+          </button>
+          <div class="notification-dropdown glass-panel" id="notificationDropdown" style="display: none;" onclick="event.stopPropagation()">
+            <div class="dropdown-header">
+              <span>실시간 알림</span>
+              <button class="btn-clear-notifications" onclick="app.clearNotifications(event)">모두 읽음</button>
+            </div>
+            <div class="dropdown-body" id="notificationList">
+              <div class="notification-empty">새로운 알림이 없습니다.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-point-badge">
+          <span class="material-icons-round" style="font-size: 1.1rem; color: #f59e0b;">monetization_on</span>
+          <span id="navPoints">0</span> P
+        </div>
+        <div class="nav-user-info">
+          <div class="user-avatar" id="navAvatar">U</div>
+          <span id="navUsername" style="font-weight: 600; font-size: 0.95rem;">사용자</span>
+        </div>
+        <button class="btn-logout" onclick="app.logout()">로그아웃</button>
       </div>
-      <div class="nav-user-info">
-        <div class="user-avatar" id="navAvatar">U</div>
-        <span id="navUsername" style="font-weight: 600; font-size: 0.95rem;">사용자</span>
-      </div>
-      <button class="btn-logout" onclick="app.logout()">로그아웃</button>
     </div>
   </header>
 

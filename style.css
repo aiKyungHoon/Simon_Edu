@@ -140,7 +140,7 @@ input {
 
 /* 4. App Structure & Views */
 header {
-  padding: 1.5rem 2rem;
+  padding: 1rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -151,11 +151,23 @@ header {
   position: sticky;
   top: 0;
   z-index: 100;
+  gap: 1rem;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .logo {
   font-family: var(--font-en);
-  font-size: 1.6rem;
+  font-size: 1.5rem;
   font-weight: 800;
   background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
   -webkit-background-clip: text;
@@ -173,7 +185,7 @@ header {
 .user-nav {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .nav-point-badge {
@@ -241,25 +253,61 @@ header {
   color: var(--text-primary);
 }
 
-/* Theme Selector Bar */
-.theme-switcher {
+/* Theme Selector Bar & Toggle Buttons */
+.theme-toggle-container {
+  position: relative;
+  display: inline-block;
+}
+
+.btn-icon-action {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.btn-icon-action:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-focus);
+  transform: scale(1.05);
+}
+
+.btn-icon-action span {
+  font-size: 1.25rem;
+}
+
+.theme-switcher {
+  position: absolute;
+  top: 45px;
+  right: 0;
+  display: none;
+  align-items: center;
   gap: 0.5rem;
-  margin-left: auto;
-  margin-right: 1rem;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   border-radius: 999px;
-  padding: 0.35rem 0.75rem;
+  padding: 0.4rem 0.6rem;
+  z-index: 1001;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  animation: dropdownFadeIn 0.2s ease-out;
+}
+
+.theme-switcher.expanded {
+  display: flex !important;
 }
 
 .theme-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-secondary);
-  margin-right: 0.15rem;
-  white-space: nowrap;
+  display: none !important;
 }
 
 .theme-btn {
@@ -1629,67 +1677,54 @@ footer {
 
 @media (max-width: 600px) {
   header {
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 0.8rem;
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     justify-content: space-between;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
   }
 
   .logo {
-    font-size: 1.25rem;
-    order: 1;
+    font-size: 1.15rem;
+    gap: 0.25rem;
   }
 
-  .theme-switcher {
-    order: 2;
-    margin-left: auto;
-    margin-right: 0;
-    padding: 0.25rem 0.5rem;
-    gap: 0.35rem;
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 999px;
+  .logo span {
+    display: none; /* Hide 'Edu' to save space */
   }
 
-  .theme-label {
-    display: none; /* 모바일에서 불필요한 테마 글자 레이블 숨김 */
-  }
-
-  .theme-btn {
-    width: 26px; /* 터치 영역 개선 */
-    height: 26px;
+  .header-right {
+    gap: 0.4rem;
   }
 
   .user-nav {
-    order: 3;
     gap: 0.4rem;
-    width: auto;
-    justify-content: flex-end;
   }
 
-  /* 로그인 상태 시 헤더 레이아웃 최적화 (has 선택기를 통해 userNav가 display none이 아닐 때 매칭) */
-  header:has(#userNav:not([style*="display: none"]):not([style*="display:none"])) .user-nav {
-    order: 2;
-    margin-left: auto;
+  #navUsername {
+    display: none !important; /* Hide username text to fit everything on one line */
   }
 
-  header:has(#userNav:not([style*="display: none"]):not([style*="display:none"])) .theme-switcher {
-    order: 3;
-    width: 100%;
-    justify-content: center;
-    margin-top: 0.25rem;
+  .btn-icon-action,
+  .btn-notification-bell {
+    width: 32px;
+    height: 32px;
+  }
+
+  .btn-icon-action span,
+  .btn-notification-bell span {
+    font-size: 1.15rem;
+  }
+
+  .nav-point-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.45rem;
+    gap: 2px;
   }
 
   .nav-user-info {
-    gap: 0.4rem;
-    white-space: nowrap;
-  }
-
-  .nav-point-badge, .btn-nav-admin, .btn-logout {
-    font-size: 0.75rem;
-    padding: 0.35rem 0.55rem;
-    white-space: nowrap;
+    gap: 0;
   }
 
   .user-avatar {
@@ -1697,6 +1732,23 @@ footer {
     height: 26px;
     font-size: 0.75rem;
   }
+
+  .btn-logout, .btn-nav-admin {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.45rem;
+    border-radius: 6px;
+  }
+
+  .theme-switcher {
+    top: 40px;
+    padding: 0.3rem 0.5rem;
+  }
+
+  .theme-btn {
+    width: 20px;
+    height: 20px;
+  }
+}
 
   /* 입력 필드 iOS 자동 줌(Auto-zoom) 방지 (16px/1rem 이상 필수) */
   .input-field {

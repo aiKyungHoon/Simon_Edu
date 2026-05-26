@@ -88,6 +88,8 @@ class SimonEduApp {
     document.querySelectorAll('.theme-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         this.setTheme(btn.dataset.theme);
+        const switcher = document.getElementById('themeSwitcher');
+        if (switcher) switcher.classList.remove('expanded');
       });
     });
 
@@ -1309,6 +1311,29 @@ class SimonEduApp {
       };
       setTimeout(() => {
         document.addEventListener('click', closeDropdown);
+      }, 0);
+    }
+  }
+
+  toggleThemeSwitcher(event) {
+    if (event) event.stopPropagation();
+    const switcher = document.getElementById('themeSwitcher');
+    if (!switcher) return;
+    const isExpanded = switcher.classList.contains('expanded');
+    
+    if (isExpanded) {
+      switcher.classList.remove('expanded');
+    } else {
+      switcher.classList.add('expanded');
+      // Close switcher when clicking outside
+      const closeSwitcher = (e) => {
+        if (!switcher.contains(e.target)) {
+          switcher.classList.remove('expanded');
+          document.removeEventListener('click', closeSwitcher);
+        }
+      };
+      setTimeout(() => {
+        document.addEventListener('click', closeSwitcher);
       }, 0);
     }
   }
