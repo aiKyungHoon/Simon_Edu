@@ -36,17 +36,18 @@ class _IntroOverlayState extends State<IntroOverlay> {
         });
         _videoController.play();
         _videoController.setPlaybackSpeed(1.5);
-        _videoController.setLooping(true);
+        _videoController.setLooping(false); // Do not loop, so it stops on the last frame (children & text)
 
-        // Listen for the first video completion to notify the parent screen
+        // Listen for the video completion to notify the parent screen
         bool hasCompletedOnce = false;
         _videoController.addListener(() {
           if (!mounted) return;
           final value = _videoController.value;
           if (value.isInitialized && 
-              value.position >= value.duration - const Duration(milliseconds: 200)) {
+              value.position >= value.duration - const Duration(milliseconds: 150)) {
             if (!hasCompletedOnce) {
               hasCompletedOnce = true;
+              debugPrint('Video Player marked as completed! position=${value.position}, duration=${value.duration}');
               widget.onVideoCompleted();
             }
           }
@@ -60,10 +61,7 @@ class _IntroOverlayState extends State<IntroOverlay> {
   @override
   void didUpdateWidget(covariant IntroOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.visible && !widget.visible) {
-      // Pause video when fade-out starts
-      _videoController.pause();
-    }
+    // Do not pause the video on fade-out so the final frames (children & text) stay visible as the screen transitions.
   }
 
   @override
@@ -95,8 +93,12 @@ class _IntroOverlayState extends State<IntroOverlay> {
                   child: FittedBox(
                     fit: BoxFit.cover,
                     child: SizedBox(
-                      width: _videoController.value.size.width,
-                      height: _videoController.value.size.height,
+                      width: _videoController.value.size.width > _videoController.value.size.height
+                          ? _videoController.value.size.height
+                          : _videoController.value.size.width,
+                      height: _videoController.value.size.width > _videoController.value.size.height
+                          ? _videoController.value.size.width
+                          : _videoController.value.size.height,
                       child: VideoPlayer(_videoController),
                     ),
                   ),

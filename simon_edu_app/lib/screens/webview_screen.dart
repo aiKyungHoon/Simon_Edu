@@ -44,7 +44,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
       _controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setBackgroundColor(const Color(0xFFFDF8E6))
-        ..clearCache()
         ..setNavigationDelegate(
           NavigationDelegate(
             onProgress: (int progress) {
@@ -535,10 +534,15 @@ class _WebViewScreenState extends State<WebViewScreen> {
               },
               onVideoCompleted: () {
                 if (mounted) {
-                  setState(() {
-                    _videoCompleted = true;
+                  // Wait for 2.0 seconds so the user can see the final branding scene (children & logo) before fading out
+                  Future.delayed(const Duration(milliseconds: 2000), () {
+                    if (mounted) {
+                      setState(() {
+                        _videoCompleted = true;
+                      });
+                      _checkIntroFinished();
+                    }
                   });
-                  _checkIntroFinished();
                 }
               },
             ),
