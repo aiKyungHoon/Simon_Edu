@@ -33,6 +33,7 @@ class _IntroOverlayState extends State<IntroOverlay> {
           _isControllerInitialized = true;
         });
         _videoController.play();
+        _videoController.setPlaybackSpeed(1.5);
         _videoController.setLooping(true);
       }
     }).catchError((error) {
