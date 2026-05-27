@@ -28,7 +28,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   bool _canGoForward = false;
   bool _showIntro = true;
   bool _introVisible = true;
-  bool _minIntroTimeElapsed = false;
+  bool _videoCompleted = false;
   int _currentIndex = 0;
   bool _isLoggedIn = false;
 
@@ -123,16 +123,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
         ..loadRequest(Uri.parse(_targetUrl));
 
       _initDeepLinking();
-
-      // Start 5-second minimum intro timer
-      Timer(const Duration(seconds: 5), () {
-        if (mounted) {
-          setState(() {
-            _minIntroTimeElapsed = true;
-          });
-          _checkIntroFinished();
-        }
-      });
     } else {
       // For Web platform (Chrome)
       _isLoading = false;
@@ -543,6 +533,14 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   }
                 }
               },
+              onVideoCompleted: () {
+                if (mounted) {
+                  setState(() {
+                    _videoCompleted = true;
+                  });
+                  _checkIntroFinished();
+                }
+              },
             ),
           ),
       ],
@@ -550,7 +548,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   }
 
   void _checkIntroFinished() {
-    if (_isPageFinished && _minIntroTimeElapsed) {
+    if (_isPageFinished && _videoCompleted) {
       if (mounted) {
         setState(() {
           _introVisible = false;

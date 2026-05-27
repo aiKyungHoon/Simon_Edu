@@ -6,6 +6,7 @@ class IntroOverlay extends StatefulWidget {
   final VoidCallback onFadeOutComplete;
   final bool isPageLoaded;
   final VoidCallback onSkip;
+  final VoidCallback onVideoCompleted;
 
   const IntroOverlay({
     super.key,
@@ -13,6 +14,7 @@ class IntroOverlay extends StatefulWidget {
     required this.onFadeOutComplete,
     required this.isPageLoaded,
     required this.onSkip,
+    required this.onVideoCompleted,
   });
 
   @override
@@ -35,6 +37,20 @@ class _IntroOverlayState extends State<IntroOverlay> {
         _videoController.play();
         _videoController.setPlaybackSpeed(1.5);
         _videoController.setLooping(true);
+
+        // Listen for the first video completion to notify the parent screen
+        bool hasCompletedOnce = false;
+        _videoController.addListener(() {
+          if (!mounted) return;
+          final value = _videoController.value;
+          if (value.isInitialized && 
+              value.position >= value.duration - const Duration(milliseconds: 200)) {
+            if (!hasCompletedOnce) {
+              hasCompletedOnce = true;
+              widget.onVideoCompleted();
+            }
+          }
+        });
       }
     }).catchError((error) {
       debugPrint('Error initializing video player: $error');
