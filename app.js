@@ -789,29 +789,6 @@ class SimonEduApp {
 
     this.renderNotifications();
     this.switchView('dashboard');
-
-    // Temporary test trigger for marketing push consent modal
-    if (!window.hasAutoRunTest) {
-      window.hasAutoRunTest = true;
-      setTimeout(() => {
-        console.log("Forcing pushEnabled: true in Firestore for current user...");
-        db.collection('users').doc(this.currentUser.id).update({
-          pushEnabled: true
-        }).then(() => {
-          console.log("Firestore updated, auto-switching to settings for testing...");
-          this.switchView('settings');
-          setTimeout(() => {
-            const toggleMarketing = document.getElementById('toggleMarketingPush');
-            if (toggleMarketing && !toggleMarketing.checked) {
-              console.log("Auto-clicking toggleMarketingPush for testing...");
-              toggleMarketing.click();
-            } else {
-              console.log("toggleMarketingPush not found or already checked", toggleMarketing);
-            }
-          }, 2000);
-        }).catch(err => console.error("Error setting pushEnabled: true:", err));
-      }, 5000);
-    }
   }
 
   // 5. Dashboard View Setup

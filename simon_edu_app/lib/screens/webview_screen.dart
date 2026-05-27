@@ -28,6 +28,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   bool _canGoForward = false;
   bool _showIntro = true;
   bool _introVisible = true;
+  bool _minIntroTimeElapsed = false;
   int _currentIndex = 0;
   bool _isLoggedIn = false;
 
@@ -61,8 +62,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
             onPageFinished: (String url) {
               setState(() {
                 _isLoading = false;
-                _introVisible = false; // Start intro fade-out
               });
+              _isPageFinished = true;
+              _checkIntroFinished();
               _updateNavigationState();
               _injectJavaScriptBridge();
               
@@ -84,8 +86,6 @@ class _WebViewScreenState extends State<WebViewScreen> {
                   }
                 })();
               ''');
-
-              _isPageFinished = true;
               if (_pendingDeepLink != null) {
                 final link = _pendingDeepLink!;
                 _pendingDeepLink = null;
@@ -123,6 +123,16 @@ class _WebViewScreenState extends State<WebViewScreen> {
         ..loadRequest(Uri.parse(_targetUrl));
 
       _initDeepLinking();
+
+      // Start 5-second minimum intro timer
+      Timer(const Duration(seconds: 5), () {
+        if (mounted) {
+          setState(() {
+            _minIntroTimeElapsed = true;
+          });
+          _checkIntroFinished();
+        }
+      });
     } else {
       // For Web platform (Chrome)
       _isLoading = false;
@@ -508,15 +518,45 @@ class _WebViewScreenState extends State<WebViewScreen> {
           Positioned.fill(
             child: IntroOverlay(
               visible: _introVisible,
+              isPageLoaded: _isPageFinished,
               onFadeOutComplete: () {
-                setState(() {
-                  _showIntro = false;
-                });
+                if (mounted) {
+                  setState(() {
+                    _showIntro = false;
+                  });
+                }
+              },
+              onSkip: () {
+                if (mounted) {
+                  if (_isPageFinished) {
+                    setState(() {
+                      _introVisible = false;
+                    });
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("앱을 불러오는 중입니다. 잠시만 기다려주세요."),
+                        duration: Duration(milliseconds: 1500),
+                        backgroundColor: Color(0xFFB8860B),
+                      ),
+                    );
+                  }
+                }
               },
             ),
           ),
       ],
     );
+  }
+
+  void _checkIntroFinished() {
+    if (_isPageFinished && _minIntroTimeElapsed) {
+      if (mounted) {
+        setState(() {
+          _introVisible = false;
+        });
+      }
+    }
   }
 
   Future<void> _checkAndSendNotificationPermission() async {
