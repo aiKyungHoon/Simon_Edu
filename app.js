@@ -93,6 +93,26 @@ class SimonEduApp {
       });
     });
 
+    // Global click listener to close dropdowns when clicking outside
+    document.addEventListener('click', (event) => {
+      const switcher = document.getElementById('themeSwitcher');
+      const dropdown = document.getElementById('notificationDropdown');
+      
+      if (switcher && switcher.classList.contains('expanded')) {
+        const btnPalette = document.querySelector('.btn-icon-action[title="테마 변경"]') || document.querySelector('.btn-icon-action');
+        if (!switcher.contains(event.target) && (!btnPalette || !btnPalette.contains(event.target))) {
+          switcher.classList.remove('expanded');
+        }
+      }
+      
+      if (dropdown && dropdown.classList.contains('active')) {
+        const btnBell = document.getElementById('btnNotificationBell');
+        if (!dropdown.contains(event.target) && (!btnBell || !btnBell.contains(event.target))) {
+          dropdown.classList.remove('active');
+        }
+      }
+    });
+
     this.currentUserPreviousRank = null;
     if (this.isMobileApp) {
       document.body.classList.add('mobile-app');
@@ -182,6 +202,12 @@ class SimonEduApp {
       const adminView = document.getElementById('adminView');
       if (adminView && adminView.classList.contains('active')) {
         this.renderAdmin();
+      }
+
+      // Re-render settings panel if active
+      const settingsView = document.getElementById('settingsView');
+      if (settingsView && settingsView.classList.contains('active')) {
+        this.renderSettings();
       }
     }, error => {
       console.error("Firestore snapshot sync error:", error);
@@ -707,6 +733,8 @@ class SimonEduApp {
       this.renderLeaderboardWidget();
     } else if (viewName === 'admin') {
       this.renderAdmin();
+    } else if (viewName === 'settings') {
+      this.renderSettings();
     }
 
     // Notify Flutter of view change
@@ -761,6 +789,29 @@ class SimonEduApp {
 
     this.renderNotifications();
     this.switchView('dashboard');
+
+    // Temporary test trigger for marketing push consent modal
+    if (!window.hasAutoRunTest) {
+      window.hasAutoRunTest = true;
+      setTimeout(() => {
+        console.log("Forcing pushEnabled: true in Firestore for current user...");
+        db.collection('users').doc(this.currentUser.id).update({
+          pushEnabled: true
+        }).then(() => {
+          console.log("Firestore updated, auto-switching to settings for testing...");
+          this.switchView('settings');
+          setTimeout(() => {
+            const toggleMarketing = document.getElementById('toggleMarketingPush');
+            if (toggleMarketing && !toggleMarketing.checked) {
+              console.log("Auto-clicking toggleMarketingPush for testing...");
+              toggleMarketing.click();
+            } else {
+              console.log("toggleMarketingPush not found or already checked", toggleMarketing);
+            }
+          }, 2000);
+        }).catch(err => console.error("Error setting pushEnabled: true:", err));
+      }, 5000);
+    }
   }
 
   // 5. Dashboard View Setup
@@ -1305,19 +1356,7 @@ class SimonEduApp {
 
     const dropdown = document.getElementById('notificationDropdown');
     if (!dropdown) return;
-    const isVisible = dropdown.style.display === 'block';
-    dropdown.style.display = isVisible ? 'none' : 'block';
-    
-    // Close dropdown when clicking outside
-    if (!isVisible) {
-      const closeDropdown = (e) => {
-        dropdown.style.display = 'none';
-        document.removeEventListener('click', closeDropdown);
-      };
-      setTimeout(() => {
-        document.addEventListener('click', closeDropdown);
-      }, 0);
-    }
+    dropdown.classList.toggle('active');
   }
 
   toggleThemeSwitcher(event) {
@@ -1325,27 +1364,11 @@ class SimonEduApp {
 
     // Close notification dropdown if open
     const dropdown = document.getElementById('notificationDropdown');
-    if (dropdown) dropdown.style.display = 'none';
+    if (dropdown) dropdown.classList.remove('active');
 
     const switcher = document.getElementById('themeSwitcher');
     if (!switcher) return;
-    const isExpanded = switcher.classList.contains('expanded');
-    
-    if (isExpanded) {
-      switcher.classList.remove('expanded');
-    } else {
-      switcher.classList.add('expanded');
-      // Close switcher when clicking outside
-      const closeSwitcher = (e) => {
-        if (!switcher.contains(e.target)) {
-          switcher.classList.remove('expanded');
-          document.removeEventListener('click', closeSwitcher);
-        }
-      };
-      setTimeout(() => {
-        document.addEventListener('click', closeSwitcher);
-      }, 0);
-    }
+    switcher.classList.toggle('expanded');
   }
 
   clearNotifications(event) {
@@ -2131,6 +2154,184 @@ class SimonEduApp {
       }).catch(err => console.error(err));
     }
   }
+
+  renderSettings() {
+    if (!this.currentUser) return;
+
+    // 1. Fill in profile card info
+    const avatar = document.getElementById('settingsAvatar');
+    if (avatar) avatar.textContent = this.currentUser.name ? this.currentUser.name.charAt(0) : 'U';
+    
+    const username = document.getElementById('settingsUsername');
+    if (username) username.textContent = this.currentUser.name || '사용자';
+    
+    const email = document.getElementById('settingsUserEmail');
+    if (email) email.textContent = this.currentUser.email || '';
+    
+    const points = document.getElementById('settingsPoints');
+    if (points) points.textContent = this.currentUser.points || 0;
+
+    // 2. Set toggle states from Firestore fields (default to true for pushEnabled if undefined, false for marketingPushEnabled)
+    const pushEnabled = this.currentUser.pushEnabled !== false; // defaults to true if not explicitly false
+    const marketingPushEnabled = !!this.currentUser.marketingPushEnabled; // defaults to false
+
+    const togglePush = document.getElementById('togglePush');
+    const toggleMarketingPush = document.getElementById('toggleMarketingPush');
+    const rowMarketingPush = document.getElementById('rowMarketingPush');
+
+    if (togglePush) {
+      togglePush.checked = pushEnabled;
+    }
+    
+    if (toggleMarketingPush) {
+      toggleMarketingPush.checked = marketingPushEnabled;
+      toggleMarketingPush.disabled = !pushEnabled;
+    }
+    
+    if (rowMarketingPush) {
+      rowMarketingPush.style.opacity = pushEnabled ? '1' : '0.5';
+    }
+
+    // 3. Request native app to check permission
+    if (this.isMobileApp && window.MobileAppChannel) {
+      window.MobileAppChannel.postMessage(JSON.stringify({
+        event: 'check_device_permission'
+      }));
+    } else {
+      // On web/desktop, hide warning banner since we don't support native permission
+      const warningBanner = document.getElementById('settingsWarningBanner');
+      if (warningBanner) warningBanner.style.display = 'none';
+    }
+
+
+  }
+
+  updateDevicePermissionStatus(isGranted) {
+    const warningBanner = document.getElementById('settingsWarningBanner');
+    const togglePush = document.getElementById('togglePush');
+
+    if (warningBanner) {
+      warningBanner.style.display = isGranted ? 'none' : 'flex';
+    }
+
+    if (isGranted && togglePush && !togglePush.checked) {
+      togglePush.checked = true;
+      // Trigger the update in Firestore
+      db.collection('users').doc(this.currentUser.id).update({
+        pushEnabled: true
+      }).catch(err => console.error("Error updating pushEnabled:", err));
+      
+      // Enable sub-toggle
+      const toggleMarketingPush = document.getElementById('toggleMarketingPush');
+      const rowMarketingPush = document.getElementById('rowMarketingPush');
+      if (toggleMarketingPush) toggleMarketingPush.disabled = false;
+      if (rowMarketingPush) rowMarketingPush.style.opacity = '1';
+    }
+  }
+
+  togglePushSetting() {
+    if (!this.currentUser) return;
+    
+    const togglePush = document.getElementById('togglePush');
+    if (!togglePush) return;
+    
+    const isChecked = togglePush.checked;
+
+    if (isChecked) {
+      // User is turning Push ON. 
+      // If we are on mobile app, check if we need to request permission first.
+      if (this.isMobileApp && window.MobileAppChannel) {
+        const warningBanner = document.getElementById('settingsWarningBanner');
+        if (warningBanner && warningBanner.style.display !== 'none') {
+          // Send request permission message
+          window.MobileAppChannel.postMessage(JSON.stringify({
+            event: 'request_device_permission'
+          }));
+          // We can temporarily revert the switch until the permission callback returns
+          togglePush.checked = false;
+          return;
+        }
+      }
+      
+      // Update firestore
+      db.collection('users').doc(this.currentUser.id).update({
+        pushEnabled: true
+      }).catch(err => console.error("Error updating pushEnabled:", err));
+      
+    } else {
+      // User is turning Push OFF.
+      db.collection('users').doc(this.currentUser.id).update({
+        pushEnabled: false,
+        marketingPushEnabled: false
+      }).then(() => {
+        // Update UI locally
+        const toggleMarketingPush = document.getElementById('toggleMarketingPush');
+        const rowMarketingPush = document.getElementById('rowMarketingPush');
+        if (toggleMarketingPush) {
+          toggleMarketingPush.checked = false;
+          toggleMarketingPush.disabled = true;
+        }
+        if (rowMarketingPush) {
+          rowMarketingPush.style.opacity = '0.5';
+        }
+      }).catch(err => console.error("Error updating pushEnabled:", err));
+    }
+  }
+
+  toggleMarketingPushSetting() {
+    if (!this.currentUser) return;
+    
+    const toggleMarketingPush = document.getElementById('toggleMarketingPush');
+    if (!toggleMarketingPush) return;
+    
+    const isChecked = toggleMarketingPush.checked;
+    
+    if (isChecked) {
+      // User toggled it ON. We must show the consent modal `#modalMarketingConsent`.
+      const modal = document.getElementById('modalMarketingConsent');
+      if (modal) {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+      }
+    } else {
+      // User toggled it OFF. Update Firestore.
+      db.collection('users').doc(this.currentUser.id).update({
+        marketingPushEnabled: false,
+        marketingAgreedDate: null
+      }).catch(err => console.error("Error updating marketingPushEnabled:", err));
+    }
+  }
+
+  acceptMarketingConsent(agreed) {
+    const modal = document.getElementById('modalMarketingConsent');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.style.display = 'none';
+    }
+
+    const toggleMarketingPush = document.getElementById('toggleMarketingPush');
+
+    if (agreed) {
+      if (!this.currentUser) return;
+      const todayStr = new Date().toISOString();
+      db.collection('users').doc(this.currentUser.id).update({
+        marketingPushEnabled: true,
+        marketingAgreedDate: todayStr
+      }).then(() => {
+        alert("마케팅 정보 수신에 동의하셨습니다. (동의 일시: " + new Date(todayStr).toLocaleString() + ")");
+      }).catch(err => console.error("Error updating marketingPushEnabled:", err));
+    } else {
+      if (toggleMarketingPush) {
+        toggleMarketingPush.checked = false;
+      }
+      if (this.currentUser) {
+        db.collection('users').doc(this.currentUser.id).update({
+          marketingPushEnabled: false,
+          marketingAgreedDate: null
+        }).catch(err => console.error("Error reverting marketingPushEnabled:", err));
+      }
+    }
+  }
 }
 
 // Instantiate and bind to window
@@ -2183,6 +2384,12 @@ window.handleDeepLink = function(urlOrPath) {
   } else if (path === 'ranking') {
     if (window.app.currentUser) {
       window.app.switchView('ranking');
+    } else {
+      window.app.switchView('auth');
+    }
+  } else if (path === 'settings') {
+    if (window.app.currentUser) {
+      window.app.switchView('settings');
     } else {
       window.app.switchView('auth');
     }

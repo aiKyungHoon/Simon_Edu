@@ -7,13 +7,13 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.3.8">
+  <link rel="stylesheet" href="style.css?v=1.4.0">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
   <script>
     (function() {
-      const APP_VER = '1.3.8';
+      const APP_VER = '1.4.0';
       if (localStorage.getItem('app_version') !== APP_VER) {
         localStorage.setItem('app_version', APP_VER);
         if ('caches' in window) {
@@ -55,12 +55,15 @@
         <button class="btn-icon-action" onclick="app.toggleThemeSwitcher(event)" title="테마 변경">
           <span class="material-icons-round">palette</span>
         </button>
-        <div class="theme-switcher" id="themeSwitcher">
-          <button class="theme-btn" data-theme="gold" title="황금" style="background: linear-gradient(135deg, #ffd700, #b8860b);"></button>
-          <button class="theme-btn" data-theme="dark" title="다크" style="background: linear-gradient(135deg, #6366f1, #0f172a);"></button>
-          <button class="theme-btn" data-theme="dreamy" title="드리미" style="background: linear-gradient(135deg, #a78bfa, #f9a8d4);"></button>
-          <button class="theme-btn" data-theme="ocean" title="오션" style="background: linear-gradient(135deg, #38bdf8, #06b6d4);"></button>
-          <button class="theme-btn" data-theme="cherry" title="벚꽃" style="background: linear-gradient(135deg, #fb7185, #fda4af);"></button>
+        <!-- Theme Switcher Dropdown (Capsule style) -->
+        <div class="theme-dropdown" id="themeSwitcher">
+          <div class="theme-buttons-row">
+            <button class="theme-btn" data-theme="gold" title="황금" style="background: linear-gradient(135deg, #ffd700, #b8860b);"></button>
+            <button class="theme-btn" data-theme="dark" title="다크" style="background: linear-gradient(135deg, #6366f1, #0f172a);"></button>
+            <button class="theme-btn" data-theme="dreamy" title="드리미" style="background: linear-gradient(135deg, #a78bfa, #f9a8d4);"></button>
+            <button class="theme-btn" data-theme="ocean" title="오션" style="background: linear-gradient(135deg, #38bdf8, #06b6d4);"></button>
+            <button class="theme-btn" data-theme="cherry" title="벚꽃" style="background: linear-gradient(135deg, #fb7185, #fda4af);"></button>
+          </div>
         </div>
       </div>
       
@@ -82,7 +85,8 @@
             <span class="material-icons-round">notifications</span>
             <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
           </button>
-          <div class="notification-dropdown glass-panel" id="notificationDropdown" style="display: none;" onclick="event.stopPropagation()">
+          <!-- Notification Dropdown -->
+          <div class="notification-dropdown glass-panel" id="notificationDropdown">
             <div class="dropdown-header">
               <span>실시간 알림</span>
               <button class="btn-clear-notifications" onclick="app.clearNotifications(event)">모두 읽음</button>
@@ -476,6 +480,82 @@
       </div>
     </div>
 
+    <!-- Settings View (Mobile Only) -->
+    <div id="settingsView" class="view-container">
+      <div class="dashboard-single-container">
+        
+        <!-- User Profile Card -->
+        <div class="dashboard-card glass-panel settings-profile-card">
+          <div class="settings-profile-info" style="display: flex; align-items: center; gap: 1rem; width: 100%;">
+            <div class="settings-avatar" id="settingsAvatar" style="width: 60px; height: 60px; border-radius: 50%; background: var(--accent-purple-glow); border: 2px solid var(--accent-purple); color: var(--text-primary); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: bold; flex-shrink: 0;">U</div>
+            <div class="settings-user-details" style="flex: 1; text-align: left;">
+              <h3 id="settingsUsername" style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary);">닉네임</h3>
+              <p id="settingsUserEmail" style="margin: 0.2rem 0 0.4rem 0; font-size: 0.85rem; color: var(--text-secondary);">email@example.com</p>
+              <div class="settings-points-badge" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.9rem; font-weight: 600; color: var(--accent-purple); background: var(--accent-purple-glow); padding: 0.25rem 0.6rem; border-radius: 20px;">
+                <span class="material-icons-round" style="font-size: 1.1rem; color: #f59e0b;">monetization_on</span>
+                <span id="settingsPoints">0</span> P
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Push Notifications Config Card -->
+        <div class="dashboard-card glass-panel settings-notifications-card" style="margin-top: 1rem; text-align: left;">
+          <div class="card-title" style="margin-bottom: 1rem;">
+            <span class="material-icons-round" style="color: var(--accent-purple);">notifications_active</span>
+            알림 설정
+          </div>
+
+          <!-- Native Notification Permission Error Banner -->
+          <div class="settings-warning-banner" id="settingsWarningBanner" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.85rem; color: #f87171; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; line-height: 1.4;">
+            <span class="material-icons-round" style="color: #ef4444; font-size: 1.2rem; flex-shrink: 0;">warning_amber</span>
+            <span>기기 알림 권한이 꺼져 있습니다.</span>
+          </div>
+
+          <!-- Main Push Notification Toggle -->
+          <div class="settings-row" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--glass-border);">
+            <div class="settings-label-col" style="flex: 1; padding-right: 1rem;">
+              <div class="settings-item-title" style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary);">이벤트 및 푸시 알림 수신</div>
+              <div class="settings-item-desc" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">알림 메시지 및 이벤트 소식을 받습니다.</div>
+            </div>
+            <div class="settings-action-col">
+              <label class="switch" style="position: relative; display: inline-block; width: 46px; height: 26px;">
+                <input type="checkbox" id="togglePush" onchange="app.togglePushSetting()" style="opacity: 0; width: 0; height: 0;">
+                <span class="slider round" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--glass-border); transition: .3s; border-radius: 34px;"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Marketing Push Notification Toggle -->
+          <div class="settings-row nested" id="rowMarketingPush" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--glass-border); opacity: 0.5; transition: opacity 0.2s;">
+            <div class="settings-label-col" style="flex: 1; padding-right: 1rem; padding-left: 1rem; border-left: 2px solid var(--glass-border);">
+              <div class="settings-item-title" style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary);">마케팅 정보 수신 동의</div>
+              <div class="settings-item-desc" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">이벤트 및 푸시 마케팅 알림 수신에 동의합니다.</div>
+            </div>
+            <div class="settings-action-col">
+              <label class="switch" style="position: relative; display: inline-block; width: 46px; height: 26px;">
+                <input type="checkbox" id="toggleMarketingPush" onchange="app.toggleMarketingPushSetting()" style="opacity: 0; width: 0; height: 0;" disabled>
+                <span class="slider round" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--glass-border); transition: .3s; border-radius: 34px;"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-info-text" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 1rem; line-height: 1.4;">
+            * 필수 알림(학습/서비스 변경 안내 등)은 수신 여부와 상관없이 발송됩니다.
+          </div>
+        </div>
+
+        <!-- App Settings Card (Logout etc.) -->
+        <div class="dashboard-card glass-panel settings-app-card" style="margin-top: 1rem; padding: 1rem; text-align: center;">
+          <button class="btn-logout-settings" onclick="app.logout()" style="background: transparent; color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600; font-family: var(--font-kr); font-size: 0.9rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; transition: all 0.2s;">
+            <span class="material-icons-round" style="font-size: 1.1rem;">logout</span>
+            로그아웃
+          </button>
+        </div>
+
+      </div>
+    </div>
+
   </main>
 
   <!-- 6. Overlays & Modals -->
@@ -564,6 +644,26 @@
     </div>
   </div>
 
+  <!-- Modal: Marketing Notification Consent Terms -->
+  <div class="modal-overlay" id="modalMarketingConsent">
+    <div class="modal-content glass-panel" style="border-color: var(--accent-purple); max-width: 450px;">
+      <div class="modal-icon">receipt_long</div>
+      <div class="modal-title" style="color: var(--accent-purple); font-size: 1.25rem;">마케팅 정보 수신 동의</div>
+      <div class="modal-body" style="text-align: left; font-size: 0.85rem; max-height: 200px; overflow-y: auto; padding: 1rem; background: rgba(0, 0, 0, 0.2); border-radius: 8px; margin: 1rem 0; border: 1px solid var(--glass-border); line-height: 1.6; color: var(--text-secondary);">
+        <p style="margin-top: 0; font-weight: bold; color: var(--text-primary);">[개인정보 보호법 및 정보통신망법 준수]</p>
+        <p>사이먼에듀는 서비스 관련 이벤트, 혜택 정보, 랭킹 및 챌린지 광고성 정보를 제공하기 위해 귀하의 개인정보를 수집 및 이용합니다.</p>
+        <p><strong>1. 수집 항목</strong>: 닉네임, 이메일 주소, 알림 토큰</p>
+        <p><strong>2. 수집 및 이용 목적</strong>: 신규 콘텐츠/기능 출시 알림, 이벤트/선물 혜택 제공, 회원 맞춤형 정보 전달</p>
+        <p><strong>3. 보유 및 이용 기간</strong>: 회원 탈퇴 시 또는 동의 철회 시까지</p>
+        <p>동의를 거부하실 권리가 있으며, 동의를 거부하시더라도 필수 알림(일일 말씀 챌린지, 서비스 주요 장애 등)은 정상 제공됩니다.</p>
+      </div>
+      <div class="modal-btn-container" style="display: flex; gap: 0.5rem; justify-content: center; width: 100%;">
+        <button class="btn-game secondary" style="flex: 1; margin: 0;" onclick="app.acceptMarketingConsent(false)">동의하지 않음</button>
+        <button class="btn-primary" style="flex: 1; margin: 0; background: var(--accent-purple);" onclick="app.acceptMarketingConsent(true)">동의함</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Floating point system container -->
   <div class="floating-point-container" id="floatingPointContainer"></div>
 
@@ -578,7 +678,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
-  <script src="bible_data.js?v=1.3.8"></script>
-  <script src="app.js?v=1.3.8"></script>
+  <script src="bible_data.js?v=1.4.0"></script>
+  <script src="app.js?v=1.4.0"></script>
 </body>
 </html>

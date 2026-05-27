@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:vibration/vibration.dart';
 import 'package:app_links/app_links.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'intro_overlay.dart';
@@ -30,7 +31,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
   int _currentIndex = 0;
   bool _isLoggedIn = false;
 
-  final String _targetUrl = 'https://simon-edu-bible-game.web.app?v=1.3.8';
+  final String _targetUrl = 'https://simon-edu-bible-game.web.app?v=1.4.0';
 
   @override
   void initState() {
@@ -42,6 +43,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
       _controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setBackgroundColor(const Color(0xFFFDF8E6))
+        ..clearCache()
         ..setNavigationDelegate(
           NavigationDelegate(
             onProgress: (int progress) {
@@ -297,12 +299,18 @@ class _WebViewScreenState extends State<WebViewScreen> {
           newIndex = 1;
         } else if (view == 'ranking') {
           newIndex = 2;
+        } else if (view == 'settings') {
+          newIndex = 3;
         }
         if (newIndex != _currentIndex) {
           setState(() {
             _currentIndex = newIndex;
           });
         }
+      } else if (event == 'check_device_permission') {
+        _checkAndSendNotificationPermission();
+      } else if (event == 'request_device_permission') {
+        _requestNotificationPermission();
       }
     } catch (e) {
       debugPrint('Error parsing MobileAppChannel message: $e');
@@ -324,6 +332,8 @@ class _WebViewScreenState extends State<WebViewScreen> {
       viewName = 'attendance';
     } else if (index == 2) {
       viewName = 'ranking';
+    } else if (index == 3) {
+      viewName = 'settings';
     }
 
     _controller!.runJavaScript('if (window.app && window.app.switchView) { window.app.switchView("$viewName"); }');
@@ -485,6 +495,11 @@ class _WebViewScreenState extends State<WebViewScreen> {
                       activeIcon: Icon(Icons.emoji_events_rounded),
                       label: '명예의 전당',
                     ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.settings_rounded),
+                      activeIcon: Icon(Icons.settings_rounded),
+                      label: '설정',
+                    ),
                   ],
                 )
               : null,
@@ -502,5 +517,21 @@ class _WebViewScreenState extends State<WebViewScreen> {
           ),
       ],
     );
+  }
+
+  Future<void> _checkAndSendNotificationPermission() async {
+    final status = await Permission.notification.status;
+    _sendDevicePermissionStatus(status.isGranted);
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    final status = await Permission.notification.request();
+    _sendDevicePermissionStatus(status.isGranted);
+  }
+
+  void _sendDevicePermissionStatus(bool granted) {
+    if (mounted && _controller != null) {
+      _controller!.runJavaScript('if (window.app && window.app.updateDevicePermissionStatus) { window.app.updateDevicePermissionStatus($granted); }');
+    }
   }
 }
