@@ -1724,7 +1724,9 @@ footer {
   
   header {
     padding: 1rem;
-    position: relative; /* 고정 해제 */
+    position: sticky;
+    top: 0;
+    z-index: 100;
   }
 
   .dashboard-card, .game-main-panel, .game-side-panel, .auth-wrapper {
@@ -1748,7 +1750,7 @@ footer {
   }
 
   .logo span {
-    display: none; /* Hide 'Edu' to save space */
+    /* "Edu" 텍스트 모바일에서도 표시 */
   }
 
   .header-right {
