@@ -2260,3 +2260,116 @@ body.mobile-app .btn-logout {
 body.mobile-app .settings-app-card {
   display: none !important;
 }
+
+/* Policy card row styling and hover effects */
+.settings-policies-card .settings-row {
+  transition: all var(--transition-fast);
+  padding: 1rem 0.5rem !important;
+  margin: 0 -0.5rem;
+}
+.settings-policies-card .settings-row:hover {
+  background: var(--glass-bg-hover);
+  border-radius: 8px;
+}
+
+/* Withdraw button styling */
+.btn-withdraw-settings {
+  cursor: pointer;
+  outline: none;
+}
+.btn-withdraw-settings:hover {
+  background: rgba(239, 68, 68, 0.08) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #ef4444 !important;
+}
+
+/* Scrollbar styling for terms modal content */
+.terms-content::-webkit-scrollbar {
+  width: 6px;
+}
+.terms-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+.terms-content::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: 3px;
+}
+.terms-content::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-purple);
+}
+
+/* Single Path Routing View Styles */
+.single-path-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 2rem;
+  background: var(--bg-primary);
+}
+
+.single-path-card {
+  max-width: 600px;
+  width: 100%;
+  padding: 2.5rem;
+  background: #fdfcf7 !important;
+  box-shadow: 0 20px 50px rgba(61, 52, 28, 0.15);
+  border-radius: 20px;
+}
+
+.single-path-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--accent-purple);
+  padding-bottom: 0.75rem;
+}
+
+.single-path-header .material-icons-round {
+  font-size: 2rem;
+  color: var(--accent-purple);
+}
+
+.single-path-header h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.single-path-body {
+  max-height: 70vh;
+  overflow-y: auto;
+  text-align: left;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  padding-right: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.single-path-body::-webkit-scrollbar {
+  width: 6px;
+}
+.single-path-body::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+.single-path-body::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: 3px;
+}
+.single-path-body::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-purple);
+}
+
+@media (max-width: 600px) {
+  .single-path-container {
+    padding: 1rem;
+  }
+  .single-path-card {
+    padding: 1.5rem;
+  }
+}
+

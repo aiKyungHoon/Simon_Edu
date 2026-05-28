@@ -166,6 +166,7 @@ class SimonEduApp {
         this.switchView('auth');
       }
     });
+    this.handleDirectPathRouting();
   }
 
   get isMobileApp() {
@@ -1954,6 +1955,129 @@ class SimonEduApp {
       console.error(err);
       alert('오류가 발생했습니다. 다시 시도해주세요.');
     });
+  }
+  withdrawAccount() {
+    const user = firebase.auth().currentUser;
+    if (!user) {
+      alert('로그인 상태가 아닙니다.');
+      return;
+    }
+
+    this.closeModal('modalWithdraw');
+
+    // Delete Firestore document first
+    db.collection('users').doc(user.uid).delete()
+      .then(() => {
+        // Then delete Firebase Auth user
+        return user.delete();
+      })
+      .then(() => {
+        alert('회원 탈퇴가 완료되었습니다. 이용해 주셔서 감사합니다.');
+        this.logout();
+      })
+      .catch(err => {
+        console.error("Error during withdrawal:", err);
+        if (err.code === 'auth/requires-recent-login') {
+          alert('보안을 위해 최근 로그인 기록이 필요합니다. 다시 로그인하신 후 탈퇴를 진행해주세요.');
+        } else {
+          alert('회원 탈퇴 처리 중 오류가 발생했습니다. 고객센터로 문의해주세요.');
+        }
+        this.logout();
+      });
+  }
+
+  handleDirectPathRouting() {
+    const path = decodeURIComponent(window.location.pathname);
+    if (path === '/privacy' || path === '/Terms_of_Use' || path === '/Terms of Use' || path.startsWith('/Delete_account') || path.startsWith('/Delete accoun') || path === '/Delete account') {
+      // Hide normal app elements
+      document.body.classList.add('single-path-route');
+      
+      // Wait for DOM content to be fully loaded
+      const applyRouting = () => {
+        const header = document.querySelector('header');
+        if (header) header.style.display = 'none';
+        const main = document.querySelector('main');
+        if (main) main.style.display = 'none';
+        const footer = document.querySelector('footer');
+        if (footer) footer.style.display = 'none';
+        
+        const singleView = document.getElementById('singlePathView');
+        if (singleView) {
+          singleView.style.display = 'flex';
+          const iconEl = document.getElementById('singlePathIcon');
+          const titleEl = document.getElementById('singlePathTitle');
+          const bodyEl = document.getElementById('singlePathBody');
+          
+          if (path === '/privacy') {
+            if (iconEl) iconEl.textContent = 'security';
+            if (titleEl) titleEl.textContent = '개인정보처리방침';
+            const privacyModalContent = document.querySelector('#modalPrivacy .terms-content');
+            if (bodyEl && privacyModalContent) {
+              bodyEl.innerHTML = privacyModalContent.innerHTML;
+            }
+          } else if (path === '/Terms_of_Use' || path === '/Terms of Use') {
+            if (iconEl) iconEl.textContent = 'gavel';
+            if (titleEl) titleEl.textContent = '이용약관';
+            const termsModalContent = document.querySelector('#modalTerms .terms-content');
+            if (bodyEl && termsModalContent) {
+              bodyEl.innerHTML = termsModalContent.innerHTML;
+            }
+          } else {
+            // Delete account path
+            if (iconEl) iconEl.textContent = 'person_remove';
+            if (titleEl) titleEl.textContent = '회원 탈퇴';
+            
+            if (bodyEl) {
+              bodyEl.innerHTML = `
+                <div class="withdrawal-wrapper" style="text-align: center;">
+                  <p style="font-weight: bold; color: var(--text-primary); margin-top: 0;">회원 탈퇴 시 아래 정보가 삭제되거나 소멸됩니다.</p>
+                  <ul style="text-align: left; display: inline-block; padding-left: 1.2rem; margin: 0.5rem 0; color: var(--text-secondary); line-height: 1.6;">
+                    <li>계정 정보</li>
+                    <li>이름</li>
+                    <li>이메일 주소</li>
+                    <li>아이디</li>
+                    <li>성경 문구 답안 작성 내역</li>
+                    <li>학습 진행도</li>
+                    <li>출석 기록</li>
+                    <li>포인트 적립 및 사용 내역</li>
+                  </ul>
+                  <p style="color: #ef4444; font-weight: bold; margin-top: 1rem;">탈퇴 후 삭제된 정보와 소멸된 포인트는 복구할 수 없습니다.</p>
+                  <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; margin-top: 0.5rem;">비밀번호는 Simon Edu가 별도 데이터베이스에 저장하지 않으며, Firebase Authentication을 통해 인증 처리됩니다.</p>
+                  <div id="withdrawalAuthArea" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--glass-border);">
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;">상태를 조회하는 중입니다...</p>
+                  </div>
+                </div>
+              `;
+              
+              firebase.auth().onAuthStateChanged(user => {
+                const authArea = document.getElementById('withdrawalAuthArea');
+                if (!authArea) return;
+                
+                if (user) {
+                  authArea.innerHTML = `
+                    <p style="font-weight: bold; color: var(--text-primary); margin-bottom: 1rem;">정말 회원 탈퇴를 진행하시겠습니까?</p>
+                    <div style="display: flex; gap: 0.75rem; justify-content: center;">
+                      <button class="btn-primary" style="background: var(--accent-rose); border: none; padding: 0.6rem 1.5rem; border-radius: 8px; font-weight: bold; color: white; cursor: pointer;" onclick="app.withdrawAccount()">탈퇴 진행하기</button>
+                    </div>
+                  `;
+                } else {
+                  authArea.innerHTML = `
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;">회원 탈퇴를 진행하려면 로그인이 필요합니다.</p>
+                    <button class="btn-primary" style="background: var(--accent-purple); border: none; padding: 0.6rem 1.5rem; border-radius: 8px; font-weight: bold; color: white; cursor: pointer;" onclick="window.location.href='/'">로그인하러 가기</button>
+                  `;
+                }
+              });
+            }
+          }
+        }
+      };
+      
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyRouting);
+      } else {
+        applyRouting();
+      }
+    }
   }
 
   // 10. Administrator Panel Dashboard Logic
