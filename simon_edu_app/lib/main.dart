@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
-import 'screens/webview_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'screens/splash_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 
@@ -11,8 +16,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Custom Gold/Beige Light Theme color palette
-    final goldTheme = ThemeData(
+    // Light theme (Gold palette)
+    final lightTheme = ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
         seedColor: const Color(0xFFB8860B),
@@ -47,11 +52,34 @@ class MyApp extends StatelessWidget {
       ),
     );
 
+    // Dark theme – use same seed but dark brightness
+    final darkTheme = ThemeData.dark().copyWith(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFFB8860B),
+        brightness: Brightness.dark,
+      ),
+      scaffoldBackgroundColor: const Color(0xFF1E1E1E),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF2C2C2C),
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: TextStyle(
+          color: Colors.white,
+          fontSize: 17,
+          fontWeight: FontWeight.bold,
+        ),
+        iconTheme: IconThemeData(color: Colors.white),
+      ),
+    );
+
     return MaterialApp(
       title: 'Simon Edu 말씀 암송',
-      theme: goldTheme,
+      theme: lightTheme,
+      darkTheme: darkTheme,
+      themeMode: ThemeMode.system, // follow system setting
       debugShowCheckedModeBanner: false,
-      home: const WebViewScreen(),
+      home: const SplashScreen(),
     );
   }
 }

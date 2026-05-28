@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'push_settings_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:vibration/vibration.dart';
@@ -8,6 +9,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'intro_overlay.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+
 
 class WebViewScreen extends StatefulWidget {
   const WebViewScreen({super.key});
@@ -16,7 +19,7 @@ class WebViewScreen extends StatefulWidget {
   State<WebViewScreen> createState() => _WebViewScreenState();
 }
 
-class _WebViewScreenState extends State<WebViewScreen> {
+class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserver {
   WebViewController? _controller;
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
@@ -26,17 +29,31 @@ class _WebViewScreenState extends State<WebViewScreen> {
   double _loadingProgress = 0.0;
   bool _canGoBack = false;
   bool _canGoForward = false;
-  bool _showIntro = true;
-  bool _introVisible = true;
+  bool _showIntro = false;
+  bool _introVisible = false;
   bool _videoCompleted = false;
   int _currentIndex = 0;
   bool _isLoggedIn = false;
+  String _appVersion = '';
 
-  final String _targetUrl = 'https://simon-edu-bible-game.web.app?v=1.4.0';
+  // Native Settings Profile State
+  String _userName = '';
+  String _userEmail = '';
+  int _userPoints = 0;
+  bool _pushEnabled = false;
+  bool _marketingPushEnabled = false;
+  bool _isNotificationPermissionGranted = true;
+  bool _isProfileLoading = true;
+
+  final String _targetUrl = 'https://simon-edu-bible-game.web.app?v=1.4.2';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadAppVersion();
+
+
     
     // Only initialize WebView controller on native mobile platforms (Android/iOS)
     if (!kIsWeb) {
@@ -132,10 +149,18 @@ class _WebViewScreenState extends State<WebViewScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (!kIsWeb) {
       _linkSubscription?.cancel();
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isLoggedIn) {
+      _checkAndSendNotificationPermission().then((_) => _syncUserProfile());
+    }
   }
 
   Future<void> _initDeepLinking() async {
@@ -284,6 +309,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
         setState(() {
           _isLoggedIn = true;
         });
+        _syncUserProfile();
       } else if (event == 'logout') {
         setState(() {
           _isLoggedIn = false;
@@ -304,12 +330,18 @@ class _WebViewScreenState extends State<WebViewScreen> {
         if (newIndex != _currentIndex) {
           setState(() {
             _currentIndex = newIndex;
+            if (newIndex == 3) {
+              _isProfileLoading = true;
+            }
           });
+          if (newIndex == 3) {
+            _syncUserProfile();
+          }
         }
       } else if (event == 'check_device_permission') {
-        _checkAndSendNotificationPermission();
+        _checkAndSendNotificationPermission().then((_) => _syncUserProfile());
       } else if (event == 'request_device_permission') {
-        _requestNotificationPermission();
+        _requestNotificationPermission().then((_) => _syncUserProfile());
       }
     } catch (e) {
       debugPrint('Error parsing MobileAppChannel message: $e');
@@ -324,6 +356,9 @@ class _WebViewScreenState extends State<WebViewScreen> {
     
     setState(() {
       _currentIndex = index;
+      if (index == 3) {
+        _isProfileLoading = true;
+      }
     });
 
     String viewName = 'dashboard';
@@ -336,6 +371,10 @@ class _WebViewScreenState extends State<WebViewScreen> {
     }
 
     _controller!.runJavaScript('if (window.app && window.app.switchView) { window.app.switchView("$viewName"); }');
+
+    if (index == 3) {
+      _syncUserProfile();
+    }
   }
 
   @override
@@ -447,23 +486,52 @@ class _WebViewScreenState extends State<WebViewScreen> {
           backgroundColor: const Color(0xFFFDF8E6),
           body: SafeArea(
             bottom: false,
-            child: Stack(
+            child: Column(
               children: [
-                if (_controller != null) WebViewWidget(controller: _controller!),
-                
-                // Linear progress bar for loading
-                if (_isLoading)
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: LinearProgressIndicator(
-                      value: _loadingProgress > 0.0 ? _loadingProgress : null,
-                      color: theme.colorScheme.primary,
-                      backgroundColor: const Color(0xFFFDF8E6),
-                      minHeight: 3,
-                    ),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Offstage(
+                        offstage: _isLoggedIn && _currentIndex == 3,
+                        child: _controller != null ? WebViewWidget(controller: _controller!) : const SizedBox(),
+                      ),
+                      
+                      if (_isLoggedIn && _currentIndex == 3)
+                        NativeSettingsView(
+                          userName: _userName,
+                          userEmail: _userEmail,
+                          userPoints: _userPoints,
+                          pushEnabled: _pushEnabled,
+                          marketingPushEnabled: _marketingPushEnabled,
+                          isPermissionGranted: _isNotificationPermissionGranted,
+                          isLoading: _isProfileLoading,
+                          version: _appVersion.isEmpty ? '1.4.2' : _appVersion,
+                          onLogout: () {
+                            _controller?.runJavaScript('if (window.app && window.app.logout) { window.app.logout(); }');
+                          },
+                          onPushChanged: _togglePushSetting,
+                          onMarketingChanged: _toggleMarketingSetting,
+                          onRequestPermission: () {
+                            _requestNotificationPermission().then((_) => _syncUserProfile());
+                          },
+                        ),
+                      
+                      // Linear progress bar for loading
+                      if (_isLoading && _currentIndex != 3)
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: LinearProgressIndicator(
+                            value: _loadingProgress > 0.0 ? _loadingProgress : null,
+                            color: theme.colorScheme.primary,
+                            backgroundColor: const Color(0xFFFDF8E6),
+                            minHeight: 3,
+                          ),
+                        ),
+                    ],
                   ),
+                ),
               ],
             ),
           ),
@@ -561,19 +629,500 @@ class _WebViewScreenState extends State<WebViewScreen> {
     }
   }
 
+  Future<void> _loadAppVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _appVersion = packageInfo.version;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error getting package info: $e');
+    }
+  }
+
+  Future<void> _syncUserProfile() async {
+    if (_controller == null || !_isLoggedIn) return;
+    try {
+      final result = await _controller!.runJavaScriptReturningResult('''
+        (function() {
+          if (window.app && window.app.currentUser) {
+            return JSON.stringify({
+              name: window.app.currentUser.name || '',
+              email: window.app.currentUser.email || '',
+              points: window.app.currentUser.points || 0,
+              pushEnabled: window.app.currentUser.pushEnabled !== false,
+              marketingPushEnabled: !!window.app.currentUser.marketingPushEnabled
+            });
+          }
+          return '{}';
+        })()
+      ''');
+      
+      String jsonStr = result.toString();
+      if (jsonStr.startsWith('"') && jsonStr.endsWith('"')) {
+        try {
+          jsonStr = json.decode(jsonStr);
+        } catch (_) {}
+      }
+      
+      final Map<String, dynamic> data = json.decode(jsonStr);
+      if (data.isNotEmpty && mounted) {
+        final status = await Permission.notification.status;
+        setState(() {
+          _userName = data['name'] ?? '';
+          _userEmail = data['email'] ?? '';
+          _userPoints = data['points'] ?? 0;
+          _pushEnabled = data['pushEnabled'] ?? false;
+          _marketingPushEnabled = data['marketingPushEnabled'] ?? false;
+          _isNotificationPermissionGranted = status.isGranted;
+          _isProfileLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error syncing user profile: $e');
+    }
+  }
+
+  Future<void> _togglePushSetting(bool value) async {
+    if (_controller == null) return;
+    
+    setState(() {
+      _pushEnabled = value;
+      if (!value) {
+        _marketingPushEnabled = false;
+      }
+    });
+
+    await _controller!.runJavaScript('''
+      (function() {
+        if (window.app) {
+          var togglePush = document.getElementById('togglePush');
+          if (togglePush) {
+            togglePush.checked = $value;
+            window.app.togglePushSetting();
+          }
+        }
+      })()
+    ''');
+    
+    Future.delayed(const Duration(milliseconds: 300), _syncUserProfile);
+  }
+
+  Future<void> _toggleMarketingSetting(bool value) async {
+    if (_controller == null) return;
+
+    if (value) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFFFCFCF7),
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: Color(0x33B8860B)),
+            ),
+            title: const Text(
+              '마케팅 정보 수신 동의',
+              style: TextStyle(
+                color: Color(0xFF3D341C),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: const Text(
+              '이벤트 및 푸시 마케팅 알림 수신에 동의하십니까?\n\n'
+              '동의하시면 Simon Edu 말씀 암송 서비스에서 제공하는 다양한 혜택과 이벤트 소식을 푸시 알림으로 받아보실 수 있습니다.',
+              style: TextStyle(
+                color: Color(0xFF6B5C37),
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await _controller!.runJavaScript('if (window.app) { window.app.acceptMarketingConsent(true); }');
+                  _syncUserProfile();
+                },
+                child: const Text(
+                  '동의함',
+                  style: TextStyle(
+                    color: Color(0xFFB8860B),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await _controller!.runJavaScript('if (window.app) { window.app.acceptMarketingConsent(false); }');
+                  _syncUserProfile();
+                },
+                child: const Text(
+                  '동의 안 함',
+                  style: TextStyle(
+                    color: Color(0xFFEF4444),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      setState(() {
+        _marketingPushEnabled = false;
+      });
+      await _controller!.runJavaScript('''
+        (function() {
+          if (window.app) {
+            var toggle = document.getElementById('toggleMarketingPush');
+            if (toggle) {
+              toggle.checked = false;
+            }
+            window.app.toggleMarketingPushSetting();
+          }
+        })()
+      ''');
+      Future.delayed(const Duration(milliseconds: 300), _syncUserProfile);
+    }
+  }
+
   Future<void> _checkAndSendNotificationPermission() async {
     final status = await Permission.notification.status;
     _sendDevicePermissionStatus(status.isGranted);
   }
 
   Future<void> _requestNotificationPermission() async {
-    final status = await Permission.notification.request();
-    _sendDevicePermissionStatus(status.isGranted);
+    final status = await Permission.notification.status;
+    if (status.isPermanentlyDenied || status.isDenied) {
+      await openAppSettings();
+    } else {
+      final newStatus = await Permission.notification.request();
+      _sendDevicePermissionStatus(newStatus.isGranted);
+    }
   }
 
   void _sendDevicePermissionStatus(bool granted) {
     if (mounted && _controller != null) {
       _controller!.runJavaScript('if (window.app && window.app.updateDevicePermissionStatus) { window.app.updateDevicePermissionStatus($granted); }');
     }
+  }
+}
+
+class NativeSettingsView extends StatelessWidget {
+  final String userName;
+  final String userEmail;
+  final int userPoints;
+  final bool pushEnabled;
+  final bool marketingPushEnabled;
+  final bool isPermissionGranted;
+  final bool isLoading;
+  final String version;
+  final VoidCallback onLogout;
+  final ValueChanged<bool> onPushChanged;
+  final ValueChanged<bool> onMarketingChanged;
+  final VoidCallback onRequestPermission;
+
+  const NativeSettingsView({
+    super.key,
+    required this.userName,
+    required this.userEmail,
+    required this.userPoints,
+    required this.pushEnabled,
+    required this.marketingPushEnabled,
+    required this.isPermissionGranted,
+    required this.isLoading,
+    required this.version,
+    required this.onLogout,
+    required this.onPushChanged,
+    required this.onMarketingChanged,
+    required this.onRequestPermission,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final initial = userName.isNotEmpty ? userName.substring(0, 1) : 'U';
+
+    if (isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFFB8860B),
+        ),
+      );
+    }
+
+    return Container(
+      color: const Color(0xFFFDF8E6), // Match background color
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        children: [
+          // 1. Profile section
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0x1FB8860B)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3D341C).withOpacity(0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: const Color(0xFFB8860B),
+                  child: CircleAvatar(
+                    radius: 28.5,
+                    backgroundColor: const Color(0xFFFDF8E6),
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF3D341C),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        userName.isNotEmpty ? userName : '사용자',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF3D341C),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        userEmail.isNotEmpty ? userEmail : '이메일 정보 없음',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF96855B),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // Points badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEA),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0x33B8860B)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.monetization_on,
+                              size: 16,
+                              color: Color(0xFFB8860B),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$userPoints P',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFB8860B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // 2. Notification Warning Banner
+          if (!isPermissionGranted)
+            GestureDetector(
+              onTap: onRequestPermission,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF0F0),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFEF4444)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '기기 알림 권한이 꺼져 있습니다. (설정하려면 터치하세요)',
+                        style: TextStyle(
+                          color: Color(0xFFEF4444),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // 3. Notification Settings Card
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0x1FB8860B)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3D341C).withOpacity(0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
+                  child: Row(
+                    children: [
+                      Icon(Icons.notifications_active_rounded, color: Color(0xFFB8860B), size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        '알림 설정',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF3D341C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(color: Color(0x1FB8860B)),
+                // Switch 1: Push enabled
+                SwitchListTile(
+                  activeColor: const Color(0xFFB8860B),
+                  title: const Text(
+                    '이벤트 및 푸시 알림 수신',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF3D341C),
+                    ),
+                  ),
+                  subtitle: const Text(
+                    '알림 메시지 및 이벤트 소식을 받습니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF96855B),
+                    ),
+                  ),
+                  value: pushEnabled,
+                  onChanged: onPushChanged,
+                ),
+                const Divider(color: Color(0x1FB8860B), height: 1),
+                // Switch 2: Marketing push enabled
+                SwitchListTile(
+                  activeColor: const Color(0xFFB8860B),
+                  title: const Text(
+                    '마케팅 정보 수신 동의',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF3D341C),
+                    ),
+                  ),
+                  subtitle: const Text(
+                    '이벤트 및 푸시 마케팅 알림 수신에 동의합니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF96855B),
+                    ),
+                  ),
+                  value: marketingPushEnabled,
+                  onChanged: pushEnabled ? onMarketingChanged : null,
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // 4. App version & Logout card
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3D341C).withOpacity(0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+              border: Border.all(color: const Color(0x1FB8860B)),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  '앱 버전 : $version',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF96855B),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: OutlinedButton.icon(
+                    onPressed: onLogout,
+                    icon: const Icon(Icons.logout, size: 18, color: Color(0xFFEF4444)),
+                    label: const Text(
+                      '로그아웃',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFEF4444),
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      backgroundColor: Colors.transparent,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

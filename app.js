@@ -617,7 +617,7 @@ class SimonEduApp {
           // Success handled by Auth state listener
         })
         .catch(err => {
-          if (err.code === 'auth/user-not-found') {
+          if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
             const seedInfo = SEED_USERS[usernameId.toLowerCase()];
             if (seedInfo && password === seedInfo.password) {
               auth.createUserWithEmailAndPassword(virtualEmail, password)
@@ -2156,17 +2156,21 @@ class SimonEduApp {
     const toggleMarketingPush = document.getElementById('toggleMarketingPush');
     const rowMarketingPush = document.getElementById('rowMarketingPush');
 
-    if (togglePush) {
-      togglePush.checked = pushEnabled;
-    }
-    
-    if (toggleMarketingPush) {
-      toggleMarketingPush.checked = marketingPushEnabled;
-      toggleMarketingPush.disabled = !pushEnabled;
-    }
-    
-    if (rowMarketingPush) {
-      rowMarketingPush.style.opacity = pushEnabled ? '1' : '0.5';
+    // Skip overwriting toggle states if a toggle action is currently in progress
+    // (prevents Firestore snapshot listener from reverting the user's click)
+    if (!this._settingsToggleBusy) {
+      if (togglePush) {
+        togglePush.checked = pushEnabled;
+      }
+      
+      if (toggleMarketingPush) {
+        toggleMarketingPush.checked = marketingPushEnabled;
+        toggleMarketingPush.disabled = !pushEnabled;
+      }
+      
+      if (rowMarketingPush) {
+        rowMarketingPush.style.opacity = pushEnabled ? '1' : '0.5';
+      }
     }
 
     // 3. Request native app to check permission
@@ -2213,10 +2217,13 @@ class SimonEduApp {
     if (!togglePush) return;
     
     const isChecked = togglePush.checked;
+    
+    // Set busy flag to prevent renderSettings from overwriting toggle state
+    this._settingsToggleBusy = true;
 
     if (isChecked) {
       // User is turning Push ON. 
-      // If we are on mobile app, check if we need to request permission first.
+      // If we are on mobile app, also request device permission
       if (this.isMobileApp && window.MobileAppChannel) {
         const warningBanner = document.getElementById('settingsWarningBanner');
         if (warningBanner && warningBanner.style.display !== 'none') {
@@ -2224,16 +2231,20 @@ class SimonEduApp {
           window.MobileAppChannel.postMessage(JSON.stringify({
             event: 'request_device_permission'
           }));
-          // We can temporarily revert the switch until the permission callback returns
-          togglePush.checked = false;
-          return;
         }
       }
       
-      // Update firestore
+      // Update firestore regardless of device permission status
       db.collection('users').doc(this.currentUser.id).update({
         pushEnabled: true
-      }).catch(err => console.error("Error updating pushEnabled:", err));
+      }).then(() => {
+        // Enable sub-toggle UI
+        const toggleMarketingPush = document.getElementById('toggleMarketingPush');
+        const rowMarketingPush = document.getElementById('rowMarketingPush');
+        if (toggleMarketingPush) toggleMarketingPush.disabled = false;
+        if (rowMarketingPush) rowMarketingPush.style.opacity = '1';
+      }).catch(err => console.error("Error updating pushEnabled:", err))
+        .finally(() => { this._settingsToggleBusy = false; });
       
     } else {
       // User is turning Push OFF.
@@ -2251,7 +2262,8 @@ class SimonEduApp {
         if (rowMarketingPush) {
           rowMarketingPush.style.opacity = '0.5';
         }
-      }).catch(err => console.error("Error updating pushEnabled:", err));
+      }).catch(err => console.error("Error updating pushEnabled:", err))
+        .finally(() => { this._settingsToggleBusy = false; });
     }
   }
 
@@ -2263,6 +2275,9 @@ class SimonEduApp {
     
     const isChecked = toggleMarketingPush.checked;
     
+    // Set busy flag to prevent renderSettings from overwriting toggle state
+    this._settingsToggleBusy = true;
+    
     if (isChecked) {
       // User toggled it ON. We must show the consent modal `#modalMarketingConsent`.
       const modal = document.getElementById('modalMarketingConsent');
@@ -2270,12 +2285,14 @@ class SimonEduApp {
         modal.classList.add('active');
         modal.style.display = 'flex';
       }
+      // Busy flag will be cleared by acceptMarketingConsent callback
     } else {
       // User toggled it OFF. Update Firestore.
       db.collection('users').doc(this.currentUser.id).update({
         marketingPushEnabled: false,
         marketingAgreedDate: null
-      }).catch(err => console.error("Error updating marketingPushEnabled:", err));
+      }).catch(err => console.error("Error updating marketingPushEnabled:", err))
+        .finally(() => { this._settingsToggleBusy = false; });
     }
   }
 
@@ -2289,14 +2306,15 @@ class SimonEduApp {
     const toggleMarketingPush = document.getElementById('toggleMarketingPush');
 
     if (agreed) {
-      if (!this.currentUser) return;
+      if (!this.currentUser) { this._settingsToggleBusy = false; return; }
       const todayStr = new Date().toISOString();
       db.collection('users').doc(this.currentUser.id).update({
         marketingPushEnabled: true,
         marketingAgreedDate: todayStr
       }).then(() => {
         alert("마케팅 정보 수신에 동의하셨습니다. (동의 일시: " + new Date(todayStr).toLocaleString() + ")");
-      }).catch(err => console.error("Error updating marketingPushEnabled:", err));
+      }).catch(err => console.error("Error updating marketingPushEnabled:", err))
+        .finally(() => { this._settingsToggleBusy = false; });
     } else {
       if (toggleMarketingPush) {
         toggleMarketingPush.checked = false;
@@ -2305,7 +2323,10 @@ class SimonEduApp {
         db.collection('users').doc(this.currentUser.id).update({
           marketingPushEnabled: false,
           marketingAgreedDate: null
-        }).catch(err => console.error("Error reverting marketingPushEnabled:", err));
+        }).catch(err => console.error("Error reverting marketingPushEnabled:", err))
+          .finally(() => { this._settingsToggleBusy = false; });
+      } else {
+        this._settingsToggleBusy = false;
       }
     }
   }
