@@ -36,18 +36,22 @@ class _IntroOverlayState extends State<IntroOverlay> {
         });
         _videoController.play();
         _videoController.setPlaybackSpeed(1.5);
-        _videoController.setLooping(false); // Do not loop, so it stops on the last frame (children & text)
+        _videoController.setLooping(
+            false); // Do not loop, so it stops on the last frame (children & text)
 
         // Listen for the video completion to notify the parent screen
         bool hasCompletedOnce = false;
         _videoController.addListener(() {
           if (!mounted) return;
           final value = _videoController.value;
-          if (value.isInitialized && 
-              value.position >= value.duration - const Duration(milliseconds: 150)) {
+          if (value.duration == Duration.zero) return;
+          if (value.isInitialized &&
+              value.position >=
+                  value.duration - const Duration(milliseconds: 150)) {
             if (!hasCompletedOnce) {
               hasCompletedOnce = true;
-              debugPrint('Video Player marked as completed! position=${value.position}, duration=${value.duration}');
+              debugPrint(
+                  'Video Player marked as completed! position=${value.position}, duration=${value.duration}');
               widget.onVideoCompleted();
             }
           }
@@ -84,7 +88,8 @@ class _IntroOverlayState extends State<IntroOverlay> {
           }
         },
         child: Container(
-          color: Colors.black, // Dark background to prevent flashing during load
+          color:
+              Colors.black, // Dark background to prevent flashing during load
           child: Stack(
             children: [
               // 1. Full-screen Video Player
@@ -93,10 +98,12 @@ class _IntroOverlayState extends State<IntroOverlay> {
                   child: FittedBox(
                     fit: BoxFit.cover,
                     child: SizedBox(
-                      width: _videoController.value.size.width > _videoController.value.size.height
+                      width: _videoController.value.size.width >
+                              _videoController.value.size.height
                           ? _videoController.value.size.height
                           : _videoController.value.size.width,
-                      height: _videoController.value.size.width > _videoController.value.size.height
+                      height: _videoController.value.size.width >
+                              _videoController.value.size.height
                           ? _videoController.value.size.width
                           : _videoController.value.size.height,
                       child: VideoPlayer(_videoController),
@@ -134,10 +141,12 @@ class _IntroOverlayState extends State<IntroOverlay> {
                       style: TextButton.styleFrom(
                         backgroundColor: Colors.black.withOpacity(0.5),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
-                          side: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
+                          side: BorderSide(
+                              color: Colors.white.withOpacity(0.3), width: 1),
                         ),
                       ),
                       onPressed: widget.onSkip,
@@ -169,7 +178,8 @@ class _IntroOverlayState extends State<IntroOverlay> {
                   right: 0,
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.6),
                         borderRadius: BorderRadius.circular(20),
@@ -182,7 +192,8 @@ class _IntroOverlayState extends State<IntroOverlay> {
                             height: 14,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.0,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white70),
                             ),
                           ),
                           SizedBox(width: 10),

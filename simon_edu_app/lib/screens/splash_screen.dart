@@ -13,28 +13,42 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   late final VideoPlayerController _controller;
   bool _isVideoReady = false;
+  bool _hasNavigated = false;
 
   @override
   void initState() {
     super.initState();
     _controller = VideoPlayerController.asset('assets/videos/intro.mp4')
       ..initialize().then((_) {
+        if (!mounted) return;
         setState(() => _isVideoReady = true);
-        // Play at 1.5x speed
-        _controller.setPlaybackSpeed(1.5);
+        _controller.setLooping(false);
         _controller.play();
-        // Listen for completion
-        _controller.addListener(() {
-          if (_controller.value.position >= _controller.value.duration) {
-            _navigateToMain();
-          }
-        });
+      }).catchError((error) {
+        debugPrint('Error initializing splash video: $error');
+        _navigateToMain();
       });
+    _controller.addListener(_handleVideoProgress);
     // Hide system UI for immersive splash
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
+  void _handleVideoProgress() {
+    if (_hasNavigated || !_controller.value.isInitialized) return;
+
+    final duration = _controller.value.duration;
+    if (duration == Duration.zero) return;
+
+    final position = _controller.value.position;
+    if (position >= duration - const Duration(milliseconds: 150)) {
+      _navigateToMain();
+    }
+  }
+
   void _navigateToMain() {
+    if (_hasNavigated) return;
+    _hasNavigated = true;
+
     // Restore UI
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     if (mounted) {
@@ -46,6 +60,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   void dispose() {
+    _controller.removeListener(_handleVideoProgress);
     _controller.dispose();
     super.dispose();
   }
@@ -58,9 +73,15 @@ class _SplashScreenState extends State<SplashScreen> {
         children: [
           Center(
             child: _isVideoReady
-                ? AspectRatio(
-                    aspectRatio: _controller.value.aspectRatio,
-                    child: VideoPlayer(_controller),
+                ? SizedBox.expand(
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: SizedBox(
+                        width: _controller.value.size.width,
+                        height: _controller.value.size.height,
+                        child: VideoPlayer(_controller),
+                      ),
+                    ),
                   )
                 : const CircularProgressIndicator(color: Colors.white),
           ),
@@ -72,11 +93,13 @@ class _SplashScreenState extends State<SplashScreen> {
                 child: GestureDetector(
                   onTap: _navigateToMain,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.6),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+                      border: Border.all(
+                          color: Colors.white.withOpacity(0.2), width: 1),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,

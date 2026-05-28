@@ -47,14 +47,14 @@ class MyApp extends StatelessWidget {
       textTheme: const TextTheme(
         bodyLarge: TextStyle(color: Color(0xFF3D341C)),
         bodyMedium: TextStyle(color: Color(0xFF6B5C37)),
-        titleLarge: TextStyle(color: Color(0xFF3D341C), fontWeight: FontWeight.bold),
+        titleLarge:
+            TextStyle(color: Color(0xFF3D341C), fontWeight: FontWeight.bold),
         labelLarge: TextStyle(color: Color(0xFF96855B)),
       ),
     );
 
     // Dark theme – use same seed but dark brightness
     final darkTheme = ThemeData.dark().copyWith(
-      useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
         seedColor: const Color(0xFFB8860B),
         brightness: Brightness.dark,

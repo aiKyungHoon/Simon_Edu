@@ -24,10 +24,7 @@ class DefaultFirebaseOptions {
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for android - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return android;
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
@@ -51,6 +48,14 @@ class DefaultFirebaseOptions {
         );
     }
   }
+
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyBLd1apbvuFsfGfiHViiV47OY1hvHVCHU4',
+    appId: '1:895429107859:android:7aa8a0f728f7cb9a47ed66',
+    messagingSenderId: '895429107859',
+    projectId: 'simon-edu-bible-game',
+    storageBucket: 'simon-edu-bible-game.firebasestorage.app',
+  );
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAqCk33u84DKnWkKq22amPEmB-UwJ75-B4',
