@@ -158,6 +158,31 @@
             <label for="authPassword">비밀번호</label>
             <input type="password" id="authPassword" class="input-field" placeholder="비밀번호를 입력하세요" required>
           </div>
+          
+          <div class="form-group" id="termsConsentGroup" style="display: none; margin-top: 1rem; border-top: 1px dashed var(--glass-border); padding-top: 1rem;">
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; text-align: left;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="consentAll" onchange="app.handleConsentAllChange(this)" style="width: 18px; height: 18px; cursor: pointer;">
+                <label for="consentAll" style="font-weight: bold; font-size: 0.9rem; cursor: pointer; margin: 0; display: inline; color: var(--text-primary);">전체 동의하기</label>
+              </div>
+              <hr style="margin: 0.25rem 0; border: 0; border-top: 1px solid var(--glass-border);">
+              <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <input type="checkbox" id="consentTerms" class="consent-checkbox" onchange="app.validateSignup()" style="width: 16px; height: 16px; cursor: pointer;">
+                  <label for="consentTerms" style="font-size: 0.85rem; cursor: pointer; margin: 0; display: inline; color: var(--text-secondary);">이용약관 동의 <span style="color: var(--accent-rose); font-weight: bold;">(필수)</span></label>
+                </div>
+                <a href="#" onclick="app.openModal('modalTerms'); return false;" style="font-size: 0.8rem; color: var(--accent-purple); text-decoration: underline;">보기</a>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <input type="checkbox" id="consentPrivacy" class="consent-checkbox" onchange="app.validateSignup()" style="width: 16px; height: 16px; cursor: pointer;">
+                  <label for="consentPrivacy" style="font-size: 0.85rem; cursor: pointer; margin: 0; display: inline; color: var(--text-secondary);">개인정보 처리방침 동의 <span style="color: var(--accent-rose); font-weight: bold;">(필수)</span></label>
+                </div>
+                <a href="#" onclick="app.openModal('modalPrivacy'); return false;" style="font-size: 0.8rem; color: var(--accent-purple); text-decoration: underline;">보기</a>
+              </div>
+            </div>
+          </div>
+
           <button type="submit" class="btn-primary" id="btnAuthSubmit" style="margin-top: 1rem;">로그인</button>
           <button type="button" class="btn-game secondary" id="btnTrialStart" style="margin-top: 0.5rem; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.25rem; border-color: var(--accent-purple); color: var(--accent-purple); background: transparent;" onclick="app.openModal('modalTrialConfirm')">
             <span class="material-icons-round" style="font-size: 1.15rem;">play_arrow</span>
