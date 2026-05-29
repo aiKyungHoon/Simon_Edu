@@ -654,6 +654,7 @@ class SimonEduApp {
     if (this.currentUser && this.currentUser.isTrial) {
       this.currentUser = null;
       this.isTrialMode = false;
+      document.body.classList.remove('logged-in');
       const authForm = document.getElementById('authForm');
       if (authForm) authForm.reset();
       const userNav = document.getElementById('userNav');
@@ -809,6 +810,7 @@ class SimonEduApp {
       isTrial: true
     };
     this.isTrialMode = true;
+    document.body.classList.add('logged-in');
     this.renderAppForUser();
   }
 
@@ -824,6 +826,7 @@ class SimonEduApp {
     const btnNavAdmin = document.getElementById('btnNavAdmin');
     if (btnNavAdmin) btnNavAdmin.style.display = 'none';
     
+    document.body.classList.remove('logged-in');
     this.switchView('auth');
     this.setAuthTab(tabName);
   }
@@ -1006,7 +1009,7 @@ class SimonEduApp {
         }
       }
       
-      if (needsDatabaseHealing && this.currentUser.id) {
+      if (needsDatabaseHealing && this.currentUser.id && !this.currentUser.isTrial) {
         history.sort();
         // Update local object to reflect healed data immediately
         this.currentUser.checkInHistory = history;
@@ -1234,9 +1237,21 @@ class SimonEduApp {
 
       // Update rank summary badge
       const rankTextEl = document.getElementById('userRankingText');
-      if (rankTextEl) rankTextEl.textContent = `현재 ${myRank}위입니다!`;
+      if (rankTextEl) {
+        if (this.currentUser.isTrial) {
+          rankTextEl.textContent = `체험 모드 (랭킹 미등록)`;
+        } else {
+          rankTextEl.textContent = `현재 ${myRank}위입니다!`;
+        }
+      }
       const rankPctEl = document.getElementById('userRankingPct');
-      if (rankPctEl) rankPctEl.textContent = `전체 ${totalCount}명 중 상위 ${rankPercentage}%`;
+      if (rankPctEl) {
+        if (this.currentUser.isTrial) {
+          rankPctEl.textContent = `회원가입 후 랭킹에 도전해보세요!`;
+        } else {
+          rankPctEl.textContent = `전체 ${totalCount}명 중 상위 ${rankPercentage}%`;
+        }
+      }
 
       // Render Top 10 users
       sortedUsers.slice(0, 10).forEach((user) => {
@@ -1404,6 +1419,12 @@ class SimonEduApp {
       timestamp: Date.now(),
       read: false
     };
+    if (this.currentUser.isTrial) {
+      if (!this.currentUser.notifications) this.currentUser.notifications = [];
+      this.currentUser.notifications.push(newNotification);
+      this.renderNotifications();
+      return;
+    }
     db.collection('users').doc(this.currentUser.id).update({
       notifications: firebase.firestore.FieldValue.arrayUnion(newNotification)
     }).catch(err => console.error("Error adding notification:", err));
@@ -1439,6 +1460,12 @@ class SimonEduApp {
     
     const notifications = this.currentUser.notifications || [];
     const updatedNotifications = notifications.map(n => ({ ...n, read: true }));
+    
+    if (this.currentUser.isTrial) {
+      this.currentUser.notifications = updatedNotifications;
+      this.renderNotifications();
+      return;
+    }
     
     db.collection('users').doc(this.currentUser.id).update({
       notifications: updatedNotifications
@@ -1584,6 +1611,10 @@ class SimonEduApp {
 
   checkIn() {
     if (!this.currentUser) return;
+    if (this.currentUser.isTrial) {
+      this.openModal('modalTrialRestrictAttendance');
+      return;
+    }
 
     const todayStr = this.getRelativeDateStr(0);
     const checkInResult = this.calculateCheckInReward();
@@ -2065,6 +2096,15 @@ class SimonEduApp {
   confirmResetAndReview() {
     if (!this.currentUser) return;
     this.closeModal('modalReviewConfirm');
+    if (this.currentUser.isTrial) {
+      this.currentUser.currentVerseIndex = 0;
+      this.currentUser.lastMissionDate = null;
+      const bibleData = window.BIBLE_DATA;
+      this.currentQuizVerse = bibleData[0];
+      this.switchView('game');
+      this.initializeQuiz();
+      return;
+    }
     db.collection('users').doc(this.currentUser.id).update({
       currentVerseIndex: 0,
       lastMissionDate: null
@@ -2319,6 +2359,13 @@ class SimonEduApp {
       lastMissionDate = dateObj.toISOString().split('T')[0];
     }
 
+    if (this.currentUser.isTrial) {
+      this.currentUser.lastCheckInDate = lastCheckInDate;
+      this.currentUser.lastMissionDate = lastMissionDate;
+      alert(`시간을 ${days}일 앞으로 이동시켰습니다! (출석 체크 및 일일 암송 미션이 리셋되어, 다음 절 말씀을 바로 암송하고 출석을 이어나갈 수 있습니다.)`);
+      return;
+    }
+
     db.collection('users').doc(this.currentUser.id).update({
       lastCheckInDate: lastCheckInDate,
       lastMissionDate: lastMissionDate
@@ -2331,6 +2378,14 @@ class SimonEduApp {
     if (!this.currentUser) return;
     
     const todayStr = this.getRelativeDateStr(0);
+    if (this.currentUser.isTrial) {
+      this.currentUser.lastCheckInDate = null;
+      if (this.currentUser.checkInHistory) {
+        this.currentUser.checkInHistory = this.currentUser.checkInHistory.filter(d => d !== todayStr);
+      }
+      alert('오늘의 출석 체크 기록이 리셋되었습니다. 대시보드에서 출석을 진행해 보세요!');
+      return;
+    }
     db.collection('users').doc(this.currentUser.id).update({
       lastCheckInDate: null,
       checkInHistory: firebase.firestore.FieldValue.arrayRemove(todayStr)
@@ -2357,6 +2412,18 @@ class SimonEduApp {
       date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
     };
 
+    if (this.currentUser.isTrial) {
+      this.currentUser.points += pts;
+      if (!this.currentUser.notifications) this.currentUser.notifications = [];
+      this.currentUser.notifications.push(newNotification);
+      if (!this.currentUser.pointsHistory) this.currentUser.pointsHistory = [];
+      this.currentUser.pointsHistory.push(cheatHistory);
+      this.showPointsFloater(pts, "시뮬레이터 치트 작동!");
+      const navPoints = document.getElementById('navPoints');
+      if (navPoints) navPoints.textContent = this.currentUser.points;
+      return;
+    }
+
     db.collection('users').doc(this.currentUser.id).update({
       points: firebase.firestore.FieldValue.increment(pts),
       notifications: firebase.firestore.FieldValue.arrayUnion(newNotification),
@@ -2371,6 +2438,12 @@ class SimonEduApp {
 
     const nextIdx = this.currentUser.currentVerseIndex + 1;
     if (nextIdx <= window.BIBLE_DATA.length) {
+      if (this.currentUser.isTrial) {
+        this.currentUser.currentVerseIndex = nextIdx;
+        alert(`치트: 다음 절이 성공적으로 해금되었습니다. (현재 ${nextIdx + 1}절 진행 중)`);
+        this.renderDashboard();
+        return;
+      }
       db.collection('users').doc(this.currentUser.id).update({
         currentVerseIndex: nextIdx
       }).then(() => {
@@ -2383,6 +2456,17 @@ class SimonEduApp {
 
   demoResetAllUsers() {
     if (confirm('정말로 본인 계정의 데이터와 암송 진행도를 초기 가입 상태로 되돌리시겠습니까?')) {
+      if (this.currentUser.isTrial) {
+        this.currentUser.points = 0;
+        this.currentUser.consecutiveCheckIns = 0;
+        this.currentUser.lastCheckInDate = null;
+        this.currentUser.checkInHistory = [];
+        this.currentUser.currentVerseIndex = 0;
+        this.currentUser.lastMissionDate = null;
+        alert('사용자 정보와 포인트가 초기 상태로 재설정되었습니다.');
+        this.renderDashboard();
+        return;
+      }
       db.collection('users').doc(this.currentUser.id).update({
         points: 0,
         consecutiveCheckIns: 0,
@@ -2461,6 +2545,16 @@ class SimonEduApp {
 
     if (isGranted && togglePush && !togglePush.checked) {
       togglePush.checked = true;
+      
+      if (this.currentUser && this.currentUser.isTrial) {
+        this.currentUser.pushEnabled = true;
+        const toggleMarketingPush = document.getElementById('toggleMarketingPush');
+        const rowMarketingPush = document.getElementById('rowMarketingPush');
+        if (toggleMarketingPush) toggleMarketingPush.disabled = false;
+        if (rowMarketingPush) rowMarketingPush.style.opacity = '1';
+        return;
+      }
+
       // Trigger the update in Firestore
       db.collection('users').doc(this.currentUser.id).update({
         pushEnabled: true
@@ -2498,6 +2592,16 @@ class SimonEduApp {
         }
       }
       
+      if (this.currentUser.isTrial) {
+        this.currentUser.pushEnabled = true;
+        const toggleMarketingPush = document.getElementById('toggleMarketingPush');
+        const rowMarketingPush = document.getElementById('rowMarketingPush');
+        if (toggleMarketingPush) toggleMarketingPush.disabled = false;
+        if (rowMarketingPush) rowMarketingPush.style.opacity = '1';
+        this._settingsToggleBusy = false;
+        return;
+      }
+
       // Update firestore regardless of device permission status
       db.collection('users').doc(this.currentUser.id).update({
         pushEnabled: true
@@ -2512,6 +2616,22 @@ class SimonEduApp {
       
     } else {
       // User is turning Push OFF.
+      if (this.currentUser.isTrial) {
+        this.currentUser.pushEnabled = false;
+        this.currentUser.marketingPushEnabled = false;
+        const toggleMarketingPush = document.getElementById('toggleMarketingPush');
+        const rowMarketingPush = document.getElementById('rowMarketingPush');
+        if (toggleMarketingPush) {
+          toggleMarketingPush.checked = false;
+          toggleMarketingPush.disabled = true;
+        }
+        if (rowMarketingPush) {
+          rowMarketingPush.style.opacity = '0.5';
+        }
+        this._settingsToggleBusy = false;
+        return;
+      }
+
       db.collection('users').doc(this.currentUser.id).update({
         pushEnabled: false,
         marketingPushEnabled: false
@@ -2552,6 +2672,13 @@ class SimonEduApp {
       // Busy flag will be cleared by acceptMarketingConsent callback
     } else {
       // User toggled it OFF. Update Firestore.
+      if (this.currentUser.isTrial) {
+        this.currentUser.marketingPushEnabled = false;
+        this.currentUser.marketingAgreedDate = null;
+        this._settingsToggleBusy = false;
+        return;
+      }
+
       db.collection('users').doc(this.currentUser.id).update({
         marketingPushEnabled: false,
         marketingAgreedDate: null
@@ -2572,6 +2699,15 @@ class SimonEduApp {
     if (agreed) {
       if (!this.currentUser) { this._settingsToggleBusy = false; return; }
       const todayStr = new Date().toISOString();
+      
+      if (this.currentUser.isTrial) {
+        this.currentUser.marketingPushEnabled = true;
+        this.currentUser.marketingAgreedDate = todayStr;
+        alert("마케팅 정보 수신에 동의하셨습니다. (동의 일시: " + new Date(todayStr).toLocaleString() + ")");
+        this._settingsToggleBusy = false;
+        return;
+      }
+
       db.collection('users').doc(this.currentUser.id).update({
         marketingPushEnabled: true,
         marketingAgreedDate: todayStr
@@ -2584,6 +2720,13 @@ class SimonEduApp {
         toggleMarketingPush.checked = false;
       }
       if (this.currentUser) {
+        if (this.currentUser.isTrial) {
+          this.currentUser.marketingPushEnabled = false;
+          this.currentUser.marketingAgreedDate = null;
+          this._settingsToggleBusy = false;
+          return;
+        }
+
         db.collection('users').doc(this.currentUser.id).update({
           marketingPushEnabled: false,
           marketingAgreedDate: null
