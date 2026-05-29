@@ -45,7 +45,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
   bool _isProfileLoading = true;
   List<dynamic> _pointsHistory = [];
 
-  final String _targetUrl = 'https://simon-edu-bible-game.firebaseapp.com?v=1.4.6';
+  final String _targetUrl = 'https://simon-edu-bible-game.firebaseapp.com?v=1.4.7';
 
   @override
   void initState() {

@@ -815,7 +815,7 @@ class SimonEduApp {
   }
 
   switchToAuthFromTrial(tabName) {
-    ['modalTrialRestrictRanking', 'modalTrialRestrictPoints', 'modalTrialRestrictAttendance', 'modalTrialQuizComplete', 'modalTrialConfirm'].forEach(mId => {
+    ['modalTrialRestrictRanking', 'modalTrialRestrictPoints', 'modalTrialRestrictAttendance', 'modalTrialQuizComplete', 'modalTrialConfirm', 'modalTrialUserMenu'].forEach(mId => {
       this.closeModal(mId);
     });
     this.currentUser = null;
@@ -829,6 +829,19 @@ class SimonEduApp {
     document.body.classList.remove('logged-in');
     this.switchView('auth');
     this.setAuthTab(tabName);
+  }
+
+  handleUserAvatarClick() {
+    if (this.currentUser && this.currentUser.isTrial) {
+      this.openModal('modalTrialUserMenu');
+    } else {
+      this.switchView('settings');
+    }
+  }
+
+  switchToAuthFromTrialMenu(tabName) {
+    this.closeModal('modalTrialUserMenu');
+    this.switchToAuthFromTrial(tabName);
   }
 
   renderAppForUser() {

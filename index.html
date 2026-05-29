@@ -7,13 +7,13 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.4.6">
+  <link rel="stylesheet" href="style.css?v=1.4.7">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
   <script>
     (function() {
-      const APP_VER = '1.4.6';
+      const APP_VER = '1.4.7';
       if (localStorage.getItem('app_version') !== APP_VER) {
         localStorage.setItem('app_version', APP_VER);
         if ('caches' in window) {
@@ -114,7 +114,7 @@
           <span class="material-icons-round" style="font-size: 1.1rem; color: #f59e0b;">monetization_on</span>
           <span id="navPoints">0</span> P
         </div>
-        <div class="nav-user-info">
+        <div class="nav-user-info" onclick="app.handleUserAvatarClick()">
           <div class="user-avatar" id="navAvatar">U</div>
           <span id="navUsername" style="font-weight: 600; font-size: 0.95rem;">사용자</span>
         </div>
@@ -1565,6 +1565,30 @@
     </div>
   </div>
 
+  <!-- Modal: Trial User Menu -->
+  <div class="modal-overlay" id="modalTrialUserMenu">
+    <div class="modal-content glass-panel" style="border-color: var(--accent-purple); max-width: 400px; display: flex; flex-direction: column; padding: 2rem; max-height: 85vh;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; width: 100%;">
+        <div class="modal-title" style="color: var(--accent-purple); margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.3rem;">
+          <span class="material-icons-round">account_circle</span>
+          체험 사용자 메뉴
+        </div>
+        <button onclick="app.closeModal('modalTrialUserMenu')" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; padding: 4px; border-radius: 50%;">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="terms-content" style="flex: 1; overflow-y: auto; text-align: center; font-size: 0.95rem; line-height: 1.8; padding: 0.5rem 0; color: var(--text-secondary); word-break: keep-all;">
+        <p style="font-weight: bold; color: var(--text-primary); margin-top: 0; font-size: 1.05rem;">현재 체험 모드로 이용 중입니다.</p>
+        <p style="margin-top: 0.5rem;">회원가입 또는 로그인하시겠습니까?</p>
+      </div>
+      <div class="modal-btn-container" style="display: flex; flex-direction: column; gap: 0.75rem; justify-content: center; width: 100%; margin-top: 1.5rem;">
+        <button class="btn-primary" style="margin: 0; background: var(--accent-purple); width: 100%; height: 44px;" onclick="app.switchToAuthFromTrialMenu('signup')">회원가입 하러가기</button>
+        <button class="btn-game secondary" style="margin: 0; border-color: var(--accent-purple); color: var(--accent-purple); width: 100%; height: 44px;" onclick="app.switchToAuthFromTrialMenu('login')">로그인 하러가기</button>
+        <button class="btn-game secondary" style="margin: 0; color: var(--text-muted); border-color: var(--glass-border); width: 100%; height: 44px;" onclick="app.closeModal('modalTrialUserMenu')">체험 계속하기</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Floating point system container -->
   <div class="floating-point-container" id="floatingPointContainer"></div>
 
@@ -1579,7 +1603,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
-  <script src="bible_data.js?v=1.4.6"></script>
-  <script src="app.js?v=1.4.6"></script>
+  <script src="bible_data.js?v=1.4.7"></script>
+  <script src="app.js?v=1.4.7"></script>
 </body>
 </html>
