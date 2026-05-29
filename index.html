@@ -1029,55 +1029,183 @@
           <span class="material-icons-round">close</span>
         </button>
       </div>
-      <div class="terms-content" style="flex: 1; overflow-y: auto; text-align: left; font-size: 0.85rem; line-height: 1.6; padding-right: 0.5rem; color: var(--text-secondary);">
-        <h4 style="margin-top: 0; color: var(--text-primary);">Simon Edu 개인정보처리방침</h4>
-        <p>Simon Edu(이하 “서비스”)는 이용자의 개인정보를 중요하게 생각하며, 「개인정보 보호법」 등 관련 법령을 준수합니다.</p>
-        <p>본 개인정보처리방침은 Simon Edu 서비스 이용과 관련하여 이용자의 개인정보가 어떤 항목으로 수집되고, 어떤 목적으로 이용되며, 어떻게 보관·파기되는지 안내하기 위해 작성되었습니다.</p>
-        <hr style="border: 0; border-top: 1px solid var(--glass-border); margin: 1rem 0;">
-        <p><strong>1. 수집하는 개인정보 항목</strong><br>
-        서비스는 회원가입, 로그인, 성경 문구 학습, 답안 작성, 포인트 적립 및 서비스 운영을 위해 아래 정보를 수집할 수 있습니다.<br>
-        1) 회원가입 및 로그인 정보<br>
-        &nbsp;&nbsp;* 아이디, 이름, 이메일 주소, 비밀번호 입력값<br>
-        &nbsp;&nbsp;(비밀번호는 Firebase Authentication을 통해 로그인 인증 목적으로 처리되며, Simon Edu는 비밀번호를 별도 데이터베이스에 직접 저장하거나 조회하지 않습니다.)<br>
-        2) 서비스 이용 과정에서 생성되는 정보<br>
-        &nbsp;&nbsp;* 성경 문구 답안 작성 내역, 학습 진행도, 포인트 적립 및 사용 내역, 출석 기록, 연속 출석 정보, 미션 수행 내역, 서비스 이용 기록, 접속 로그, 기기 정보, IP 주소</p>
-        <p><strong>2. 개인정보 수집 및 이용 목적</strong><br>
-        서비스는 수집한 개인정보를 아래 목적으로 이용합니다.<br>
-        1) 회원 관리: 회원가입 처리, 로그인 및 계정 인증, 회원 식별, 계정 관리, 부정 이용 방지<br>
-        2) 서비스 제공: 성경 문구 학습 기능 제공, 답안 작성 및 저장 기능 제공, 학습 진행도 저장, 출석 및 미션 기능 제공, 포인트 적립 및 사용 내역 관리<br>
-        3) 서비스 운영 및 개선: 서비스 오류 확인, 서비스 안정성 확보, 이용 통계 분석, 사용자 경험 개선, 고객 문의 대응, 부정 이용 및 비정상 이용 패턴 확인</p>
-        <p><strong>3. Firebase Authentication 이용 안내</strong><br>
-        Simon Edu는 회원가입 및 로그인을 위해 Firebase Authentication을 사용할 수 있습니다. Firebase Authentication을 통해 이메일 주소와 비밀번호 기반 로그인이 처리되며, 비밀번호는 인증 목적으로만 사용됩니다. Simon Edu는 비밀번호를 별도 데이터베이스에 직접 저장하거나 조회하지 않습니다.</p>
-        <p><strong>4. 개인정보 보유 및 이용 기간</strong><br>
-        서비스는 개인정보 수집 및 이용 목적이 달성된 후에는 해당 정보를 지체 없이 파기합니다. 회원 탈퇴 시 계정 정보, 학습 기록, 답안 작성 내역, 출석 기록, 포인트 정보는 관련 정책에 따라 삭제 또는 소멸됩니다. 단, 관계 법령에 따라 일정 기간 보관이 필요한 정보는 해당 법령에서 정한 기간 동안 보관할 수 있습니다.<br>
-        - 로그인 기록: 3개월 (통신비밀보호법)<br>
-        - 소비자 불만 또는 분쟁 처리 기록: 3년 (전자상거래 등에서의 소비자보호에 관한 법률)<br>
-        - 계약 또는 청약철회 관련 기록: 5년 (전자상거래 등에서의 소비자보호에 관한 법률)</p>
-        <p><strong>5. 개인정보의 제3자 제공</strong><br>
-        서비스는 이용자의 개인정보를 원칙적으로 제3자에게 제공하지 않습니다. 다만, 이용자가 사전에 동의한 경우, 법령에 따라 제공 의무가 발생한 경우, 수사기관 등 공공기관이 법령에 따라 정당하게 요청한 경우에는 예외로 합니다. Simon Edu는 이용자의 개인정보를 광고 목적 또는 제3자 마케팅 목적으로 판매하거나 제공하지 않습니다.</p>
-        <p><strong>6. 개인정보 처리 위탁</strong><br>
-        서비스는 안정적인 서비스 제공을 위해 일부 개인정보 처리를 외부 서비스에 위탁할 수 있습니다.<br>
-        - 수탁 업체: Google Firebase<br>
-        - 이용 목적: 회원가입, 로그인 인증, 데이터 저장, 서비스 운영<br>
-        위탁 내용이 변경되는 경우 본 개인정보처리방침 또는 서비스 내 공지를 통해 안내합니다.</p>
-        <p><strong>7. 포인트 및 답안 데이터 처리</strong><br>
-        서비스는 성경 문구 답안 작성, 출석, 미션 수행 등 학습 활동에 따라 포인트를 적립할 수 있습니다. 포인트와 답안 데이터는 회원별 학습 기록 관리, 포인트 지급, 부정 적립 방지 및 서비스 운영 목적으로 사용됩니다. 포인트는 Simon Edu 서비스 내에서만 사용 가능한 보상이며, 현금으로 환전되지 않습니다. 부정 적립, 중복 적립, 시스템 오류 악용 등이 확인될 경우 포인트는 회수될 수 있으며, 계정 이용이 제한될 수 있습니다.</p>
-        <p><strong>8. 이용자의 권리 및 행사 방법</strong><br>
-        이용자는 언제든지 자신의 개인정보에 대해 조회, 수정, 회원 탈퇴, 계정 삭제 요청, 개인정보 삭제 요청의 권리를 행사할 수 있습니다. 서비스 내 회원 정보 화면 또는 고객센터 문의를 통해 위 권리를 행사할 수 있으며, 서비스는 요청 확인 후 지체 없이 처리합니다.</p>
-        <p><strong>9. 회원 탈퇴 및 계정 삭제</strong><br>
-        이용자는 언제든지 서비스 내 회원 탈퇴 기능 또는 고객센터 문의를 통해 계정 삭제를 요청할 수 있습니다. 회원 탈퇴 시 계정 정보, 이름, 이메일 주소, 아이디, 성경 문구 답안 작성 내역, 학습 진행도, 출석 기록, 포인트 적립 및 사용 내역은 삭제 또는 소멸되며 복구할 수 없습니다.</p>
-        <p><strong>10. 개인정보의 파기 절차 및 방법</strong><br>
-        서비스는 목적 달성 또는 회원 탈퇴 시 개인정보를 지체 없이 파기합니다. 전자적 파일 형태는 복구 및 재생이 불가능한 방법으로 삭제하며, 종이 문서는 분쇄 또는 소각합니다.</p>
-        <p><strong>11. 개인정보 보호를 위한 조치</strong><br>
-        서비스는 개인정보 접근 권한 제한, 관리자 권한 분리, 서비스 접근 기록 관리, Firebase Authentication을 통한 로그인 인증, 외부 노출 방지를 위한 보안 관리, 부정 이용 및 비정상 이용 패턴 확인 등의 조치를 시행합니다.</p>
-        <p><strong>12. 쿠키 및 접속 정보 사용</strong><br>
-        서비스는 로그인 유지, 서비스 이용 분석 등을 위해 쿠키 또는 유사 기술을 사용할 수 있습니다. 이용자는 설정을 통해 쿠키 저장을 제한할 수 있습니다.</p>
-        <p><strong>13. 만 14세 미만 아동의 개인정보</strong><br>
-        서비스가 만 14세 미만 아동의 개인정보를 수집해야 하는 경우 법정대리인의 동의를 받으며, 운영 정책상 가입 및 이용이 제한될 수 있습니다.</p>
-        <p><strong>14. 개인정보 보호책임자</strong><br>
-        - 담당자: Simon Edu 운영팀<br>
-        - 이메일: simon660314@gmail.com</p>
-        <p style="margin-bottom: 0;"><strong>부칙</strong><br>시행일자: 2026년 5월 28일</p>
+      <div class="terms-content" style="flex: 1; overflow-y: auto; text-align: left; font-size: 0.85rem; line-height: 1.7; padding-right: 0.5rem; color: var(--text-secondary);">
+        <h4 style="margin-top: 0; color: var(--text-primary); font-size: 1.15rem; font-weight: bold; border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; margin-bottom: 1.5rem;">Simon Edu 개인정보처리방침</h4>
+        
+        <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 1.5rem; word-break: keep-all; padding-left: 0.6rem;">
+          <p style="margin: 0 0 0.5rem 0;">Simon Edu(이하 “서비스”)는 이용자의 개인정보를 중요하게 생각하며, 「개인정보 보호법」 등 관련 법령을 준수합니다.</p>
+          <p style="margin: 0;">본 개인정보처리방침은 Simon Edu 서비스 이용과 관련하여 이용자의 개인정보가 어떤 항목으로 수집되고, 어떤 목적으로 이용되며, 어떻게 보관·파기되는지 안내하기 위해 작성되었습니다.</p>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            1. 수집하는 개인정보 항목
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.5rem;">서비스는 회원가입, 로그인, 성경 문구 학습, 답안 작성, 포인트 적립 및 서비스 운영을 위해 아래 정보를 수집할 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem; font-weight: 600; color: var(--text-primary);">1) 회원가입 및 로그인 정보</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 1.6rem; color: var(--text-muted);">
+              • 아이디, 이름, 이메일 주소, 비밀번호 입력값<br>
+              <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 0.2rem; line-height: 1.5;">(비밀번호는 Firebase Authentication을 통해 로그인 인증 목적으로 처리되며, Simon Edu는 비밀번호를 별도 데이터베이스에 직접 저장하거나 조회하지 않습니다.)</span>
+            </div>
+            <div style="margin-top: 0.8rem; margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem; font-weight: 600; color: var(--text-primary);">2) 서비스 이용 과정에서 생성되는 정보</div>
+            <div style="padding-left: 1.6rem; color: var(--text-muted);">
+              • 성경 문구 답안 작성 내역, 학습 진행도, 포인트 적립 및 사용 내역, 출석 기록, 연속 출석 정보, 미션 수행 내역, 서비스 이용 기록, 접속 로그, 기기 정보, IP 주소
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            2. 개인정보 수집 및 이용 목적
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.5rem;">서비스는 수집한 개인정보를 아래 목적으로 이용합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;"><span style="font-weight: bold; color: var(--text-primary);">1) 회원 관리:</span> 회원가입 처리, 로그인 및 계정 인증, 회원 식별, 계정 관리, 부정 이용 방지</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;"><span style="font-weight: bold; color: var(--text-primary);">2) 서비스 제공:</span> 성경 문구 학습 기능 제공, 답안 작성 및 저장 기능 제공, 학습 진행도 저장, 출석 및 미션 기능 제공, 포인트 적립 및 사용 내역 관리</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;"><span style="font-weight: bold; color: var(--text-primary);">3) 서비스 운영 및 개선:</span> 서비스 오류 확인, 서비스 안정성 확보, 이용 통계 분석, 사용자 경험 개선, 고객 문의 대응, 부정 이용 및 비정상 이용 패턴 확인</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            3. Firebase Authentication 이용 안내
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            Simon Edu는 회원가입 및 로그인을 위해 Firebase Authentication을 사용할 수 있습니다. Firebase Authentication을 통해 이메일 주소와 비밀번호 기반 로그인이 처리되며, 비밀번호는 인증 목적으로만 사용됩니다. Simon Edu는 비밀번호를 별도 데이터베이스에 직접 저장하거나 조회하지 않습니다.
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            4. 개인정보 보유 및 이용 기간
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.5rem;">서비스는 개인정보 수집 및 이용 목적이 달성된 후에는 해당 정보를 지체 없이 파기합니다. 회원 탈퇴 시 계정 정보, 학습 기록, 답안 작성 내역, 출석 기록, 포인트 정보는 관련 정책에 따라 삭제 또는 소멸됩니다. 단, 관계 법령에 따라 일정 기간 보관이 필요한 정보는 해당 법령에서 정한 기간 동안 보관할 수 있습니다.</div>
+            <div style="padding-left: 0.8rem; color: var(--text-muted);">
+              <div style="margin-bottom: 0.3rem;">• 로그인 기록: 3개월 (통신비밀보호법)</div>
+              <div style="margin-bottom: 0.3rem;">• 소비자 불만 또는 분쟁 처리 기록: 3년 (전자상거래 등에서의 소비자보호에 관한 법률)</div>
+              <div style="margin-bottom: 0.3rem;">• 계약 또는 청약철회 관련 기록: 5년 (전자상거래 등에서의 소비자보호에 관한 법률)</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            5. 개인정보의 제3자 제공
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            서비스는 이용자의 개인정보를 원칙적으로 제3자에게 제공하지 않습니다. 다만, 이용자가 사전에 동의한 경우, 법령에 따라 제공 의무가 발생한 경우, 수사기관 등 공공기관이 법령에 따라 정당하게 요청한 경우에는 예외로 합니다. Simon Edu는 이용자의 개인정보를 광고 목적 또는 제3자 마케팅 목적으로 판매하거나 제공하지 않습니다.
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            6. 개인정보 처리 위탁
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.5rem;">서비스는 안정적인 서비스 제공을 위해 일부 개인정보 처리를 외부 서비스에 위탁할 수 있습니다.</div>
+            <div style="padding-left: 0.8rem; margin-bottom: 0.5rem;">
+              <div style="margin-bottom: 0.3rem;">• 수탁 업체: Google Firebase</div>
+              <div style="margin-bottom: 0.3rem;">• 이용 목적: 회원가입, 로그인 인증, 데이터 저장, 서비스 운영</div>
+            </div>
+            <div>위탁 내용이 변경되는 경우 본 개인정보처리방침 또는 서비스 내 공지를 통해 안내합니다.</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            7. 포인트 및 답안 데이터 처리
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            포인트와 답안 데이터는 회원별 학습 기록 관리, 포인트 지급, 부정 적립 방지 및 서비스 운영 목적으로 사용됩니다. 포인트는 Simon Edu 서비스 내에서만 사용 가능한 보상이며, 현금으로 환전되지 않습니다. 부정 적립, 중복 적립, 시스템 오류 악용 등이 확인될 경우 포인트는 회수될 수 있으며, 계정 이용이 제한될 수 있습니다.
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            8. 이용자의 권리 및 행사 방법
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            이용자는 언제든지 자신의 개인정보에 대해 조회, 수정, 회원 탈퇴, 계정 삭제 요청, 개인정보 삭제 요청의 권리를 행사할 수 있습니다. 서비스 내 회원 정보 화면 또는 고객센터 문의를 통해 위 권리를 행사할 수 있으며, 서비스는 요청 확인 후 지체 없이 처리합니다.
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            9. 회원 탈퇴 및 계정 삭제
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            이용자는 언제든지 서비스 내 회원 탈퇴 기능 또는 고객센터 문의를 통해 계정 삭제를 요청할 수 있습니다. 회원 탈퇴 시 계정 정보, 이름, 이메일 주소, 아이디, 성경 문구 답안 작성 내역, 학습 진행도, 출석 기록, 포인트 적립 및 사용 내역은 삭제 또는 소멸되며 복구할 수 없습니다.
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            10. 개인정보의 파기 절차 및 방법
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            서비스는 목적 달성 또는 회원 탈퇴 시 개인정보를 지체 없이 파기합니다. 전자적 파일 형태는 복구 및 재생이 불가능한 방법으로 삭제하며, 종이 문서는 분쇄 또는 소각합니다.
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            11. 개인정보 보호를 위한 조치
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            서비스는 개인정보 접근 권한 제한, 관리자 권한 분리, 서비스 접근 기록 관리, Firebase Authentication을 통한 로그인 인증, 외부 노출 방지를 위한 보안 관리, 부정 이용 및 비정상 이용 패턴 확인 등의 조치를 시행합니다.
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            12. 쿠키 및 접속 정보 사용
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            서비스는 로그인 유지, 서비스 이용 분석 등을 위해 쿠키 또는 유사 기술을 사용할 수 있습니다. 이용자는 설정을 통해 쿠키 저장을 제한할 수 있습니다.
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            13. 만 14세 미만 아동의 개인정보
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            서비스가 만 14세 미만 아동의 개인정보를 수집해야 하는 경우 법정대리인의 동의를 받으며, 운영 정책상 가입 및 이용이 제한될 수 있습니다.
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            14. 개인정보 보호책임자
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="padding-left: 0.8rem;">
+              <div style="margin-bottom: 0.3rem;">• 담당자: Simon Edu 운영팀</div>
+              <div style="margin-bottom: 0.3rem;">• 이메일: <a href="mailto:simon660314@gmail.com" style="color: var(--accent-purple); font-weight: 500; text-decoration: underline;">simon660314@gmail.com</a></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 2.5rem; border-top: 1px solid var(--glass-border); padding-top: 20px;">
+          <p style="margin: 0; font-weight: bold; color: var(--text-primary); font-size: 0.95rem;">부칙</p>
+          <p style="margin: 8px 0 0 0; font-size: 0.82rem; color: var(--text-muted);">시행일자: 2026년 5월 28일</p>
+        </div>
       </div>
       <div class="modal-btn-container" style="margin-top: 1rem; width: 100%;">
         <button class="btn-primary" style="background: var(--accent-purple); width: 100%;" onclick="app.closeModal('modalPrivacy')">확인</button>
