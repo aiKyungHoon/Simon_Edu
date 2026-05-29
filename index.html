@@ -733,113 +733,283 @@
           <span class="material-icons-round">close</span>
         </button>
       </div>
-      <div class="terms-content" style="flex: 1; overflow-y: auto; text-align: left; font-size: 0.85rem; line-height: 1.6; padding-right: 0.5rem; color: var(--text-secondary);">
-        <h4 style="margin-top: 0; color: var(--text-primary);">Simon Edu 이용약관</h4>
-        <p><strong>제1조 목적</strong><br>본 약관은 Simon Edu(이하 “서비스”)가 제공하는 성경 문구 학습, 답안 작성, 포인트 적립 및 관련 서비스의 이용과 관련하여 서비스와 회원 간의 권리, 의무 및 책임사항, 서비스 이용 조건과 절차를 규정함을 목적으로 합니다.</p>
-        <p><strong>제2조 용어의 정의</strong><br>본 약관에서 사용하는 용어의 의미는 다음과 같습니다.<br>
-        1. “서비스”란 Simon Edu가 제공하는 성경 문구 학습, 답안 작성, 출석, 미션, 포인트 적립 및 기타 관련 기능을 말합니다.<br>
-        2. “회원”이란 본 약관에 동의하고 회원가입을 완료한 이용자를 말합니다.<br>
-        3. “아이디”란 회원 식별 및 서비스 이용을 위해 회원이 설정하거나 서비스가 부여한 고유 식별 정보를 말합니다.<br>
-        4. “계정”이란 회원이 서비스를 이용하기 위해 생성한 로그인 정보를 말합니다.<br>
-        5. “답안”이란 회원이 서비스 내 성경 문구 학습 또는 미션 수행 과정에서 작성하거나 제출한 내용을 말합니다.<br>
-        6. “포인트”란 회원의 학습 활동, 답안 작성, 출석, 미션 수행 등에 따라 서비스 내에서 적립되는 보상 단위를 말합니다.<br>
-        7. “운영자”란 서비스의 관리 및 운영을 담당하는 주체를 말합니다.</p>
-        <p><strong>제3조 약관의 효력 및 변경</strong><br>1. 본 약관은 회원가입 시 이용자가 동의함으로써 효력이 발생합니다.<br>
-        2. 서비스는 관련 법령을 위반하지 않는 범위에서 본 약관을 변경할 수 있습니다.<br>
-        3. 약관이 변경되는 경우 서비스는 변경 내용, 적용일자 및 변경 사유를 서비스 내 공지사항 또는 기타 방법으로 사전에 안내합니다.<br>
-        4. 회원이 변경된 약관에 동의하지 않는 경우 회원 탈퇴를 요청할 수 있습니다.<br>
-        5. 변경 약관 적용일 이후에도 서비스를 계속 이용하는 경우 변경된 약관에 동의한 것으로 봅니다.</p>
-        <p><strong>제4조 회원가입</strong><br>1. 이용자는 서비스가 정한 가입 절차에 따라 아이디, 이름, 이메일 주소, 비밀번호를 입력하고 본 약관 및 개인정보처리방침에 동의하여 회원가입을 신청합니다.<br>
-        2. 서비스는 회원가입 신청자에게 계정을 생성하고 서비스를 이용할 수 있도록 합니다.<br>
-        3. 서비스는 다음 각 호에 해당하는 경우 회원가입을 제한하거나 취소할 수 있습니다.<br>
-        &nbsp;&nbsp;1) 허위 정보를 입력한 경우<br>
-        &nbsp;&nbsp;2) 타인의 정보를 도용한 경우<br>
-        &nbsp;&nbsp;3) 서비스 운영을 방해할 목적이 있다고 판단되는 경우<br>
-        &nbsp;&nbsp;4) 이전에 약관 위반으로 이용 제한을 받은 이력이 있는 경우<br>
-        &nbsp;&nbsp;5) 기타 서비스가 부적절하다고 판단하는 경우</p>
-        <p><strong>제5조 계정 및 비밀번호 관리</strong><br>1. 회원은 본인의 계정 정보를 안전하게 관리해야 합니다.<br>
-        2. 회원은 자신의 계정을 제3자에게 양도, 대여, 공유하거나 사용하게 해서는 안 됩니다.<br>
-        3. 계정 관리 소홀, 부정 사용, 제3자 사용 허용으로 인해 발생한 손해는 회원 본인에게 책임이 있습니다.<br>
-        4. 비밀번호는 Firebase Authentication을 통해 로그인 인증 목적으로 처리되며, Simon Edu는 비밀번호를 별도 데이터베이스에 직접 저장하거나 조회하지 않습니다.<br>
-        5. 계정 도용 또는 부정 사용이 의심되는 경우 회원은 즉시 운영자에게 알려야 합니다.</p>
-        <p><strong>제6조 서비스 제공 내용</strong><br>서비스는 회원에게 다음 기능을 제공합니다.<br>
-        1. 성경 문구 학습 기능<br>
-        2. 성경 문구 관련 답안 작성 기능<br>
-        3. 출석 체크 및 연속 출석 관리 기능<br>
-        4. 미션 수행 기능<br>
-        5. 학습 진행도 저장 기능<br>
-        6. 포인트 적립 및 조회 기능<br>
-        7. 회원 정보 관리 기능<br>
-        8. 기타 서비스가 정하는 학습 지원 기능</p>
-        <p><strong>제7조 서비스 이용 조건</strong><br>
-        1. 서비스는 회원가입 후 로그인하여 이용할 수 있습니다.<br>
-        2. 서비스는 일부 기능에 한하여 비회원 또는 체험모드 이용을 제공할 수 있습니다.<br>
-        3. 비회원 또는 체험모드 이용자는 다음 기능을 이용할 수 있습니다.<br>
-        &nbsp;&nbsp;- 오늘의 성경 말씀 보기<br>
-        &nbsp;&nbsp;- 성경 말씀 암송 퀴즈 체험<br>
-        &nbsp;&nbsp;- 학습 결과 확인<br>
-        4. 비회원 또는 체험모드 이용자는 아래 기능을 이용할 수 없습니다.<br>
-        &nbsp;&nbsp;- 포인트 적립 및 사용<br>
-        &nbsp;&nbsp;- 랭킹 확인<br>
-        &nbsp;&nbsp;- 출석 체크<br>
-        &nbsp;&nbsp;- 연속 출석 보상<br>
-        &nbsp;&nbsp;- 학습 기록 저장<br>
-        &nbsp;&nbsp;- 계정 기반 데이터 동기화<br>
-        5. 회원가입 및 로그인한 이용자는 서비스가 제공하는 포인트, 랭킹, 출석, 학습 기록 저장 및 기타 회원 전용 기능을 이용할 수 있습니다.<br>
-        6. 서비스는 운영 정책에 따라 비회원 또는 체험모드 이용 범위를 변경할 수 있으며, 변경 시 서비스 내 공지사항 또는 기타 방법을 통해 안내합니다.</p>
-        <p><strong>제8조 답안 작성 및 회원 콘텐츠</strong><br>1. 회원은 서비스 내에서 성경 문구 학습 또는 미션 수행을 위해 답안을 작성할 수 있습니다.<br>
-        2. 회원이 작성한 답안은 학습 기록 관리, 포인트 적립, 서비스 운영 및 부정 이용 방지 목적으로 이용될 수 있습니다.<br>
-        3. 회원은 타인의 권리, 명예, 사생활을 침해하거나 불법적인 내용을 작성해서는 안 됩니다.<br>
-        4. 서비스는 다음 각 호에 해당하는 답안을 사전 통보 없이 삭제하거나 이용 제한 조치를 할 수 있습니다.<br>
-        &nbsp;&nbsp;1) 욕설, 비방, 혐오, 음란, 폭력적 표현이 포함된 경우<br>
-        &nbsp;&nbsp;2) 타인의 개인정보가 포함된 경우<br>
-        &nbsp;&nbsp;3) 서비스 운영을 방해하는 내용인 경우<br>
-        &nbsp;&nbsp;4) 반복 입력, 자동 입력 등 부정 이용으로 판단되는 경우<br>
-        &nbsp;&nbsp;5) 기타 관련 법령 또는 본 약관을 위반하는 경우</p>
-        <p><strong>제9조 포인트 적립 및 이용</strong><br>1. 포인트는 성경 문구 답안 작성, 출석, 미션 수행 등 서비스가 정한 활동에 따라 적립될 수 있습니다.<br>
-        2. 포인트 적립 기준, 지급 수량, 사용 가능 범위는 서비스 정책에 따라 정해집니다.<br>
-        3. 포인트는 Simon Edu 서비스 내에서만 사용 가능한 보상 단위이며, 현금으로 환전되지 않습니다.<br>
-        4. 포인트는 타인에게 양도, 판매, 대여할 수 없습니다.<br>
-        5. 서비스 오류, 부정 이용, 중복 적립, 시스템 악용으로 적립된 포인트는 사전 안내 후 회수될 수 있습니다.<br>
-        6. 회원 탈퇴 시 보유 포인트는 즉시 소멸되며 복구되지 않습니다.<br>
-        7. 포인트 정책은 서비스 운영 상황에 따라 변경될 수 있으며, 변경 시 서비스 내 공지사항 등을 통해 안내합니다.</p>
-        <p><strong>제10조 금지 행위</strong><br>회원은 서비스 이용 시 다음 행위를 해서는 안 됩니다.<br>
-        1. 허위 정보 입력 또는 타인 정보 도용<br>
-        2. 타인의 계정 이용 또는 계정 공유<br>
-        3. 자동화 프로그램, 매크로, 봇 등을 이용한 답안 작성 또는 포인트 적립<br>
-        4. 동일하거나 무의미한 답안을 반복 제출하여 포인트를 적립하는 행위<br>
-        5. 시스템 오류 또는 허점을 악용하는 행위<br>
-        6. 서비스 운영을 방해하거나 서버에 과도한 부하를 주는 행위<br>
-        7. 타인의 개인정보 또는 권리를 침해하는 행위<br>
-        8. 불법적, 음란, 폭력적, 혐오적 내용을 작성하는 행위<br>
-        9. 서비스 또는 운영자를 사칭하는 행위<br>
-        10. 기타 관련 법령 또는 본 약관을 위반하는 행위</p>
-        <p><strong>제11조 이용 제한</strong><br>1. 서비스는 회원이 본 약관을 위반하거나 부정 이용이 확인되는 경우 서비스 이용을 제한할 수 있습니다.<br>
-        2. 이용 제한 조치는 경고, 포인트 회수, 일부 기능 제한, 계정 정지, 회원 자격 박탈 등을 포함할 수 있습니다.<br>
-        3. 서비스는 긴급한 운영상 필요가 있는 경우 사전 통보 없이 이용 제한 조치를 할 수 있습니다.<br>
-        4. 회원은 이용 제한 조치에 대해 운영자에게 이의를 제기할 수 있습니다.</p>
-        <p><strong>제12조 서비스 변경 및 중단</strong><br>1. 서비스는 운영상, 기술상 필요에 따라 서비스의 전부 또는 일부를 변경할 수 있습니다.<br>
-        2. 시스템 점검, 장애, 서버 오류, 천재지변, 외부 서비스 장애 등 불가피한 사유가 있는 경우 서비스 제공이 일시 중단될 수 있습니다.<br>
-        3. 서비스 변경 또는 중단이 발생하는 경우 가능한 범위에서 사전에 안내합니다.</p>
-        <p><strong>제13조 회원 탈퇴 및 계정 삭제</strong><br>1. 회원은 언제든지 서비스 내 회원 탈퇴 기능 또는 고객센터 문의를 통해 계정 삭제를 요청할 수 있습니다.<br>
-        2. 회원 탈퇴 시 계정 정보, 학습 기록, 답안 작성 내역, 포인트 정보는 개인정보처리방침 및 서비스 정책에 따라 삭제 또는 소멸됩니다.<br>
-        3. 탈퇴 후 삭제된 정보와 소멸된 포인트는 복구되지 않습니다.<br>
-        4. 법령에 따라 보관이 필요한 정보는 해당 법령에서 정한 기간 동안 보관될 수 있습니다.</p>
-        <p><strong>제14조 개인정보 보호</strong><br>1. 서비스는 회원의 개인정보를 관련 법령 및 개인정보처리방침에 따라 보호합니다.<br>
-        2. 개인정보 수집, 이용, 보관, 파기, 제3자 제공 여부 등 세부 사항은 개인정보처리방침에서 정합니다.<br>
-        3. 서비스는 회원의 개인정보를 광고 목적 또는 제3자 마케팅 목적으로 판매하거나 제공하지 않습니다.</p>
-        <p><strong>제15조 책임 제한</strong><br>1. 서비스는 천재지변, 네트워크 장애, 외부 서비스 장애 등 불가항력으로 인해 서비스를 제공할 수 없는 경우 책임을 지지 않습니다.<br>
-        2. 서비스는 회원의 귀책사유로 발생한 서비스 이용 장애 또는 손해에 대해 책임을 지지 않습니다.<br>
-        3. 서비스는 회원이 작성한 답안의 정확성, 신앙적 해석, 개인적 판단에 대해 보증하지 않습니다.<br>
-        4. 서비스는 무료로 제공되는 기능 또는 포인트에 대해 금전적 보상을 보장하지 않습니다.<br>
-        5. 서비스는 회원 간 또는 회원과 제3자 간 발생한 분쟁에 개입할 의무가 없습니다.</p>
-        <p><strong>제16조 분쟁 해결 및 준거법</strong><br>1. 본 약관은 대한민국 법령에 따라 해석됩니다.<br>
-        2. 서비스 이용과 관련하여 분쟁이 발생한 경우 서비스와 회원은 원만한 해결을 위해 성실히 협의합니다.<br>
-        3. 협의가 이루어지지 않을 경우 관련 법령에 따른 관할 법원을 관할 법원으로 합니다.</p>
-        <p><strong>제17조 고객 문의</strong><br>서비스 이용, 계정, 개인정보, 포인트 관련 문의는 아래 연락처를 통해 접수할 수 있습니다.<br>
-        - 담당자: Simon Edu 운영팀<br>
-        - 이메일: simon660314@gmail.com</p>
-        <p style="margin-bottom: 0;"><strong>부칙</strong><br>본 약관은 2026년 5월 28일부터 시행됩니다.</p>
+      <div class="terms-content" style="flex: 1; overflow-y: auto; text-align: left; font-size: 0.85rem; line-height: 1.7; padding-right: 0.5rem; color: var(--text-secondary);">
+        <h4 style="margin-top: 0; color: var(--text-primary); font-size: 1.15rem; font-weight: bold; border-bottom: 1px solid var(--glass-border); padding-bottom: 10px; margin-bottom: 1.5rem;">Simon Edu 이용약관</h4>
+        
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제1조 목적
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            본 약관은 Simon Edu(이하 “서비스”)가 제공하는 성경 문구 학습, 답안 작성, 포인트 적립 및 관련 서비스의 이용과 관련하여 서비스와 회원 간의 권리, 의무 및 책임사항, 서비스 이용 조건과 절차를 규정함을 목적으로 합니다.
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제2조 용어의 정의
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.5rem;">본 약관에서 사용하는 용어의 의미는 다음과 같습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">1. “서비스”란 Simon Edu가 제공하는 성경 문구 학습, 답안 작성, 출석, 미션, 포인트 적립 및 기타 관련 기능을 말합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">2. “회원”이란 본 약관에 동의하고 회원가입을 완료한 이용자를 말합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">3. “아이디”란 회원 식별 및 서비스 이용을 위해 회원이 설정하거나 서비스가 부여한 고유 식별 정보를 말합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">4. “계정”이란 회원이 서비스를 이용하기 위해 생성한 로그인 정보를 말합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">5. “답안”이란 회원이 서비스 내 성경 문구 학습 또는 미션 수행 과정에서 작성하거나 제출한 내용을 말합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">6. “포인트”란 회원의 학습 활동, 답안 작성, 출석, 미션 수행 등에 따라 서비스 내에서 적립되는 보상 단위를 말합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">7. “운영자”란 서비스의 관리 및 운영을 담당하는 주체를 말합니다.</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제3조 약관의 효력 및 변경
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">1. 본 약관은 회원가입 시 이용자가 동의함으로써 효력이 발생합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">2. 서비스는 관련 법령을 위반하지 않는 범위에서 본 약관을 변경할 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">3. 약관이 변경되는 경우 서비스는 변경 내용, 적용일자 및 변경 사유를 서비스 내 공지사항 또는 기타 방법으로 사전에 안내합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">4. 회원이 변경된 약관에 동의하지 않는 경우 회원 탈퇴를 요청할 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">5. 변경 약관 적용일 이후에도 서비스를 계속 이용하는 경우 변경된 약관에 동의한 것으로 봅니다.</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제4조 회원가입
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">1. 이용자는 서비스가 정한 가입 절차에 따라 아이디, 이름, 이메일 주소, 비밀번호를 입력하고 본 약관 및 개인정보처리방침에 동의하여 회원가입을 신청합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">2. 서비스는 회원가입 신청자에게 계정을 생성하고 서비스를 이용할 수 있도록 합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">3. 서비스는 다음 각 호에 해당하는 경우 회원가입을 제한하거나 취소할 수 있습니다.</div>
+            <div style="padding-left: 1.6rem; color: var(--text-muted);">
+              <div style="margin-bottom: 0.3rem;">1) 허위 정보를 입력한 경우</div>
+              <div style="margin-bottom: 0.3rem;">2) 타인의 정보를 도용한 경우</div>
+              <div style="margin-bottom: 0.3rem;">3) 서비스 운영을 방해할 목적이 있다고 판단되는 경우</div>
+              <div style="margin-bottom: 0.3rem;">4) 이전에 약관 위반으로 이용 제한을 받은 이력이 있는 경우</div>
+              <div style="margin-bottom: 0.3rem;">5) 기타 서비스가 부적절하다고 판단하는 경우</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제5조 계정 및 비밀번호 관리
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">1. 회원은 본인의 계정 정보를 안전하게 관리해야 합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">2. 회원은 자신의 계정을 제3자에게 양도, 대여, 공유하거나 사용하게 해서는 안 됩니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">3. 계정 관리 소홀, 부정 사용, 제3자 사용 허용으로 인해 발생한 손해는 회원 본인에게 책임이 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">4. 비밀번호는 Firebase Authentication을 통해 로그인 인증 목적으로 처리되며, Simon Edu는 비밀번호를 별도 데이터베이스에 직접 저장하거나 조회하지 않습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">5. 계정 도용 또는 부정 사용이 의심되는 경우 회원은 즉시 운영자에게 알려야 합니다.</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제6조 서비스 제공 내용
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.5rem;">서비스는 회원에게 다음 기능을 제공합니다.</div>
+            <div style="padding-left: 0.8rem;">
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: var(--accent-purple);">•</span> <span>성경 문구 학습 기능</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: var(--accent-purple);">•</span> <span>성경 문구 관련 답안 작성 기능</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: var(--accent-purple);">•</span> <span>출석 체크 및 연속 출석 관리 기능</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: var(--accent-purple);">•</span> <span>미션 수행 기능</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: var(--accent-purple);">•</span> <span>학습 진행도 저장 기능</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: var(--accent-purple);">•</span> <span>포인트 적립 및 조회 기능</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: var(--accent-purple);">•</span> <span>회원 정보 관리 기능</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: var(--accent-purple);">•</span> <span>기타 서비스가 정하는 학습 지원 기능</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제7조 서비스 이용 조건
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">1. 서비스는 회원가입 후 로그인하여 이용할 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">2. 서비스는 일부 기능에 한하여 비회원 또는 체험모드 이용을 제공할 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">3. 비회원 또는 체험모드 이용자는 다음 기능을 이용할 수 있습니다.</div>
+            <div style="padding-left: 1.6rem; color: var(--text-muted); margin-bottom: 0.4rem;">
+              <div style="margin-bottom: 0.2rem; display: flex; align-items: start; gap: 0.3rem;"><span>-</span> <span>오늘의 성경 말씀 보기</span></div>
+              <div style="margin-bottom: 0.2rem; display: flex; align-items: start; gap: 0.3rem;"><span>-</span> <span>성경 말씀 암송 퀴즈 체험</span></div>
+              <div style="margin-bottom: 0.2rem; display: flex; align-items: start; gap: 0.3rem;"><span>-</span> <span>학습 결과 확인</span></div>
+            </div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">4. 비회원 또는 체험모드 이용자는 아래 기능을 이용할 수 없습니다.</div>
+            <div style="padding-left: 1.6rem; color: var(--text-muted); margin-bottom: 0.4rem;">
+              <div style="margin-bottom: 0.2rem; display: flex; align-items: start; gap: 0.3rem;"><span>-</span> <span>포인트 적립 및 사용</span></div>
+              <div style="margin-bottom: 0.2rem; display: flex; align-items: start; gap: 0.3rem;"><span>-</span> <span>랭킹 확인</span></div>
+              <div style="margin-bottom: 0.2rem; display: flex; align-items: start; gap: 0.3rem;"><span>-</span> <span>출석 체크</span></div>
+              <div style="margin-bottom: 0.2rem; display: flex; align-items: start; gap: 0.3rem;"><span>-</span> <span>연속 출석 보상</span></div>
+              <div style="margin-bottom: 0.2rem; display: flex; align-items: start; gap: 0.3rem;"><span>-</span> <span>학습 기록 저장</span></div>
+              <div style="margin-bottom: 0.2rem; display: flex; align-items: start; gap: 0.3rem;"><span>-</span> <span>계정 기반 데이터 동기화</span></div>
+            </div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">5. 회원가입 및 로그인한 이용자는 서비스가 제공하는 포인트, 랭킹, 출석, 학습 기록 저장 및 기타 회원 전용 기능을 이용할 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">6. 서비스는 운영 정책에 따라 비회원 또는 체험모드 이용 범위를 변경할 수 있으며, 변경 시 서비스 내 공지사항 또는 기타 방법을 통해 안내합니다.</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제8조 답안 작성 및 회원 콘텐츠
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">1. 회원은 서비스 내에서 성경 문구 학습 또는 미션 수행을 위해 답안을 작성할 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">2. 회원이 작성한 답안은 학습 기록 관리, 포인트 적립, 서비스 운영 및 부정 이용 방지 목적으로 이용될 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">3. 회원은 타인의 권리, 명예, 사생활을 침해하거나 불법적인 내용을 작성해서는 안 됩니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">4. 서비스는 다음 각 호에 해당하는 답안을 사전 통보 없이 삭제하거나 이용 제한 조치를 할 수 있습니다.</div>
+            <div style="padding-left: 1.6rem; color: var(--text-muted);">
+              <div style="margin-bottom: 0.3rem;">1) 욕설, 비방, 혐오, 음란, 폭력적 표현이 포함된 경우</div>
+              <div style="margin-bottom: 0.3rem;">2) 타인의 개인정보가 포함된 경우</div>
+              <div style="margin-bottom: 0.3rem;">3) 서비스 운영을 방해하는 내용인 경우</div>
+              <div style="margin-bottom: 0.3rem;">4) 반복 입력, 자동 입력 등 부정 이용으로 판단되는 경우</div>
+              <div style="margin-bottom: 0.3rem;">5) 기타 관련 법령 또는 본 약관을 위반하는 경우</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제9조 포인트 적립 및 이용
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">1. 포인트는 성경 문구 답안 작성, 출석, 미션 수행 등 서비스가 정한 활동에 따라 적립될 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">2. 포인트 적립 기준, 지급 수량, 사용 가능 범위는 서비스 정책에 따라 정해집니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">3. 포인트는 Simon Edu 서비스 내에서만 사용 가능한 보상 단위이며, 현금으로 환전되지 않습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">4. 포인트는 타인에게 양도, 판매, 대여할 수 없습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">5. 서비스 오류, 부정 이용, 중복 적립, 시스템 악용으로 적립된 포인트는 사전 안내 후 회수될 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">6. 회원 탈퇴 시 보유 포인트는 즉시 소멸되며 복구되지 않습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">7. 포인트 정책은 서비스 운영 상황에 따라 변경될 수 있으며, 변경 시 서비스 내 공지사항 등을 통해 안내합니다.</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제10조 금지 행위
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.5rem;">회원은 서비스 이용 시 다음 행위를 해서는 안 됩니다.</div>
+            <div style="padding-left: 0.8rem;">
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: #ef4444;">•</span> <span>허위 정보 입력 또는 타인 정보 도용</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: #ef4444;">•</span> <span>타인의 계정 이용 또는 계정 공유</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: #ef4444;">•</span> <span>자동화 프로그램, 매크로, 봇 등을 이용한 답안 작성 또는 포인트 적립</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: #ef4444;">•</span> <span>동일하거나 무의미한 답안을 반복 제출하여 포인트를 적립하는 행위</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: #ef4444;">•</span> <span>시스템 오류 또는 허점을 악용하는 행위</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: #ef4444;">•</span> <span>서비스 운영을 방해하거나 서버에 과도한 부하를 주는 행위</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: #ef4444;">•</span> <span>타인의 개인정보 또는 권리를 침해하는 행위</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: #ef4444;">•</span> <span>불법적, 음란, 폭력적, 혐오적 내용을 작성하는 행위</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: #ef4444;">•</span> <span>서비스 또는 운영자를 사칭하는 행위</span></div>
+              <div style="margin-bottom: 0.3rem; display: flex; align-items: start; gap: 0.35rem;"><span style="color: #ef4444;">•</span> <span>기타 관련 법령 또는 본 약관을 위반하는 행위</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제11조 이용 제한
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">1. 서비스는 회원이 본 약관을 위반하거나 부정 이용이 확인되는 경우 서비스 이용을 제한할 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">2. 이용 제한 조치는 경고, 포인트 회수, 일부 기능 제한, 계정 정지, 회원 자격 박탈 등을 포함할 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">3. 서비스는 긴급한 운영상 필요가 있는 경우 사전 통보 없이 이용 제한 조치를 할 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">4. 회원은 이용 제한 조치에 대해 운영자에게 이의를 제기할 수 있습니다.</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제12조 서비스 변경 및 중단
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">1. 서비스는 운영상, 기술상 필요에 따라 서비스의 전부 또는 일부를 변경할 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">2. 시스템 점검, 장애, 서버 오류, 천재지변, 외부 서비스 장애 등 불가피한 사유가 있는 경우 서비스 제공이 일시 중단될 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">3. 서비스 변경 또는 중단이 발생하는 경우 가능한 범위에서 사전에 안내합니다.</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제13조 회원 탈퇴 및 계정 삭제
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">1. 회원은 언제든지 서비스 내 회원 탈퇴 기능 또는 고객센터 문의를 통해 계정 삭제를 요청할 수 있습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">2. 회원 탈퇴 시 계정 정보, 학습 기록, 답안 작성 내역, 포인트 정보는 개인정보처리방침 및 서비스 정책에 따라 삭제 또는 소멸됩니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">3. 탈퇴 후 삭제된 정보와 소멸된 포인트는 복구되지 않습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">4. 법령에 따라 보관이 필요한 정보는 해당 법령에서 정한 기간 동안 보관될 수 있습니다.</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제14조 개인정보 보호
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">1. 서비스는 회원의 개인정보를 관련 법령 및 개인정보처리방침에 따라 보호합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">2. 개인정보 수집, 이용, 보관, 파기, 제3자 제공 여부 등 세부 사항은 개인정보처리방침에서 정합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">3. 서비스는 회원의 개인정보를 광고 목적 또는 제3자 마케팅 목적으로 판매하거나 제공하지 않습니다.</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제15조 책임 제한
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">1. 서비스는 천재지변, 네트워크 장애, 외부 서비스 장애 등 불가항력으로 인해 서비스를 제공할 수 없는 경우 책임을 지지 않습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">2. 서비스는 회원의 귀책사유로 발생한 서비스 이용 장애 또는 손해에 대해 책임을 지지 않습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">3. 서비스는 회원이 작성한 답안의 정확성, 신앙적 해석, 개인적 판단에 대해 보증하지 않습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">4. 서비스는 무료로 제공되는 기능 또는 포인트에 대해 금전적 보상을 보장하지 않습니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">5. 서비스는 회원 간 또는 회원과 제3자 간 발생한 분쟁에 개입할 의무가 없습니다.</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제16조 분쟁 해결 및 준거법
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">1. 본 약관은 대한민국 법령에 따라 해석됩니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">2. 서비스 이용과 관련하여 분쟁이 발생한 경우 서비스와 회원은 원만한 해결을 위해 성실히 협의합니다.</div>
+            <div style="margin-bottom: 0.4rem; padding-left: 0.8rem; text-indent: -0.8rem;">3. 협의가 이루어지지 않을 경우 관련 법령에 따른 관할 법원을 관할 법원으로 합니다.</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 2rem;">
+          <h5 style="color: var(--text-primary); font-size: 1rem; font-weight: 700; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span style="display: inline-block; width: 4px; height: 15px; background: var(--accent-purple); border-radius: 2px;"></span>
+            제17조 고객 문의
+          </h5>
+          <div style="line-height: 1.8; color: var(--text-secondary); font-size: 0.88rem; padding-left: 0.6rem; word-break: keep-all;">
+            <div style="margin-bottom: 0.5rem;">서비스 이용, 계정, 개인정보, 포인트 관련 문의는 아래 연락처를 통해 접수할 수 있습니다.</div>
+            <div style="padding-left: 0.8rem;">
+              <div style="margin-bottom: 0.3rem;">• 담당자: Simon Edu 운영팀</div>
+              <div style="margin-bottom: 0.3rem;">• 이메일: <a href="mailto:simon660314@gmail.com" style="color: var(--accent-purple); font-weight: 500; text-decoration: underline;">simon660314@gmail.com</a></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 2.5rem; border-top: 1px solid var(--glass-border); padding-top: 20px;">
+          <p style="margin: 0; font-weight: bold; color: var(--text-primary); font-size: 0.95rem;">부칙</p>
+          <p style="margin: 8px 0 0 0; font-size: 0.82rem; color: var(--text-muted);">본 약관은 2026년 5월 28일부터 시행됩니다.</p>
+        </div>
       </div>
       <div class="modal-btn-container" style="margin-top: 1rem; width: 100%;">
         <button class="btn-primary" style="background: var(--accent-purple); width: 100%;" onclick="app.closeModal('modalTerms')">확인</button>
