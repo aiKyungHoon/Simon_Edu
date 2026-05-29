@@ -1315,7 +1315,15 @@ class NativeSettingsView extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
-        final reversedHistory = pointsHistory.reversed.toList();
+        final List<dynamic> reversedHistory = List.from(pointsHistory.reversed);
+        if (reversedHistory.isEmpty && userPoints > 0) {
+          reversedHistory.add({
+            'type': 'legacy',
+            'title': '이전 활동 누적 포인트',
+            'amount': userPoints,
+            'date': '기존 적립 이력',
+          });
+        }
         
         return Container(
           height: MediaQuery.of(context).size.height * 0.7,
@@ -1482,6 +1490,11 @@ class NativeSettingsView extends StatelessWidget {
                               bgColor = const Color(0xFFF1F3F5);
                               iconColor = const Color(0xFF495057);
                               iconData = Icons.admin_panel_settings_rounded;
+                              break;
+                            case 'legacy':
+                              bgColor = const Color(0xFFFFFBEB);
+                              iconColor = const Color(0xFFF59E0B);
+                              iconData = Icons.monetization_on_rounded;
                               break;
                             default:
                               bgColor = const Color(0xFFFFFBEB);

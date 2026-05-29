@@ -163,7 +163,9 @@ class SimonEduApp {
           }));
         }
         
-        this.switchView('auth');
+        if (!document.body.classList.contains('single-path-route')) {
+          this.switchView('auth');
+        }
       }
     });
     this.handleDirectPathRouting();
@@ -797,7 +799,9 @@ class SimonEduApp {
     }
 
     this.renderNotifications();
-    this.switchView('dashboard');
+    if (!document.body.classList.contains('single-path-route')) {
+      this.switchView('dashboard');
+    }
   }
 
   // 5. Dashboard View Setup
