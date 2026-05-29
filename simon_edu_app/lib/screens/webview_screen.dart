@@ -43,6 +43,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
   bool _marketingPushEnabled = false;
   bool _isNotificationPermissionGranted = true;
   bool _isProfileLoading = true;
+  List<dynamic> _pointsHistory = [];
 
   final String _targetUrl = 'https://simon-edu-bible-game.firebaseapp.com?v=1.4.2';
 
@@ -505,6 +506,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
                           isPermissionGranted: _isNotificationPermissionGranted,
                           isLoading: _isProfileLoading,
                           version: _appVersion.isEmpty ? '1.4.2' : _appVersion,
+                          pointsHistory: _pointsHistory,
                           onLogout: () {
                             _controller?.runJavaScript('if (window.app && window.app.logout) { window.app.logout(); }');
                           },
@@ -655,7 +657,8 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
               email: window.app.currentUser.email || '',
               points: window.app.currentUser.points || 0,
               pushEnabled: window.app.currentUser.pushEnabled !== false,
-              marketingPushEnabled: !!window.app.currentUser.marketingPushEnabled
+              marketingPushEnabled: !!window.app.currentUser.marketingPushEnabled,
+              pointsHistory: window.app.currentUser.pointsHistory || []
             });
           }
           return '{}';
@@ -678,6 +681,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
           _userPoints = data['points'] ?? 0;
           _pushEnabled = data['pushEnabled'] ?? false;
           _marketingPushEnabled = data['marketingPushEnabled'] ?? false;
+          _pointsHistory = data['pointsHistory'] ?? [];
           _isNotificationPermissionGranted = status.isGranted;
           _isProfileLoading = false;
         });
@@ -689,6 +693,18 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
 
   Future<void> _togglePushSetting(bool value) async {
     if (_controller == null) return;
+    
+    if (value) {
+      final status = await Permission.notification.status;
+      if (!status.isGranted) {
+        await _requestNotificationPermission();
+        final afterStatus = await Permission.notification.status;
+        if (!afterStatus.isGranted) {
+          // If permission is still not granted, do not enable the toggle
+          return;
+        }
+      }
+    }
     
     setState(() {
       _pushEnabled = value;
@@ -801,8 +817,62 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
 
   Future<void> _requestNotificationPermission() async {
     final status = await Permission.notification.status;
-    if (status.isPermanentlyDenied || status.isDenied) {
-      await openAppSettings();
+    if (status.isPermanentlyDenied) {
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFFFCFCF7),
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: Color(0x33B8860B)),
+            ),
+            title: const Text(
+              '알림 권한 설정 필요',
+              style: TextStyle(
+                color: Color(0xFF3D341C),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: const Text(
+              '기기 설정에서 Simon Edu의 알림 권한을 허용해 주셔야 알림을 받으실 수 있습니다. 설정 화면으로 이동하시겠습니까?',
+              style: TextStyle(
+                color: Color(0xFF6B5C37),
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text(
+                  '취소',
+                  style: TextStyle(
+                    color: Color(0xFFEF4444),
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await openAppSettings();
+                },
+                child: const Text(
+                  '설정으로 이동',
+                  style: TextStyle(
+                    color: Color(0xFFB8860B),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
     } else {
       final newStatus = await Permission.notification.request();
       _sendDevicePermissionStatus(newStatus.isGranted);
@@ -830,6 +900,7 @@ class NativeSettingsView extends StatelessWidget {
   final ValueChanged<bool> onPushChanged;
   final ValueChanged<bool> onMarketingChanged;
   final VoidCallback onRequestPermission;
+  final List<dynamic> pointsHistory;
 
   const NativeSettingsView({
     super.key,
@@ -846,6 +917,7 @@ class NativeSettingsView extends StatelessWidget {
     required this.onPushChanged,
     required this.onMarketingChanged,
     required this.onRequestPermission,
+    required this.pointsHistory,
   });
 
   @override
@@ -1148,7 +1220,13 @@ class NativeSettingsView extends StatelessWidget {
                     ),
                   ),
                   trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF96855B)),
-                  onTap: () => _showPointsDialog(context),
+                  onTap: () {
+                    _openWebPopup(
+                      context: context,
+                      title: '포인트 정책',
+                      url: 'https://simon-edu-bible-game.firebaseapp.com/points_policy',
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
               ],
@@ -1232,72 +1310,247 @@ class NativeSettingsView extends StatelessWidget {
   }
 
   void _showPointHistoryDialog(BuildContext context) {
-    showDialog(
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFFFCFCF7),
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0x33B8860B)),
-          ),
-          title: const Text(
-            '포인트 내역',
-            style: TextStyle(color: Color(0xFF3D341C), fontWeight: FontWeight.bold),
-          ),
-          content: const Text(
-            '자세한 포인트 내역 기능은 곧 준비될 예정입니다.',
-            style: TextStyle(color: Color(0xFF6B5C37), fontSize: 14, height: 1.5),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                '확인',
-                style: TextStyle(color: Color(0xFFB8860B), fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showPointsDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFFFCFCF7),
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: Color(0x33B8860B)),
-          ),
-          title: const Text(
-            '포인트 정책',
-            style: TextStyle(color: Color(0xFF3D341C), fontWeight: FontWeight.bold),
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            height: MediaQuery.of(context).size.height * 0.6,
-            child: const SingleChildScrollView(
-              child: Text(
-                _pointsText,
-                style: TextStyle(color: Color(0xFF6B5C37), fontSize: 13, height: 1.6),
-              ),
+        final reversedHistory = pointsHistory.reversed.toList();
+        
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          decoration: const BoxDecoration(
+            color: Color(0xFFFDF8E6),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                '확인',
-                style: TextStyle(color: Color(0xFFB8860B), fontWeight: FontWeight.bold),
+          child: Column(
+            children: [
+              // Drag handle
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF96855B).withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              
+              // Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '포인트 적립 내역',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF3D341C),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF96855B)),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Points Summary Card
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0x1FB8860B)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF3D341C).withOpacity(0.02),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.monetization_on_rounded, color: Color(0xFFB8860B), size: 24),
+                          SizedBox(width: 8),
+                          Text(
+                            '현재 보유 포인트',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF6B5C37),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '$userPoints P',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFB8860B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // History List
+              Expanded(
+                child: reversedHistory.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.monetization_on_outlined,
+                              size: 64,
+                              color: const Color(0xFF96855B).withOpacity(0.3),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              '아직 포인트 적립 내역이 없습니다.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF96855B),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              '출석 체크와 말씀 암송을 통해 포인트를 쌓아보세요!',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFFB8860B),
+                              ),
+                            ),
+                            const SizedBox(height: 40),
+                          ],
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                        itemCount: reversedHistory.length,
+                        separatorBuilder: (context, index) => const Divider(
+                          color: Color(0x1FB8860B),
+                          height: 1,
+                        ),
+                        itemBuilder: (context, index) {
+                          final item = reversedHistory[index] as Map<String, dynamic>;
+                          final type = item['type'] ?? '';
+                          final title = item['title'] ?? '포인트 적립';
+                          final amount = item['amount'] ?? 0;
+                          final date = item['date'] ?? '';
+                          
+                          // Styling configurations based on type
+                          Color bgColor;
+                          Color iconColor;
+                          IconData iconData;
+                          
+                          switch (type) {
+                            case 'signup':
+                              bgColor = const Color(0xFFFFF4EB);
+                              iconColor = const Color(0xFFFD7E14);
+                              iconData = Icons.celebration_rounded;
+                              break;
+                            case 'attendance':
+                              bgColor = const Color(0xFFEBFDF2);
+                              iconColor = const Color(0xFF20C997);
+                              iconData = Icons.calendar_today_rounded;
+                              break;
+                            case 'challenge':
+                              bgColor = const Color(0xFFF3EBFD);
+                              iconColor = const Color(0xFF7048E8);
+                              iconData = Icons.menu_book_rounded;
+                              break;
+                            case 'admin':
+                              bgColor = const Color(0xFFF1F3F5);
+                              iconColor = const Color(0xFF495057);
+                              iconData = Icons.admin_panel_settings_rounded;
+                              break;
+                            default:
+                              bgColor = const Color(0xFFFFFBEB);
+                              iconColor = const Color(0xFFF59E0B);
+                              iconData = Icons.monetization_on_rounded;
+                          }
+                          
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              children: [
+                                // Icon Circle
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: bgColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    iconData,
+                                    color: iconColor,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                
+                                // Text details
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        title,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF3D341C),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        date,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF96855B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                
+                                // Amount text
+                                Text(
+                                  '+${amount}P',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFFB8860B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -1453,147 +1706,5 @@ class _PopupWebViewState extends State<_PopupWebView> {
 
 
 
-const String _pointsText = """# Simon Edu 포인트 정책
 
-Simon Edu(이하 “서비스”)는 이용자의 성경 문구 학습 참여를 장려하기 위해 포인트 시스템을 운영합니다.
-
-본 포인트 정책은 포인트 적립 기준, 사용 조건, 제한 사항 및 운영 기준을 안내하기 위해 작성되었습니다.
-
----
-
-## 1. 포인트 정책 목적
-
-Simon Edu 포인트는 성경 문구 학습, 출석, 암송 챌린지 참여 등 학습 활동에 대한 보상 목적으로 제공됩니다.
-
-포인트는 서비스 내 활동 참여를 독려하기 위한 비현금성 보상이며, 현금으로 환전되지 않습니다.
-
----
-
-## 2. 포인트 적립 기준
-
-서비스는 아래 활동에 따라 포인트를 지급할 수 있습니다.
-
-### 1) 회원가입 보너스
-
-회원가입 완료 시 가입 축하 포인트가 즉시 지급됩니다.
-
-| 활동      | 지급 포인트 |
-| ------- | -----: |
-| 회원가입 완료 |  +100P |
-
----
-
-### 2) 출석 체크 포인트
-
-회원은 하루 1회 출석 체크를 통해 포인트를 적립할 수 있습니다.
-
-| 활동       | 지급 포인트 |
-| -------- | -----: |
-| 일일 출석 체크 |   +10P |
-
-* 동일 날짜 기준 중복 출석 체크는 인정되지 않습니다.
-* 출석 기준은 서비스 서버 시간을 기준으로 합니다.
-
----
-
-### 3) 연속 출석 보너스
-
-회원이 연속으로 출석 체크를 완료한 경우 추가 보너스 포인트가 지급됩니다.
-
-| 연속 출석 일수  | 추가 지급 포인트 |
-| --------- | --------: |
-| 5일 연속 출석  |     +150P |
-| 10일 연속 출석 |     +200P |
-| 15일 연속 출석 |     +250P |
-| 30일 연속 출석 |     +300P |
-
-* 연속 출석은 하루라도 출석하지 않으면 초기화될 수 있습니다.
-* 연속 출석 보너스는 조건 달성 시 자동 지급됩니다.
-
----
-
-## 3. 성경 말씀 암송 챌린지 포인트
-
-회원이 오늘의 성경 말씀 암송 챌린지 또는 퀴즈를 성공적으로 완료한 경우 난이도에 따라 포인트가 지급됩니다.
-
-| 난이도         | 지급 포인트 |
-| ----------- | -----: |
-| 쉬움 (Easy)   |   +80P |
-| 보통 (Normal) |  +100P |
-| 어려움 (Hard)  |  +130P |
-
-* 포인트는 정답 판정 완료 후 지급됩니다.
-* 동일 챌린지에 대한 반복 적립은 제한될 수 있습니다.
-* 서비스 정책에 따라 챌린지 구성 및 포인트 기준은 변경될 수 있습니다.
-
----
-
-## 4. 포인트 사용 안내
-
-1. 포인트는 Simon Edu 서비스 내에서만 사용 가능합니다.
-2. 포인트는 현금, 상품권 또는 기타 재화로 환전되지 않습니다.
-3. 포인트는 타인에게 양도, 판매 또는 대여할 수 없습니다.
-4. 포인트 사용 가능 범위는 서비스 정책에 따라 변경될 수 있습니다.
-
----
-
-## 5. 포인트 회수 및 제한
-
-서비스는 아래와 같은 부정 이용 행위가 확인되는 경우 포인트를 회수하거나 계정 이용을 제한할 수 있습니다.
-
-### 부정 이용 예시
-
-* 자동화 프로그램, 매크로, 봇 등을 이용한 출석 체크
-* 자동 입력 또는 반복 입력을 통한 암송 챌린지 수행
-* 동일 답안 반복 제출
-* 시스템 오류를 악용한 포인트 적립
-* 타인 계정 사용 또는 계정 공유
-* 비정상적인 방법으로 포인트를 적립하는 행위
-
-서비스는 부정 이용이 확인된 경우 아래 조치를 할 수 있습니다.
-
-* 포인트 회수
-* 출석 기록 초기화
-* 일부 기능 제한
-* 계정 정지 또는 회원 자격 제한
-
----
-
-## 6. 포인트 소멸
-
-1. 회원 탈퇴 시 보유 포인트는 즉시 소멸됩니다.
-2. 소멸된 포인트는 복구되지 않습니다.
-3. 서비스 정책 변경 또는 운영 종료 시 포인트 정책이 변경되거나 종료될 수 있습니다.
-
----
-
-## 7. 포인트 정책 변경
-
-서비스는 운영상 필요에 따라 포인트 적립 기준, 지급 수량, 사용 범위, 보너스 정책 등을 변경할 수 있습니다.
-
-정책 변경 시 서비스 내 공지사항 또는 기타 방법을 통해 안내합니다.
-
----
-
-## 8. App Store 및 Google Play 안내 문구
-
-Simon Edu 포인트는 서비스 내 성경 문구 학습, 출석, 암송 챌린지 참여에 따라 지급되는 비현금성 보상입니다.
-
-포인트는 현금 또는 외부 재화로 환전되지 않으며, 서비스 내에서만 사용 가능합니다.
-
-서비스는 부정 적립, 중복 적립, 시스템 악용 등이 확인되는 경우 포인트를 회수하거나 계정 이용을 제한할 수 있습니다.
-
----
-
-## 9. 고객 문의
-
-포인트 관련 문의는 아래 이메일을 통해 접수할 수 있습니다.
-
-* 담당자: Simon Edu 운영팀
-* 이메일: simon660314@gmail.com
-
----
-
-시행일자: 2026년 5월 28일
-""";
 

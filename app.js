@@ -596,8 +596,16 @@ class SimonEduApp {
 
           return db.collection('users').doc(newUser.id).set(newUser)
             .then(() => {
+              const signupHistory = {
+                id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                type: 'signup',
+                title: '회원가입 축하금',
+                amount: 100,
+                date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+              };
               return db.collection('users').doc(newUser.id).update({
-                points: firebase.firestore.FieldValue.increment(100)
+                points: firebase.firestore.FieldValue.increment(100),
+                pointsHistory: firebase.firestore.FieldValue.arrayUnion(signupHistory)
               });
             })
             .then(() => {
@@ -1306,9 +1314,17 @@ class SimonEduApp {
       timestamp: Date.now(),
       read: false
     };
+    const adminHistory = {
+      id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      type: 'admin',
+      title: '관리자 보너스 포인트',
+      amount: amount,
+      date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+    };
     db.collection('users').doc(userId).update({
       points: firebase.firestore.FieldValue.increment(amount),
-      notifications: firebase.firestore.FieldValue.arrayUnion(newNotification)
+      notifications: firebase.firestore.FieldValue.arrayUnion(newNotification),
+      pointsHistory: firebase.firestore.FieldValue.arrayUnion(adminHistory)
     }).catch(err => console.error("Error adding points:", err));
   }
 
@@ -1522,12 +1538,21 @@ class SimonEduApp {
       read: false
     };
 
+    const attendanceHistory = {
+      id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      type: 'attendance',
+      title: gotBonus ? `연속 출석 보너스 (${consecutiveCheckIns}일차)` : '일일 출석 체크',
+      amount: pointsAwarded,
+      date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+    };
+
     db.collection('users').doc(this.currentUser.id).update({
       lastCheckInDate: todayStr,
       consecutiveCheckIns: consecutiveCheckIns,
       checkInHistory: firebase.firestore.FieldValue.arrayUnion(todayStr),
       points: firebase.firestore.FieldValue.increment(pointsAwarded),
-      notifications: firebase.firestore.FieldValue.arrayUnion(newNotification)
+      notifications: firebase.firestore.FieldValue.arrayUnion(newNotification),
+      pointsHistory: firebase.firestore.FieldValue.arrayUnion(attendanceHistory)
     }).then(() => {
       this.showPointsFloater(pointsAwarded, message);
       this.playConfetti('checkin');
@@ -1837,11 +1862,20 @@ class SimonEduApp {
       read: false
     };
 
+    const quizHistory = {
+      id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      type: 'challenge',
+      title: `암송 성공 (요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절)`,
+      amount: totalAward,
+      date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+    };
+
     let updateData = {
       points: firebase.firestore.FieldValue.increment(totalAward),
       lastMissionDate: todayStr,
       currentVerseIndex: nextVerseIndex,
-      notifications: firebase.firestore.FieldValue.arrayUnion(newNotification)
+      notifications: firebase.firestore.FieldValue.arrayUnion(newNotification),
+      pointsHistory: firebase.firestore.FieldValue.arrayUnion(quizHistory)
     };
 
     if (checkInResult) {
@@ -1849,6 +1883,15 @@ class SimonEduApp {
       updateData.consecutiveCheckIns = checkInResult.consecutiveCheckIns;
       updateData.checkInHistory = firebase.firestore.FieldValue.arrayUnion(todayStr);
       updateData.points = firebase.firestore.FieldValue.increment(totalEarned);
+      
+      const checkInHistoryObj = {
+        id: 'hist_' + (Date.now() + 1) + '_' + Math.random().toString(36).substr(2, 5),
+        type: 'attendance',
+        title: checkInResult.gotBonus ? `연속 출석 보너스 (${checkInResult.consecutiveCheckIns}일차)` : '일일 출석 체크',
+        amount: checkInResult.pointsAwarded,
+        date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+      };
+      updateData.pointsHistory = firebase.firestore.FieldValue.arrayUnion(quizHistory, checkInHistoryObj);
     }
 
     db.collection('users').doc(this.currentUser.id).update(updateData).then(() => {
@@ -1988,7 +2031,7 @@ class SimonEduApp {
 
   handleDirectPathRouting() {
     const path = decodeURIComponent(window.location.pathname);
-    if (path === '/privacy' || path === '/Terms_of_Use' || path === '/Terms of Use' || path.startsWith('/Delete_account') || path.startsWith('/Delete accoun') || path === '/Delete account') {
+    if (path === '/privacy' || path === '/Terms_of_Use' || path === '/Terms of Use' || path.startsWith('/Delete_account') || path.startsWith('/Delete accoun') || path === '/Delete account' || path === '/points_policy' || path === '/points policy') {
       // Hide normal app elements
       document.body.classList.add('single-path-route');
       
@@ -2021,6 +2064,13 @@ class SimonEduApp {
             const termsModalContent = document.querySelector('#modalTerms .terms-content');
             if (bodyEl && termsModalContent) {
               bodyEl.innerHTML = termsModalContent.innerHTML;
+            }
+          } else if (path === '/points_policy' || path === '/points policy') {
+            if (iconEl) iconEl.textContent = 'monetization_on';
+            if (titleEl) titleEl.textContent = '포인트 정책';
+            const pointsModalContent = document.querySelector('#modalPoints .terms-content');
+            if (bodyEl && pointsModalContent) {
+              bodyEl.innerHTML = pointsModalContent.innerHTML;
             }
           } else {
             // Delete account path
@@ -2218,9 +2268,18 @@ class SimonEduApp {
       read: false
     };
 
+    const cheatHistory = {
+      id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      type: 'admin',
+      title: '시뮬레이터 치트 보상',
+      amount: pts,
+      date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+    };
+
     db.collection('users').doc(this.currentUser.id).update({
       points: firebase.firestore.FieldValue.increment(pts),
-      notifications: firebase.firestore.FieldValue.arrayUnion(newNotification)
+      notifications: firebase.firestore.FieldValue.arrayUnion(newNotification),
+      pointsHistory: firebase.firestore.FieldValue.arrayUnion(cheatHistory)
     }).then(() => {
       this.showPointsFloater(pts, "시뮬레이터 치트 작동!");
     }).catch(err => console.error(err));
