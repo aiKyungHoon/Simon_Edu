@@ -110,7 +110,7 @@
           </div>
         </div>
 
-        <div class="nav-point-badge">
+        <div class="nav-point-badge" onclick="app.handlePointBadgeClick()" style="cursor: pointer;">
           <span class="material-icons-round" style="font-size: 1.1rem; color: #f59e0b;">monetization_on</span>
           <span id="navPoints">0</span> P
         </div>
@@ -130,8 +130,8 @@
     <div id="authView" class="view-container active">
       <div class="auth-wrapper glass-panel">
         <div class="auth-header">
-          <h2>사이먼에듀</h2>
-          <p>요한계시록 말씀을 게임처럼 암송해보세요</p>
+          <h2>Simon Edu</h2>
+          <p>성경 말씀을 읽고, 암송하고, 포인트를 적립해 보세요.</p>
         </div>
         
         <div class="auth-tabs">
@@ -159,6 +159,10 @@
             <input type="password" id="authPassword" class="input-field" placeholder="비밀번호를 입력하세요" required>
           </div>
           <button type="submit" class="btn-primary" id="btnAuthSubmit" style="margin-top: 1rem;">로그인</button>
+          <button type="button" class="btn-game secondary" id="btnTrialStart" style="margin-top: 0.5rem; width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.25rem; border-color: var(--accent-purple); color: var(--accent-purple); background: transparent;" onclick="app.openModal('modalTrialConfirm')">
+            <span class="material-icons-round" style="font-size: 1.15rem;">play_arrow</span>
+            체험하기
+          </button>
         </form>
         
         <div class="auth-footer" id="authFooterText">
@@ -1422,6 +1426,136 @@
       <div class="modal-btn-container" style="display: flex; gap: 0.5rem; justify-content: center; width: 100%; margin-top: 1rem;">
         <button class="btn-game secondary" style="flex: 1; margin: 0;" onclick="app.closeModal('modalWithdraw')">취소</button>
         <button class="btn-primary" style="flex: 1; margin: 0; background: var(--accent-rose);" onclick="app.withdrawAccount()">탈퇴하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Trial Confirm -->
+  <div class="modal-overlay" id="modalTrialConfirm">
+    <div class="modal-content glass-panel" style="border-color: var(--accent-purple); max-width: 500px; display: flex; flex-direction: column; padding: 2rem; max-height: 85vh;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; width: 100%;">
+        <div class="modal-title" style="color: var(--accent-purple); margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.3rem;">
+          <span class="material-icons-round">play_arrow</span>
+          체험 모드로 시작하기
+        </div>
+        <button onclick="app.closeModal('modalTrialConfirm')" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; padding: 4px; border-radius: 50%;">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="terms-content" style="flex: 1; overflow-y: auto; text-align: left; font-size: 0.88rem; line-height: 1.8; padding-right: 0.5rem; color: var(--text-secondary); word-break: keep-all;">
+        <p style="font-weight: bold; color: var(--text-primary); margin-top: 0; font-size: 1.05rem;">회원가입 없이 오늘의 말씀과 암송 퀴즈를 체험할 수 있습니다.</p>
+        <p style="margin-top: 0.75rem;">단, 체험 모드에서는 아래 기능이 제공되지 않습니다.</p>
+        <div style="padding-left: 0.8rem; color: var(--text-muted); margin: 0.5rem 0;">
+          <div>• 포인트 적립 및 사용</div>
+          <div>• 랭킹 참여 및 확인</div>
+          <div>• 출석 체크 및 연속 출석 보상</div>
+          <div>• 학습 기록 저장 및 계정 동기화</div>
+        </div>
+      </div>
+      <div class="modal-btn-container" style="display: flex; gap: 0.5rem; justify-content: center; width: 100%; margin-top: 1.5rem;">
+        <button class="btn-game secondary" style="flex: 1; margin: 0;" onclick="app.closeModal('modalTrialConfirm')">로그인하기</button>
+        <button class="btn-primary" style="flex: 1; margin: 0; background: var(--accent-purple);" onclick="app.startTrialMode()">체험 시작</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Trial Restrict Ranking -->
+  <div class="modal-overlay" id="modalTrialRestrictRanking">
+    <div class="modal-content glass-panel" style="border-color: var(--accent-purple); max-width: 500px; display: flex; flex-direction: column; padding: 2rem; max-height: 85vh;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; width: 100%;">
+        <div class="modal-title" style="color: var(--accent-purple); margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.3rem;">
+          <span class="material-icons-round">lock</span>
+          랭킹 제한
+        </div>
+        <button onclick="app.closeModal('modalTrialRestrictRanking')" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; padding: 4px; border-radius: 50%;">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="terms-content" style="flex: 1; overflow-y: auto; text-align: left; font-size: 0.88rem; line-height: 1.8; padding-right: 0.5rem; color: var(--text-secondary); word-break: keep-all;">
+        <p style="font-weight: bold; color: var(--text-primary); margin-top: 0; font-size: 1.05rem;">랭킹은 회원 전용 기능입니다.</p>
+        <p style="margin-top: 0.75rem;">회원가입 후 포인트를 적립하고 랭킹에 참여할 수 있습니다.</p>
+      </div>
+      <div class="modal-btn-container" style="display: flex; gap: 0.5rem; justify-content: center; width: 100%; margin-top: 1.5rem;">
+        <button class="btn-game secondary" style="flex: 1; margin: 0;" onclick="app.closeModal('modalTrialRestrictRanking')">닫기</button>
+        <button class="btn-game secondary" style="flex: 1; margin: 0; border-color: var(--accent-purple); color: var(--accent-purple);" onclick="app.switchToAuthFromTrial('login')">로그인</button>
+        <button class="btn-primary" style="flex: 1; margin: 0; background: var(--accent-purple);" onclick="app.switchToAuthFromTrial('signup')">회원가입</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Trial Restrict Points -->
+  <div class="modal-overlay" id="modalTrialRestrictPoints">
+    <div class="modal-content glass-panel" style="border-color: var(--accent-purple); max-width: 500px; display: flex; flex-direction: column; padding: 2rem; max-height: 85vh;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; width: 100%;">
+        <div class="modal-title" style="color: var(--accent-purple); margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.3rem;">
+          <span class="material-icons-round">lock</span>
+          포인트 제한
+        </div>
+        <button onclick="app.closeModal('modalTrialRestrictPoints')" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; padding: 4px; border-radius: 50%;">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="terms-content" style="flex: 1; overflow-y: auto; text-align: left; font-size: 0.88rem; line-height: 1.8; padding-right: 0.5rem; color: var(--text-secondary); word-break: keep-all;">
+        <p style="font-weight: bold; color: var(--text-primary); margin-top: 0; font-size: 1.05rem;">포인트는 회원 전용 기능입니다.</p>
+        <p style="margin-top: 0.75rem;">회원가입 후 출석, 암송 챌린지, 미션을 통해 포인트를 적립할 수 있습니다.</p>
+      </div>
+      <div class="modal-btn-container" style="display: flex; gap: 0.5rem; justify-content: center; width: 100%; margin-top: 1.5rem;">
+        <button class="btn-game secondary" style="flex: 1; margin: 0;" onclick="app.closeModal('modalTrialRestrictPoints')">닫기</button>
+        <button class="btn-game secondary" style="flex: 1; margin: 0; border-color: var(--accent-purple); color: var(--accent-purple);" onclick="app.switchToAuthFromTrial('login')">로그인</button>
+        <button class="btn-primary" style="flex: 1; margin: 0; background: var(--accent-purple);" onclick="app.switchToAuthFromTrial('signup')">회원가입</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Trial Restrict Attendance -->
+  <div class="modal-overlay" id="modalTrialRestrictAttendance">
+    <div class="modal-content glass-panel" style="border-color: var(--accent-purple); max-width: 500px; display: flex; flex-direction: column; padding: 2rem; max-height: 85vh;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; width: 100%;">
+        <div class="modal-title" style="color: var(--accent-purple); margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.3rem;">
+          <span class="material-icons-round">lock</span>
+          출석체크 제한
+        </div>
+        <button onclick="app.closeModal('modalTrialRestrictAttendance')" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; padding: 4px; border-radius: 50%;">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="terms-content" style="flex: 1; overflow-y: auto; text-align: left; font-size: 0.88rem; line-height: 1.8; padding-right: 0.5rem; color: var(--text-secondary); word-break: keep-all;">
+        <p style="font-weight: bold; color: var(--text-primary); margin-top: 0; font-size: 1.05rem;">출석 체크는 회원 전용 기능입니다.</p>
+        <p style="margin-top: 0.75rem;">회원가입 후 매일 출석하고 연속 출석 보너스를 받을 수 있습니다.</p>
+      </div>
+      <div class="modal-btn-container" style="display: flex; gap: 0.5rem; justify-content: center; width: 100%; margin-top: 1.5rem;">
+        <button class="btn-game secondary" style="flex: 1; margin: 0;" onclick="app.closeModal('modalTrialRestrictAttendance')">닫기</button>
+        <button class="btn-game secondary" style="flex: 1; margin: 0; border-color: var(--accent-purple); color: var(--accent-purple);" onclick="app.switchToAuthFromTrial('login')">로그인</button>
+        <button class="btn-primary" style="flex: 1; margin: 0; background: var(--accent-purple);" onclick="app.switchToAuthFromTrial('signup')">회원가입</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Trial Quiz Complete -->
+  <div class="modal-overlay" id="modalTrialQuizComplete">
+    <div class="modal-content glass-panel" style="border-color: var(--accent-purple); max-width: 500px; display: flex; flex-direction: column; padding: 2rem; max-height: 85vh;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; width: 100%;">
+        <div class="modal-title" style="color: var(--accent-purple); margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.3rem;">
+          <span class="material-icons-round">emoji_events</span>
+          퀴즈 완료!
+        </div>
+        <button onclick="app.closeModal('modalTrialQuizComplete')" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; padding: 4px; border-radius: 50%;">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div class="terms-content" style="flex: 1; overflow-y: auto; text-align: left; font-size: 0.88rem; line-height: 1.8; padding-right: 0.5rem; color: var(--text-secondary); word-break: keep-all;">
+        <p style="font-weight: bold; color: var(--text-primary); margin-top: 0; font-size: 1.05rem;">회원가입하면 오늘의 학습 기록을 저장하고 포인트를 적립할 수 있습니다.</p>
+        <p style="margin-top: 0.75rem; font-weight: 600; color: var(--text-primary);">회원 전용 혜택</p>
+        <div style="padding-left: 0.8rem; color: var(--text-muted); margin: 0.5rem 0;">
+          <div>• 포인트 적립 및 사용</div>
+          <div>• 랭킹 참여</div>
+          <div>• 출석 체크 및 연속 출석 보너스</div>
+          <div>• 학습 기록 저장</div>
+        </div>
+      </div>
+      <div class="modal-btn-container" style="display: flex; gap: 0.5rem; justify-content: center; width: 100%; margin-top: 1.5rem;">
+        <button class="btn-game secondary" style="flex: 1; margin: 0;" onclick="app.closeModal('modalTrialQuizComplete')">계속 체험하기</button>
+        <button class="btn-primary" style="flex: 1; margin: 0; background: var(--accent-purple);" onclick="app.switchToAuthFromTrial('signup')">회원가입하고 포인트 받기</button>
       </div>
     </div>
   </div>

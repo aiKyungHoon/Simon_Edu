@@ -651,6 +651,19 @@ class SimonEduApp {
   }
 
   logout() {
+    if (this.currentUser && this.currentUser.isTrial) {
+      this.currentUser = null;
+      this.isTrialMode = false;
+      const authForm = document.getElementById('authForm');
+      if (authForm) authForm.reset();
+      const userNav = document.getElementById('userNav');
+      if (userNav) userNav.style.display = 'none';
+      const btnNavAdmin = document.getElementById('btnNavAdmin');
+      if (btnNavAdmin) btnNavAdmin.style.display = 'none';
+      this.switchView('auth');
+      return;
+    }
+
     auth.signOut()
       .then(() => {
         this.currentUser = null;
@@ -669,6 +682,17 @@ class SimonEduApp {
 
   // 4. View Router & Screen Renders
   switchView(viewName) {
+    if (this.currentUser && this.currentUser.isTrial) {
+      if (viewName === 'ranking') {
+        this.openModal('modalTrialRestrictRanking');
+        return;
+      }
+      if (viewName === 'attendance') {
+        this.openModal('modalTrialRestrictAttendance');
+        return;
+      }
+    }
+
     if (viewName !== 'game') {
       this.clearIntervals();
       this.gameActive = false;
@@ -766,6 +790,44 @@ class SimonEduApp {
     }
   }
 
+  handlePointBadgeClick() {
+    if (this.currentUser && this.currentUser.isTrial) {
+      this.openModal('modalTrialRestrictPoints');
+    } else {
+      this.openModal('modalPoints');
+    }
+  }
+
+  startTrialMode() {
+    this.closeModal('modalTrialConfirm');
+    this.currentUser = {
+      id: 'trial_user',
+      name: '체험 사용자',
+      points: 0,
+      currentVerseIndex: 0,
+      lastMissionDate: null,
+      isTrial: true
+    };
+    this.isTrialMode = true;
+    this.renderAppForUser();
+  }
+
+  switchToAuthFromTrial(tabName) {
+    ['modalTrialRestrictRanking', 'modalTrialRestrictPoints', 'modalTrialRestrictAttendance', 'modalTrialQuizComplete', 'modalTrialConfirm'].forEach(mId => {
+      this.closeModal(mId);
+    });
+    this.currentUser = null;
+    this.isTrialMode = false;
+    
+    const userNav = document.getElementById('userNav');
+    if (userNav) userNav.style.display = 'none';
+    const btnNavAdmin = document.getElementById('btnNavAdmin');
+    if (btnNavAdmin) btnNavAdmin.style.display = 'none';
+    
+    this.switchView('auth');
+    this.setAuthTab(tabName);
+  }
+
   renderAppForUser() {
     const userNav = document.getElementById('userNav');
     if (userNav) userNav.style.display = 'flex';
@@ -812,9 +874,11 @@ class SimonEduApp {
 
     // 5.1 Points and Info
     // Always refresh currentUser details from memory array to stay synced
-    const freshUser = this.users.find(u => u.id === this.currentUser.id);
-    if (freshUser) {
-      this.currentUser = freshUser;
+    if (!this.currentUser.isTrial) {
+      const freshUser = this.users.find(u => u.id === this.currentUser.id);
+      if (freshUser) {
+        this.currentUser = freshUser;
+      }
     }
     const navPoints = document.getElementById('navPoints');
     if (navPoints) {
@@ -1608,15 +1672,8 @@ class SimonEduApp {
   startMission() {
     if (!this.currentUser) return;
     
-    const todayStr = this.getRelativeDateStr(0);
     const bibleData = window.BIBLE_DATA;
     let curIdx = this.currentUser.currentVerseIndex;
-
-    // Prevent doing multiple missions a day
-    if (curIdx < bibleData.length && this.currentUser.lastMissionDate === todayStr) {
-      alert('하루에 한 절씩만 암송 챌린지에 도전할 수 있습니다! 내일 다시 도전해주세요.');
-      return;
-    }
     
     // Loop back to start if finished
     if (curIdx >= bibleData.length) {
@@ -1838,6 +1895,26 @@ class SimonEduApp {
     // Time bonus: 2P per second remaining
     const timeBonus = this.gameTimeRemaining * 2;
     const totalAward = basePoints + timeBonus;
+
+    // 체험모드 유저 예외처리 분기
+    if (this.currentUser && this.currentUser.isTrial) {
+      const nextVerseIndex = this.currentUser.currentVerseIndex + 1;
+      this.currentUser.currentVerseIndex = nextVerseIndex; // 체험 유저 진도 임시 진행
+      
+      const modalBody = document.getElementById('modalCompleteBody');
+      if (modalBody) {
+        modalBody.innerHTML = `
+          요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 시험을 완료했습니다!<br><br>
+          기본 포인트: <strong>+${basePoints} P (체험 모드 - 미지급)</strong><br>
+          남은 시간 보너스 (${this.gameTimeRemaining}s): <strong>+${timeBonus} P (체험 모드 - 미지급)</strong><br>
+          <hr style="margin: 0.75rem 0; border:0; border-top:1px solid var(--glass-border);">
+          <strong style="color:var(--accent-amber); font-size:1.15rem;">체험 모드 완료 (회원가입 시 실제 적립이 가능합니다)</strong>
+        `;
+      }
+      this.playConfetti('quiz');
+      this.openModal('modalTrialQuizComplete');
+      return;
+    }
 
     if (this.isTestMode) {
       const modalBody = document.getElementById('modalCompleteBody');
