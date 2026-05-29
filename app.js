@@ -1932,15 +1932,9 @@ class SimonEduApp {
       const nextVerseIndex = this.currentUser.currentVerseIndex + 1;
       this.currentUser.currentVerseIndex = nextVerseIndex; // 체험 유저 진도 임시 진행
       
-      const modalBody = document.getElementById('modalCompleteBody');
-      if (modalBody) {
-        modalBody.innerHTML = `
-          요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 시험을 완료했습니다!<br><br>
-          기본 포인트: <strong>+${basePoints} P (체험 모드 - 미지급)</strong><br>
-          남은 시간 보너스 (${this.gameTimeRemaining}s): <strong>+${timeBonus} P (체험 모드 - 미지급)</strong><br>
-          <hr style="margin: 0.75rem 0; border:0; border-top:1px solid var(--glass-border);">
-          <strong style="color:var(--accent-amber); font-size:1.15rem;">체험 모드 완료 (회원가입 시 실제 적립이 가능합니다)</strong>
-        `;
+      const pointsEl = document.getElementById('trialQuizCompletePoints');
+      if (pointsEl) {
+        pointsEl.textContent = `+${totalAward}P`;
       }
       this.playConfetti('quiz');
       this.openModal('modalTrialQuizComplete');
