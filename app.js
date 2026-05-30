@@ -2744,6 +2744,22 @@ class SimonEduApp {
       }
     }
   }
+
+  updatePushToken(token) {
+    if (!this.currentUser) return;
+    if (this.currentUser.pushToken === token) return; // avoid duplicate updates
+    
+    this.currentUser.pushToken = token;
+    if (this.currentUser.isTrial) return;
+    
+    db.collection('users').doc(this.currentUser.id).update({
+      pushToken: token
+    }).then(() => {
+      console.log("Push token successfully updated in Firestore:", token);
+    }).catch(err => {
+      console.error("Error updating push token in Firestore:", err);
+    });
+  }
 }
 
 // Instantiate and bind to window

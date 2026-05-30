@@ -9,6 +9,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'intro_overlay.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import '../core/push/push_notification_service.dart';
 
 
 class WebViewScreen extends StatefulWidget {
@@ -34,6 +36,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
   int _currentIndex = 0;
   bool _isLoggedIn = false;
   String _appVersion = '';
+  String? _fcmToken;
 
   // Native Settings Profile State
   String _userName = '';
@@ -52,6 +55,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadAppVersion();
+    _initFcmToken();
 
 
     
@@ -83,6 +87,9 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
               _checkIntroFinished();
               _updateNavigationState();
               _injectJavaScriptBridge();
+              if (_fcmToken != null) {
+                _syncTokenToWebView(_fcmToken);
+              }
               
               // Synchronize auth state and active view state after page finish
               _controller?.runJavaScript('''
@@ -309,6 +316,9 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
         setState(() {
           _isLoggedIn = true;
         });
+        if (_fcmToken != null) {
+          _syncTokenToWebView(_fcmToken);
+        }
         _syncUserProfile();
       } else if (event == 'logout') {
         setState(() {
@@ -506,6 +516,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
                           isPermissionGranted: _isNotificationPermissionGranted,
                           isLoading: _isProfileLoading,
                           version: _appVersion.isEmpty ? '1.4.2' : _appVersion,
+                          fcmToken: _fcmToken,
                           pointsHistory: _pointsHistory,
                           onLogout: () {
                             _controller?.runJavaScript('if (window.app && window.app.logout) { window.app.logout(); }');
@@ -874,8 +885,8 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
         },
       );
     } else {
-      final newStatus = await Permission.notification.request();
-      _sendDevicePermissionStatus(newStatus.isGranted);
+      final granted = await PushNotificationService.instance.requestPermission();
+      _sendDevicePermissionStatus(granted);
     }
   }
 
@@ -883,6 +894,66 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
     if (mounted && _controller != null) {
       _controller!.runJavaScript('if (window.app && window.app.updateDevicePermissionStatus) { window.app.updateDevicePermissionStatus($granted); }');
     }
+  }
+
+  Future<void> _initFcmToken() async {
+    try {
+      final pushService = PushNotificationService.instance;
+
+      // Set foreground notification options
+      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      // Get the current token cached in the service
+      String? token = pushService.token;
+      if (mounted) {
+        setState(() {
+          _fcmToken = token;
+        });
+        debugPrint("FCM Token (from service): $token");
+        _syncTokenToWebView(token);
+      }
+
+      // Listen to token refresh events from the service
+      pushService.onTokenRefresh.listen((newToken) {
+        if (mounted) {
+          setState(() {
+            _fcmToken = newToken;
+          });
+          _syncTokenToWebView(newToken);
+        }
+      });
+
+      // Handle foreground notifications
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        debugPrint('Got a message whilst in the foreground!');
+        debugPrint('Message data: ${message.data}');
+
+        if (message.notification != null && mounted) {
+          debugPrint('Message also contained a notification: ${message.notification}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${message.notification!.title ?? ""}: ${message.notification!.body ?? ""}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              backgroundColor: const Color(0xFFB8860B),
+            ),
+          );
+        }
+      });
+    } catch (e) {
+      debugPrint("Error initializing FCM token: $e");
+    }
+  }
+
+  void _syncTokenToWebView(String? token) {
+    if (token == null || _controller == null) return;
+    debugPrint("Syncing push token to webview: $token");
+    _controller!.runJavaScript('if (window.app && window.app.updatePushToken) { window.app.updatePushToken("$token"); }');
   }
 }
 
@@ -895,6 +966,7 @@ class NativeSettingsView extends StatelessWidget {
   final bool isPermissionGranted;
   final bool isLoading;
   final String version;
+  final String? fcmToken;
   final VoidCallback onLogout;
   final VoidCallback onWithdraw;
   final ValueChanged<bool> onPushChanged;
@@ -912,6 +984,7 @@ class NativeSettingsView extends StatelessWidget {
     required this.isPermissionGranted,
     required this.isLoading,
     required this.version,
+    this.fcmToken,
     required this.onLogout,
     required this.onWithdraw,
     required this.onPushChanged,
@@ -1232,6 +1305,55 @@ class NativeSettingsView extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+
+          // 3.5 앱 정보 (FCM 토큰 복사 등)
+          if (fcmToken != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0x1FB8860B)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF3D341C).withOpacity(0.04),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                leading: const Icon(Icons.copy_all_rounded, color: Color(0xFFB8860B), size: 20),
+                title: const Text(
+                  '푸시 알림 토큰 복사',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF3D341C),
+                  ),
+                ),
+                subtitle: const Text(
+                  '디버그 및 테스트용 기기 토큰을 복사합니다.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF96855B),
+                  ),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF96855B)),
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: fcmToken!));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('푸시 토큰이 클립보드에 복사되었습니다.'),
+                      backgroundColor: Color(0xFFB8860B),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
 
           // 4. 로그아웃 및 회원탈퇴 그룹
