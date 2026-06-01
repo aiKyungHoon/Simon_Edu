@@ -1338,53 +1338,7 @@ class NativeSettingsView extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // 3.5 앱 정보 (FCM 토큰 복사 등)
-          if (fcmToken != null) ...[
-            const SizedBox(height: 16),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0x1FB8860B)),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF3D341C).withOpacity(0.04),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                leading: const Icon(Icons.copy_all_rounded, color: Color(0xFFB8860B), size: 20),
-                title: const Text(
-                  '푸시 알림 토큰 복사',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF3D341C),
-                  ),
-                ),
-                subtitle: const Text(
-                  '디버그 및 테스트용 기기 토큰을 복사합니다.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF96855B),
-                  ),
-                ),
-                trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF96855B)),
-                onTap: () {
-                  Clipboard.setData(ClipboardData(text: fcmToken!));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('푸시 토큰이 클립보드에 복사되었습니다.'),
-                      backgroundColor: Color(0xFFB8860B),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+
           const SizedBox(height: 16),
 
           // 4. 로그아웃 및 회원탈퇴 그룹
