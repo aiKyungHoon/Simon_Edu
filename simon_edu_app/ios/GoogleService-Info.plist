@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyAqCk33u84DKnWkKq22amPEmB-UwJ75-B4</string>
+	<key>GCM_SENDER_ID</key>
+	<string>895429107859</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.simonedu.simonEduApp</string>
+	<key>PROJECT_ID</key>
+	<string>simon-edu-bible-game</string>
+	<key>STORAGE_BUCKET</key>
+	<string>simon-edu-bible-game.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:895429107859:ios:e4acab1ce7c50b2047ed66</string>
+</dict>
+</plist>
