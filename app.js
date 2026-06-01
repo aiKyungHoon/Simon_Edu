@@ -200,6 +200,18 @@ class SimonEduApp {
         this.renderLeaderboardWidget();
         this.renderDashboard();
       }
+
+      // Re-render attendance panel if active
+      const attendanceView = document.getElementById('attendanceView');
+      if (attendanceView && attendanceView.classList.contains('active')) {
+        this.renderAttendanceWidget();
+      }
+
+      // Re-render ranking panel if active
+      const rankingView = document.getElementById('rankingView');
+      if (rankingView && rankingView.classList.contains('active')) {
+        this.renderLeaderboardWidget();
+      }
       
       // Re-render admin panel if active
       const adminView = document.getElementById('adminView');
@@ -280,6 +292,15 @@ class SimonEduApp {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const date = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${date}`;
+  }
+
+  showToast(message) {
+    if (this.isMobileApp && window.MobileAppChannel) {
+      window.MobileAppChannel.postMessage(JSON.stringify({
+        event: 'toast',
+        message: message
+      }));
+    }
   }
 
   // 2. Auth view tab switcher
@@ -919,7 +940,7 @@ class SimonEduApp {
 
     const startBtn = document.querySelector('.btn-start-mission');
     const todayStr = this.getRelativeDateStr(0);
-    const hasDoneMissionToday = this.currentUser.lastMissionDate === todayStr;
+    const hasDoneMissionToday = false; // Unlimited missions requested
 
     const titleEl = document.getElementById('currentVerseTitle');
     const previewEl = document.getElementById('currentVersePreview');
@@ -1668,10 +1689,18 @@ class SimonEduApp {
     }).then(() => {
       this.showPointsFloater(pointsAwarded, message);
       this.playConfetti('checkin');
-      if (gotBonus) {
-        alert(`축하합니다! ${consecutiveCheckIns}일 연속 출석 달성 보너스로 총 ${pointsAwarded}P를 획득하셨습니다!`);
-      } else {
-        alert(`오늘의 출석 체크가 완료되었습니다 (+10P). 연속 출석: ${consecutiveCheckIns}일째`);
+
+      const toastMsg = gotBonus 
+        ? `🎉 ${consecutiveCheckIns}일 연속 출석 달성! 보너스로 총 ${pointsAwarded}P를 획득하셨습니다!`
+        : `오늘의 출석 체크가 완료되었습니다 (+10P). 연속 출석: ${consecutiveCheckIns}일째`;
+      this.showToast(toastMsg);
+
+      if (!this.isMobileApp) {
+        if (gotBonus) {
+          alert(`축하합니다! ${consecutiveCheckIns}일 연속 출석 달성 보너스로 총 ${pointsAwarded}P를 획득하셨습니다!`);
+        } else {
+          alert(`오늘의 출석 체크가 완료되었습니다 (+10P). 연속 출석: ${consecutiveCheckIns}일째`);
+        }
       }
     }).catch(err => {
       console.error("Check-in update failed:", err);
@@ -1731,12 +1760,6 @@ class SimonEduApp {
   }
 
   setDifficulty(diff) {
-    if (this.gameActive) {
-      if (!confirm('난이도를 변경하면 현재 진행 중인 시험이 리셋됩니다. 변경하시겠습니까?')) {
-        return;
-      }
-    }
-    
     this.currentDifficulty = diff;
     
     // Toggle active classes on buttons
@@ -1951,6 +1974,7 @@ class SimonEduApp {
       }
       this.playConfetti('quiz');
       this.openModal('modalTrialQuizComplete');
+      this.showToast(`📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 성공! (체험모드)`);
       return;
     }
 
@@ -1965,6 +1989,7 @@ class SimonEduApp {
       `;
       this.playConfetti('quiz');
       this.openModal('modalComplete');
+      this.showToast(`📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 완료! (테스트 모드)`);
       return;
     }
 
@@ -2047,6 +2072,13 @@ class SimonEduApp {
       }
       this.playConfetti('quiz');
       this.openModal('modalComplete');
+
+      // Show toast on success
+      let toastMsg = `📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 성공! (+${totalAward}P)`;
+      if (checkInResult) {
+        toastMsg += ` & 오늘의 출석체크 자동 완료! (+${checkInResult.pointsAwarded}P)`;
+      }
+      this.showToast(toastMsg);
     }).catch(err => {
       console.error("Error updating quiz success:", err);
       alert("진도 업데이트 중 오류가 발생했습니다.");

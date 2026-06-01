@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.simonedu.simonEdu</string>
+	<string>com.simonedu.simonEduApp</string>
 	<key>PROJECT_ID</key>
 	<string>simon-edu-bible-game</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:895429107859:ios:1733adaa7d3d0c3547ed66</string>
+	<string>1:895429107859:ios:e4acab1ce7c50b2047ed66</string>
 </dict>
 </plist>

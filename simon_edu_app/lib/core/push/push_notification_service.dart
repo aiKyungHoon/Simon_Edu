@@ -17,11 +17,13 @@ class PushNotificationService {
   Stream<String?> get onTokenRefresh => _tokenController.stream;
 
   Future<void> initialize() async {
-    await requestPermission();
-
-    token = await _messaging.getToken();
-
-    debugPrint('FCM Token: $token');
+    try {
+      await requestPermission();
+      token = await _messaging.getToken();
+      debugPrint('FCM Token: $token');
+    } catch (e) {
+      debugPrint('Error initializing Firebase Messaging: $e');
+    }
 
     _messaging.onTokenRefresh.listen((newToken) {
       token = newToken;
@@ -54,7 +56,9 @@ class PushNotificationService {
       );
 
       return settings.authorizationStatus ==
-          AuthorizationStatus.authorized;
+          AuthorizationStatus.authorized ||
+          settings.authorizationStatus ==
+          AuthorizationStatus.provisional;
     }
 
     if (Platform.isAndroid) {

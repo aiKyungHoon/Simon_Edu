@@ -48,7 +48,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
   bool _isProfileLoading = true;
   List<dynamic> _pointsHistory = [];
 
-  final String _targetUrl = 'https://simon-edu-bible-game.firebaseapp.com?v=1.4.7';
+  final String _targetUrl = 'https://simon-edu-bible-game.firebaseapp.com?v=1.5.0';
 
   @override
   void initState() {
@@ -352,6 +352,37 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
         _checkAndSendNotificationPermission().then((_) => _syncUserProfile());
       } else if (event == 'request_device_permission') {
         _requestNotificationPermission().then((_) => _syncUserProfile());
+      } else if (event == 'toast') {
+        final message = data['message'] ?? '';
+        if (message.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle_outline_rounded, color: Colors.white),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFF10B981), // Emerald green
+              behavior: SnackBarBehavior.floating,
+              elevation: 6,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
       }
     } catch (e) {
       debugPrint('Error parsing MobileAppChannel message: $e');
@@ -693,7 +724,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
           _pushEnabled = data['pushEnabled'] ?? false;
           _marketingPushEnabled = data['marketingPushEnabled'] ?? false;
           _pointsHistory = data['pointsHistory'] ?? [];
-          _isNotificationPermissionGranted = status.isGranted;
+          _isNotificationPermissionGranted = status.isGranted || status.isProvisional;
           _isProfileLoading = false;
         });
       }
@@ -707,10 +738,10 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
     
     if (value) {
       final status = await Permission.notification.status;
-      if (!status.isGranted) {
+      if (!status.isGranted && !status.isProvisional) {
         await _requestNotificationPermission();
         final afterStatus = await Permission.notification.status;
-        if (!afterStatus.isGranted) {
+        if (!afterStatus.isGranted && !afterStatus.isProvisional) {
           // If permission is still not granted, do not enable the toggle
           return;
         }
@@ -823,7 +854,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
 
   Future<void> _checkAndSendNotificationPermission() async {
     final status = await Permission.notification.status;
-    _sendDevicePermissionStatus(status.isGranted);
+    _sendDevicePermissionStatus(status.isGranted || status.isProvisional);
   }
 
   Future<void> _requestNotificationPermission() async {
