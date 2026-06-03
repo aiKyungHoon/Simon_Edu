@@ -82,10 +82,6 @@
       
       <!-- User Navigation (Logged In Only) -->
       <div class="user-nav" id="userNav" style="display: none;">
-        <button class="btn-nav-admin" id="btnNavAdmin" style="display: none;" onclick="app.switchView('admin')">
-          <span class="material-icons-round" style="font-size: 1rem; vertical-align: middle; margin-right: 2px;">admin_panel_settings</span>
-          관리자 모드
-        </button>
 
         <!-- Refresh Button -->
         <button class="btn-icon-action" onclick="window.location.reload()" title="새로고침">
@@ -460,73 +456,7 @@
       </div>
     </div>
 
-    <!-- 5. Admin View (Dashboard & Simulator) -->
-    <div id="adminView" class="view-container">
-      <div class="dashboard-card glass-panel" style="margin-bottom: 2rem;">
-        <div class="card-title" style="justify-content: space-between; align-items: center; width: 100%;">
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <span class="material-icons-round" style="color: var(--accent-purple);">admin_panel_settings</span>
-            관리자 대시보드
-          </div>
-          <button class="btn-logout" onclick="app.switchView('dashboard')" style="background: var(--accent-purple); color: white;">대시보드로 복귀</button>
-        </div>
-        
-        <!-- Stat widgets -->
-        <div class="admin-stats-grid">
-          <div class="admin-stat-card glass-panel">
-            <div class="admin-stat-val" id="adminStatUsers">0</div>
-            <div class="admin-stat-lbl">총 사용자 수</div>
-          </div>
-          <div class="admin-stat-card glass-panel">
-            <div class="admin-stat-val" id="adminStatAvgPoints">0</div>
-            <div class="admin-stat-lbl">평균 포인트</div>
-          </div>
-          <div class="admin-stat-card glass-panel">
-            <div class="admin-stat-val" id="adminStatTotalCleared">0</div>
-            <div class="admin-stat-lbl">평균 암송 진행도</div>
-          </div>
-        </div>
 
-        <!-- Users Table -->
-        <div class="admin-table-container">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>아이디</th>
-                <th>이름</th>
-                <th>이메일</th>
-                <th>역할</th>
-                <th>포인트</th>
-                <th>연속 출석</th>
-                <th>진행 말씀</th>
-                <th>관리 조치</th>
-              </tr>
-            </thead>
-            <tbody id="adminUserTableBody">
-              <!-- Populated by JS -->
-            </tbody>
-          </table>
-        </div>
-        
-        <!-- Demo Control Panel (Cheat Panel) -->
-        <div class="demo-control-panel">
-          <div class="demo-control-title">
-            <span class="material-icons-round">terminal</span>
-            개발자 & 테스터 전용 디버그 시뮬레이터 (데모 전용)
-          </div>
-          <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;">
-            실제 날짜가 변경되거나 연속 출석을 한 것처럼 강제로 상태를 조작하여 모든 보상 시스템과 랭킹 실시간 변동을 즉시 검증할 수 있습니다.
-          </p>
-          <div class="demo-buttons">
-            <button class="btn-demo" onclick="app.demoFastForwardDays(1)">⏰ 1일 시간 흐름 시뮬레이션</button>
-            <button class="btn-demo" onclick="app.demoResetAttendance()">📅 오늘의 출석 정보 초기화</button>
-            <button class="btn-demo" onclick="app.demoAddPointsToMe(100)">💰 내 계정에 100P 추가</button>
-            <button class="btn-demo" onclick="app.demoNextVerse()">🔓 다음 절 즉시 해금 (치트)</button>
-            <button class="btn-demo" onclick="app.demoResetAllUsers()">🔄 모든 데이터 초기화 (초기 상태로)</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Settings View (Mobile Only) -->
     <div id="settingsView" class="view-container">

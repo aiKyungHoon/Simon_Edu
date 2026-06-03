@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "simon-edu-bible-game"
-  }
+  },
+  "targets": {
+    "simon-edu-bible-game": {
+      "hosting": {
+        "main": [
+          "simon-edu-bible-game"
+        ],
+        "admin": [
+          "simon-edu-bible-game-admin"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
