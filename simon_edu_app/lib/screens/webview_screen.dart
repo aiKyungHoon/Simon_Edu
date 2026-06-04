@@ -7,6 +7,7 @@ import 'package:app_links/app_links.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'intro_overlay.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -940,6 +941,20 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
 
       // Get the current token cached in the service
       String? token = pushService.token;
+      
+      if (token == null) {
+        debugPrint("Cached FCM Token is null. Retrying direct fetch...");
+        if (Platform.isIOS) {
+          int retries = 0;
+          while (await FirebaseMessaging.instance.getAPNSToken() == null && retries < 10) {
+            await Future.delayed(const Duration(milliseconds: 500));
+            retries++;
+          }
+        }
+        token = await FirebaseMessaging.instance.getToken();
+        pushService.token = token;
+      }
+
       if (mounted) {
         setState(() {
           _fcmToken = token;

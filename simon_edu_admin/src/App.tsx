@@ -15,6 +15,7 @@ import Stats from './components/Stats';
 import Notices from './components/Notices';
 import Settings from './components/Settings';
 import Logs from './components/Logs';
+import PushManagement from './components/PushManagement';
 
 interface User {
   id: string;
@@ -206,6 +207,7 @@ export default function App() {
       case 'notices': return '공지사항 게시판 관리';
       case 'settings': return '시스템 전역 환경설정';
       case 'logs': return '관리자 시스템 감사 로그';
+      case 'push': return '푸시 알림 및 발송 관리';
       default: return 'Simon Edu 관리자';
     }
   };
@@ -252,6 +254,8 @@ export default function App() {
         return <Settings adminEmail={adminEmail} />;
       case 'logs':
         return <Logs />;
+      case 'push':
+        return <PushManagement users={users} adminEmail={adminEmail} />;
       default:
         return (
           <Dashboard
@@ -343,7 +347,9 @@ export default function App() {
                currentTab === 'events' ? 'event' :
                currentTab === 'stats' ? 'analytics' :
                currentTab === 'notices' ? 'campaign' :
-               currentTab === 'settings' ? 'settings' : 'security'}
+               currentTab === 'settings' ? 'settings' :
+               currentTab === 'logs' ? 'terminal' :
+               currentTab === 'push' ? 'notifications' : 'security'}
             </span>
             <h1 className="header-title">{getTabTitle(currentTab)}</h1>
           </div>

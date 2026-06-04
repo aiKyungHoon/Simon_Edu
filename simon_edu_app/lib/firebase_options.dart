@@ -59,7 +59,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAqCk33u84DKnWkKq22amPEmB-UwJ75-B4',
-    appId: '1:895429107859:ios:070276190fc26e8147ed66',
+    appId: '1:895429107859:ios:e4acab1ce7c50b2047ed66',
     messagingSenderId: '895429107859',
     projectId: 'simon-edu-bible-game',
     storageBucket: 'simon-edu-bible-game.firebasestorage.app',

@@ -27,6 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "notices", label: "공지사항 관리", icon: "campaign" },
     { id: "settings", label: "설정 관리", icon: "settings" },
     { id: "logs", label: "관리자 로그", icon: "terminal" },
+    { id: "push", label: "푸시 알림 관리", icon: "notifications" },
   ];
 
   return (

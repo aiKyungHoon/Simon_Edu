@@ -3036,6 +3036,19 @@ body {
   display: none;
 }
 
+/* PUSH NOTIFICATION MANAGEMENT */
+.push-layout-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.3fr);
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .push-layout-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 /* MOBILE & RESPONSIVE STYLING */
 
 /* Hide mobile-only buttons by default on desktop */

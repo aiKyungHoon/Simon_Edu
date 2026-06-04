@@ -19,6 +19,18 @@ class PushNotificationService {
   Future<void> initialize() async {
     try {
       await requestPermission();
+      
+      if (Platform.isIOS) {
+        debugPrint('Waiting for iOS APNs token to register...');
+        int retries = 0;
+        while (await _messaging.getAPNSToken() == null && retries < 10) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          retries++;
+        }
+        final apnsToken = await _messaging.getAPNSToken();
+        debugPrint('APNs Token: $apnsToken');
+      }
+
       token = await _messaging.getToken();
       debugPrint('FCM Token: $token');
     } catch (e) {
