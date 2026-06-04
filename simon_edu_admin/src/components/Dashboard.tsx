@@ -15,6 +15,7 @@ interface User {
   lastMissionDate: string | null;
   currentVerseIndex: number;
   checkInHistory?: string[];
+  os?: string;
   pointsHistory?: Array<{
     id: string;
     type: string;
@@ -63,9 +64,10 @@ export default function Dashboard({
   const [settings, setSettings] = useState({
     signUpPoints: 100,
     checkInPoints: 10,
-    bonus7Days: 50,
-    bonus15Days: 100,
-    bonus30Days: 200
+    bonus5Days: 150,
+    bonus10Days: 200,
+    bonus15Days: 250,
+    bonus30Days: 300
   });
 
   const [loading, setLoading] = useState(true);
@@ -142,9 +144,10 @@ export default function Dashboard({
         setSettings({
           signUpPoints: data.signUpPoints || 100,
           checkInPoints: data.checkInPoints || 10,
-          bonus7Days: data.bonus7Days || 50,
-          bonus15Days: data.bonus15Days || 100,
-          bonus30Days: data.bonus30Days || 200
+          bonus5Days: data.bonus5Days || 150,
+          bonus10Days: data.bonus10Days || 200,
+          bonus15Days: data.bonus15Days || 250,
+          bonus30Days: data.bonus30Days || 300
         });
       }
     });
@@ -241,6 +244,7 @@ export default function Dashboard({
         lastCheckInDate: todayStr,
         lastMissionDate: todayStr,
         currentVerseIndex: 120, // 7장 완료자
+        os: 'Android',
         pointsHistory: [
           { id: 'h1', type: 'signup', title: '회원가입 축하금', amount: 100, date: '2026-06-02 10:00:00' },
           { id: 'h2', type: 'attendance', title: '일일 출석 체크', amount: 10, date: todayStr + ' 08:30:12' },
@@ -258,6 +262,7 @@ export default function Dashboard({
         lastCheckInDate: todayStr,
         lastMissionDate: todayStr,
         currentVerseIndex: 320, // 21장 완료자
+        os: 'iOS',
         pointsHistory: [
           { id: 'h4', type: 'attendance', title: '연속 출석 보너스 (12일차)', amount: 30, date: todayStr + ' 07:12:00' },
           { id: 'h5', type: 'challenge', title: '암송 성공 (요한계시록 21장 2절)', amount: 80, date: '2026-06-02 13:45:00' }
@@ -274,6 +279,7 @@ export default function Dashboard({
         lastCheckInDate: yesterdayStr,
         lastMissionDate: yesterdayStr,
         currentVerseIndex: 85, // 5장
+        os: 'Android',
         pointsHistory: [
           { id: 'h6', type: 'signup', title: '회원가입 축하금', amount: 100, date: '2026-06-01 14:22:01' }
         ]
@@ -289,6 +295,7 @@ export default function Dashboard({
         lastCheckInDate: todayStr,
         lastMissionDate: null,
         currentVerseIndex: 45, // 3장
+        os: 'iOS',
         pointsHistory: [
           { id: 'h7', type: 'signup', title: '회원가입 축하금', amount: 100, date: '2026-06-01 11:08:00' },
           { id: 'h8', type: 'attendance', title: '일일 출석 체크', amount: 10, date: todayStr + ' 11:45:00' }
@@ -305,6 +312,7 @@ export default function Dashboard({
         lastCheckInDate: yesterdayStr,
         lastMissionDate: null,
         currentVerseIndex: 250, // 15장
+        os: 'Android',
         pointsHistory: [
           { id: 'h9', type: 'signup', title: '회원가입 축하금', amount: 100, date: '2026-06-01 11:00:00' },
           { id: 'h10', type: 'attendance', title: '5월 연속 출석', amount: 150, date: '2026-06-01 22:31:00' }
@@ -526,7 +534,13 @@ export default function Dashboard({
     { label: '학습 전', count: progressCounts.g6, pct: progressPcts.g6, color: '#9ca3af' }
   ];
 
+  // OS distribution calculations
+  const iosCount = isDbEmpty ? 2 : displayUsers.filter(u => u.os?.toLowerCase() === 'ios').length;
+  const androidCount = isDbEmpty ? 3 : displayUsers.filter(u => u.os?.toLowerCase() === 'android' || u.os?.toLowerCase() === 'aos').length;
+  const unknownCount = totalMembers - iosCount - androidCount;
+
   // 5. ACTIVITY LISTS
+  // Flatten activities
   interface ActivityItem {
     id: string;
     username: string;
@@ -590,6 +604,7 @@ export default function Dashboard({
     }
     const items: ActivityTimelineItem[] = [];
 
+    // 1. Points History items
     user.pointsHistory?.forEach((h, idx) => {
       let type: ActivityTimelineItem['type'] = 'admin';
       if (h.type === 'attendance') type = 'attendance';
@@ -606,6 +621,7 @@ export default function Dashboard({
       });
     });
 
+    // 2. Attendance history items (avoid duplicate if already in points history)
     const attendanceDates = getAttendanceHistory(user);
     attendanceDates.forEach((dateStr, idx) => {
       const hasPointEvent = user.pointsHistory?.some(h => h.type === 'attendance' && formatDateOnly(h.date) === dateStr);
@@ -619,6 +635,7 @@ export default function Dashboard({
       }
     });
 
+    // 3. Mock some chapter completions based on current verse index for realistic UI
     const currentChapter = getChapterOfUser(user.currentVerseIndex);
     if (currentChapter > 1) {
       for (let c = 1; c < currentChapter; c++) {
@@ -642,9 +659,6 @@ export default function Dashboard({
           <span className="material-icons-round" style={{ fontSize: '3rem', color: 'var(--accent-purple)', animation: 'spin 1.5s linear infinite' }}>
             sync
           </span>
-          <style>{`
-            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-          `}</style>
         </div>
       ) : (
         <div className="dashboard-wrapper-premium">
@@ -982,6 +996,56 @@ export default function Dashboard({
                   </div>
                 </div>
 
+                {/* OS 기기 분포 */}
+                <div className="glass-panel donut-card-premium" style={{ marginTop: '1rem', padding: '1.25rem' }}>
+                  <h2 className="card-title-premium" style={{ marginBottom: '1rem' }}>기기 OS별 분포</h2>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {/* iOS Bar */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#007AFF' }}></span>
+                          iOS
+                        </span>
+                        <span>{iosCount}명 ({totalMembers > 0 ? Math.round((iosCount / totalMembers) * 100) : 0}%)</span>
+                      </div>
+                      <div style={{ height: '8px', background: 'rgba(0,0,0,0.04)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${totalMembers > 0 ? (iosCount / totalMembers) * 100 : 0}%`, height: '100%', background: '#007AFF', borderRadius: '4px' }}></div>
+                      </div>
+                    </div>
+
+                    {/* Android Bar */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34C759' }}></span>
+                          Android (AOS)
+                        </span>
+                        <span>{androidCount}명 ({totalMembers > 0 ? Math.round((androidCount / totalMembers) * 100) : 0}%)</span>
+                      </div>
+                      <div style={{ height: '8px', background: 'rgba(0,0,0,0.04)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${totalMembers > 0 ? (androidCount / totalMembers) * 100 : 0}%`, height: '100%', background: '#34C759', borderRadius: '4px' }}></div>
+                      </div>
+                    </div>
+
+                    {/* Web / Unknown Bar */}
+                    {unknownCount > 0 && (
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 600 }}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#9ca3af' }}></span>
+                            Web / 기타
+                          </span>
+                          <span>{unknownCount}명 ({totalMembers > 0 ? Math.round((unknownCount / totalMembers) * 100) : 0}%)</span>
+                        </div>
+                        <div style={{ height: '8px', background: 'rgba(0,0,0,0.04)', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{ width: `${(unknownCount / totalMembers) * 100}%`, height: '100%', background: '#9ca3af', borderRadius: '4px' }}></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* 이번 주 요약 */}
                 <div className="glass-panel summary-card-premium">
                   <h2 className="card-title-premium" style={{ marginBottom: '1rem' }}>이번 주 요약 <span className="summary-date-span">(05.27 ~ 06.02)</span></h2>
@@ -1125,55 +1189,59 @@ export default function Dashboard({
               </div>
             </div>
 
-            {/* MAIN ROW 3: Policy Configuration Summary (Integrated settings rule row) */}
-            <div className="glass-panel policy-summary-row-container" style={{ padding: '1rem 1.5rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginTop: '1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <span className="material-icons-round">settings</span>
+            {/* MAIN ROW 3: Policy Configuration Summary */}
+            <div className="glass-panel policy-summary-card">
+              <div className="card-header-row" style={{ marginBottom: '1.25rem' }}>
+                <h3 className="card-title-sub" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span className="material-icons-round" style={{ color: 'var(--accent-purple)', fontSize: '1.2rem' }}>gavel</span>
                   정책 설정 요약
                 </h3>
-
-                <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.85rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span className="material-icons-round" style={{ fontSize: '1.1rem', color: 'var(--accent-purple)' }}>person_add</span>
-                    <span style={{ color: 'var(--text-muted)' }}>가입 보너스:</span>
-                    <span style={{ fontWeight: 'bold' }}>{settings.signUpPoints}P</span>
+                <span className="card-link" onClick={() => setCurrentTab('settings')}>설정 관리 &gt;</span>
+              </div>
+              <div className="policy-badges-grid custom-scroll">
+                <div className="policy-badge-item">
+                  <span className="material-icons-round icon" style={{ color: '#4f46e5' }}>person_add</span>
+                  <div>
+                    <div className="lbl">가입 보너스</div>
+                    <div className="val">{settings.signUpPoints}P</div>
                   </div>
-                  
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span className="material-icons-round" style={{ fontSize: '1.1rem', color: 'var(--accent-emerald)' }}>event</span>
-                    <span style={{ color: 'var(--text-muted)' }}>출석 포인트:</span>
-                    <span style={{ fontWeight: 'bold' }}>{settings.checkInPoints}P/일</span>
+                </div>
+                <div className="policy-badge-item">
+                  <span className="material-icons-round icon" style={{ color: '#10b981' }}>calendar_today</span>
+                  <div>
+                    <div className="lbl">출석 포인트</div>
+                    <div className="val">{settings.checkInPoints}P/일</div>
                   </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span className="material-icons-round" style={{ fontSize: '1.1rem', color: '#3b82f6' }}>looks_one</span>
-                    <span style={{ color: 'var(--text-muted)' }}>7일 연속 보너스:</span>
-                    <span style={{ fontWeight: 'bold' }}>{settings.bonus7Days}P</span>
+                </div>
+                <div className="policy-badge-item">
+                  <span className="material-icons-round icon" style={{ color: '#f59e0b' }}>stars</span>
+                  <div>
+                    <div className="lbl">5일 연속 보너스</div>
+                    <div className="val">{settings.bonus5Days}P</div>
                   </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span className="material-icons-round" style={{ fontSize: '1.1rem', color: '#a855f7' }}>looks_two</span>
-                    <span style={{ color: 'var(--text-muted)' }}>15일 연속 보너스:</span>
-                    <span style={{ fontWeight: 'bold' }}>{settings.bonus15Days}P</span>
+                </div>
+                <div className="policy-badge-item">
+                  <span className="material-icons-round icon" style={{ color: '#d97706' }}>emoji_events</span>
+                  <div>
+                    <div className="lbl">10일 연속 보너스</div>
+                    <div className="val">{settings.bonus10Days}P</div>
                   </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span className="material-icons-round" style={{ fontSize: '1.1rem', color: 'var(--accent-rose)' }}>looks_3</span>
-                    <span style={{ color: 'var(--text-muted)' }}>30일 연속 보너스:</span>
-                    <span style={{ fontWeight: 'bold' }}>{settings.bonus30Days}P</span>
+                </div>
+                <div className="policy-badge-item">
+                  <span className="material-icons-round icon" style={{ color: '#8b5cf6' }}>military_tech</span>
+                  <div>
+                    <div className="lbl">15일 연속 보너스</div>
+                    <div className="val">{settings.bonus15Days}P</div>
+                  </div>
+                </div>
+                <div className="policy-badge-item">
+                  <span className="material-icons-round icon" style={{ color: '#db2777' }}>workspace_premium</span>
+                  <div>
+                    <div className="lbl">30일 연속 보너스</div>
+                    <div className="val">{settings.bonus30Days}P</div>
                   </div>
                 </div>
               </div>
-
-              <button 
-                onClick={() => setCurrentTab('settings')}
-                className="btn-secondary" 
-                style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-              >
-                <span className="material-icons-round" style={{ fontSize: '0.95rem' }}>settings</span>
-                설정 관리 &gt;
-              </button>
             </div>
           </div>
 

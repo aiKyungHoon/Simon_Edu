@@ -212,7 +212,12 @@ class SimonEduApp {
       if (rankingView && rankingView.classList.contains('active')) {
         this.renderLeaderboardWidget();
       }
-
+      
+      // Re-render admin panel if active
+      const adminView = document.getElementById('adminView');
+      if (adminView && adminView.classList.contains('active')) {
+        this.renderAdmin();
+      }
 
       // Re-render settings panel if active
       const settingsView = document.getElementById('settingsView');
@@ -734,8 +739,8 @@ class SimonEduApp {
     }
 
     if (!this.isMobileApp && ['dashboard', 'attendance', 'ranking'].includes(viewName)) {
-      // Hide auth and game views on desktop web
-      ['auth', 'game'].forEach(v => {
+      // Hide auth, game, and admin views on desktop web
+      ['auth', 'game', 'admin'].forEach(v => {
         const el = document.getElementById(v + 'View');
         if (el) el.classList.remove('active');
       });
@@ -783,6 +788,8 @@ class SimonEduApp {
       this.renderAttendanceWidget();
     } else if (viewName === 'ranking') {
       this.renderLeaderboardWidget();
+    } else if (viewName === 'admin') {
+      this.switchView('dashboard');
     } else if (viewName === 'settings') {
       this.renderSettings();
     }
@@ -871,7 +878,11 @@ class SimonEduApp {
     const navAvatar = document.getElementById('navAvatar');
     if (navAvatar) navAvatar.textContent = this.currentUser.name.charAt(0);
 
-
+    // Show Admin button if the user is an admin (Admin mode removed from client app)
+    const btnNavAdmin = document.getElementById('btnNavAdmin');
+    if (btnNavAdmin) {
+      btnNavAdmin.style.display = 'none';
+    }
 
     if (this.isMobileApp) {
       document.body.classList.add('mobile-app');
@@ -2275,7 +2286,94 @@ class SimonEduApp {
     }
   }
 
+  // 10. Administrator Panel Dashboard Logic
+  renderAdmin() {
+    if (!this.currentUser || this.currentUser.role !== 'admin') {
+      alert('관리자 권한이 없습니다.');
+      this.switchView('dashboard');
+      return;
+    }
 
+    // Gather Stats
+    const totalUsers = this.users.length;
+    
+    let totalPoints = 0;
+    let totalClearedVerses = 0;
+    this.users.forEach(u => {
+      totalPoints += u.points;
+      totalClearedVerses += u.currentVerseIndex;
+    });
+
+    const avgPoints = totalUsers > 0 ? Math.round(totalPoints / totalUsers) : 0;
+    const avgCleared = totalUsers > 0 ? (totalClearedVerses / totalUsers).toFixed(1) : "0.0";
+
+    // Set stat fields
+    const statUsers = document.getElementById('adminStatUsers');
+    if (statUsers) statUsers.textContent = totalUsers;
+    const statAvgPoints = document.getElementById('adminStatAvgPoints');
+    if (statAvgPoints) statAvgPoints.textContent = avgPoints.toLocaleString();
+    const statTotalCleared = document.getElementById('adminStatTotalCleared');
+    if (statTotalCleared) statTotalCleared.textContent = `${avgCleared} 절`;
+
+    // Render User Management Table
+    const tableBody = document.getElementById('adminUserTableBody');
+    if (tableBody) {
+      tableBody.innerHTML = '';
+
+      this.users.forEach(u => {
+        const tr = document.createElement('tr');
+        
+        const lastCheck = u.lastCheckInDate ? u.lastCheckInDate : '출석 없음';
+        const maxVerse = window.BIBLE_DATA.length;
+        const progressStr = u.currentVerseIndex >= maxVerse ? '완독 완료' : `${u.currentVerseIndex + 1}절 진행 중`;
+
+        tr.innerHTML = `
+          <td style="font-family:var(--font-en); font-weight:600; color:var(--accent-purple);">${u.username || u.id}</td>
+          <td style="font-weight:700;">${u.name}</td>
+          <td>${u.email}</td>
+          <td><span class="btn-admin-action edit" style="cursor:default; background:${u.role === 'admin'?'rgba(147, 51, 234, 0.15)':'rgba(255,255,255,0.05)'}; color:${u.role==='admin'?'var(--accent-purple)':'var(--text-secondary)'}">${u.role.toUpperCase()}</span></td>
+          <td style="font-family:var(--font-en); font-weight:700; color:var(--accent-amber);">${u.points.toLocaleString()} P</td>
+          <td>🔥 ${u.consecutiveCheckIns}일 (${lastCheck})</td>
+          <td>${progressStr}</td>
+          <td class="actions">
+            <button class="btn-admin-action edit" onclick="app.adminGivePoints('${u.id}')">보너스 100P</button>
+            <button class="btn-admin-action reset" onclick="app.adminResetProgress('${u.id}')">진도 리셋</button>
+            ${u.id !== this.currentUser.id ? `<button class="btn-admin-action reset" style="background:rgba(244,63,94,0.1); border-color:rgba(244,63,94,0.2)" onclick="app.adminDeleteUser('${u.id}')">삭제</button>` : ''}
+          </td>
+        `;
+
+        tableBody.appendChild(tr);
+      });
+    }
+  }
+
+  // Admin Action Methods
+  adminGivePoints(userId) {
+    this.addPoints(userId, 100);
+    this.showPointsFloater(100, "관리자 보너스 지급!");
+    this.renderAdmin();
+  }
+
+  adminResetProgress(userId) {
+    const user = this.users.find(u => u.id === userId);
+    if (user) {
+      if (confirm(`정말 ${user.name}님의 말씀 암송 진도를 1절부터 초기화하시겠습니까?`)) {
+        db.collection('users').doc(userId).update({
+          currentVerseIndex: 0
+        }).catch(err => console.error(err));
+      }
+    }
+  }
+
+  adminDeleteUser(userId) {
+    const user = this.users.find(u => u.id === userId);
+    if (user) {
+      if (confirm(`정말 사용자 "${user.name}" 계정을 플랫폼에서 삭제하시겠습니까?`)) {
+        db.collection('users').doc(userId).delete()
+          .catch(err => console.error(err));
+      }
+    }
+  }
 
   // 11. Debug Simulation / Cheat Engine Controls
   // Simulate days passing
@@ -2737,8 +2835,7 @@ window.handleDeepLink = function(urlOrPath) {
 
   // Handle routing
   if (path === 'admin') {
-    window.location.href = 'https://simon-edu-bible-game-admin.web.app';
-    return;
+    window.app.switchView('dashboard');
   } else if (path === 'dashboard') {
     if (window.app.currentUser) {
       window.app.switchView('dashboard');

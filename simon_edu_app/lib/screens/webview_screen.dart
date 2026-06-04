@@ -7,7 +7,6 @@ import 'package:app_links/app_links.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'intro_overlay.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -49,7 +48,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
   bool _isProfileLoading = true;
   List<dynamic> _pointsHistory = [];
 
-  final String _targetUrl = 'https://simon-edu-bible-game.firebaseapp.com?v=1.5.0';
+  final String _targetUrl = 'https://simon-edu-bible-game.firebaseapp.com?v=1.5.1';
 
   @override
   void initState() {
@@ -91,8 +90,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
               if (_fcmToken != null) {
                 _syncTokenToWebView(_fcmToken);
               }
-              final osName = Platform.isIOS ? 'iOS' : 'Android';
-              _controller?.runJavaScript('if (window.app && window.app.updateDevicePlatform) { window.app.updateDevicePlatform("$osName"); }');
+              _syncPlatformToWebView();
               
               // Synchronize auth state and active view state after page finish
               _controller?.runJavaScript('''
@@ -322,6 +320,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
         if (_fcmToken != null) {
           _syncTokenToWebView(_fcmToken);
         }
+        _syncPlatformToWebView();
         _syncUserProfile();
       } else if (event == 'logout') {
         setState(() {
@@ -943,20 +942,6 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
 
       // Get the current token cached in the service
       String? token = pushService.token;
-      
-      if (token == null) {
-        debugPrint("Cached FCM Token is null. Retrying direct fetch...");
-        if (Platform.isIOS) {
-          int retries = 0;
-          while (await FirebaseMessaging.instance.getAPNSToken() == null && retries < 10) {
-            await Future.delayed(const Duration(milliseconds: 500));
-            retries++;
-          }
-        }
-        token = await FirebaseMessaging.instance.getToken();
-        pushService.token = token;
-      }
-
       if (mounted) {
         setState(() {
           _fcmToken = token;
@@ -1002,6 +987,13 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
     if (token == null || _controller == null) return;
     debugPrint("Syncing push token to webview: $token");
     _controller!.runJavaScript('if (window.app && window.app.updatePushToken) { window.app.updatePushToken("$token"); }');
+  }
+
+  void _syncPlatformToWebView() {
+    if (_controller == null) return;
+    String osName = defaultTargetPlatform == TargetPlatform.iOS ? 'iOS' : 'Android';
+    debugPrint("Syncing platform to webview: $osName");
+    _controller!.runJavaScript('if (window.app && window.app.updateDevicePlatform) { window.app.updateDevicePlatform("$osName"); }');
   }
 }
 

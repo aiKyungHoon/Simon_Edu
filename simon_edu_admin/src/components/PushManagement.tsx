@@ -17,6 +17,7 @@ interface User {
   pushToken?: string;
   fcmToken?: string;
   lastActive?: any;
+  os?: string;
 }
 
 interface PushManagementProps {
@@ -363,7 +364,18 @@ export default function PushManagement({ users, adminEmail }: PushManagementProp
                               <span style={{ color: 'var(--text-muted)', marginLeft: '0.4rem', fontSize: '0.75rem' }}>@{u.username}</span>
                               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.1rem' }}>{u.email}</div>
                             </div>
-                            <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              {u.os && (
+                                <span className="badge" style={{ 
+                                  fontSize: '0.65rem', 
+                                  padding: '0.15rem 0.35rem',
+                                  background: u.os.toLowerCase() === 'ios' ? 'rgba(0, 122, 255, 0.1)' : 'rgba(52, 199, 89, 0.1)',
+                                  color: u.os.toLowerCase() === 'ios' ? '#007AFF' : '#34C759',
+                                  border: `1px solid ${u.os.toLowerCase() === 'ios' ? 'rgba(0, 122, 255, 0.2)' : 'rgba(52, 199, 89, 0.2)'}`
+                                }}>
+                                  {u.os}
+                                </span>
+                              )}
                               {(u.pushToken || u.fcmToken) ? (
                                 <span className="badge active" style={{ fontSize: '0.65rem', padding: '0.15rem 0.35rem' }}>🟢 토큰있음</span>
                               ) : (
@@ -392,6 +404,19 @@ export default function PushManagement({ users, adminEmail }: PushManagementProp
                         <span style={{ fontWeight: 700, color: 'var(--accent-purple)' }}>[지정됨] </span>
                         <strong>{targetUser.name || targetUser.username}</strong>
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: '0.4rem' }}>({targetUser.email})</span>
+                        {targetUser.os && (
+                          <span className="badge" style={{ 
+                            fontSize: '0.65rem', 
+                            padding: '0.1rem 0.3rem',
+                            marginLeft: '0.4rem',
+                            verticalAlign: 'middle',
+                            background: targetUser.os.toLowerCase() === 'ios' ? 'rgba(0, 122, 255, 0.1)' : 'rgba(52, 199, 89, 0.1)',
+                            color: targetUser.os.toLowerCase() === 'ios' ? '#007AFF' : '#34C759',
+                            border: `1px solid ${targetUser.os.toLowerCase() === 'ios' ? 'rgba(0, 122, 255, 0.2)' : 'rgba(52, 199, 89, 0.2)'}`
+                          }}>
+                            {targetUser.os}
+                          </span>
+                        )}
                         {!(targetUser.pushToken || targetUser.fcmToken) && (
                           <div style={{ color: 'var(--accent-rose)', fontSize: '0.75rem', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
                             <span className="material-icons-round" style={{ fontSize: '0.9rem' }}>warning</span>
@@ -531,6 +556,17 @@ export default function PushManagement({ users, adminEmail }: PushManagementProp
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {user.os && (
+                          <span className="badge" style={{ 
+                            fontSize: '0.7rem', 
+                            padding: '0.2rem 0.4rem',
+                            background: user.os.toLowerCase() === 'ios' ? 'rgba(0, 122, 255, 0.1)' : 'rgba(52, 199, 89, 0.1)',
+                            color: user.os.toLowerCase() === 'ios' ? '#007AFF' : '#34C759',
+                            border: `1px solid ${user.os.toLowerCase() === 'ios' ? 'rgba(0, 122, 255, 0.2)' : 'rgba(52, 199, 89, 0.2)'}`
+                          }}>
+                            {user.os}
+                          </span>
+                        )}
                         {(user.pushToken || user.fcmToken) ? (
                           <>
                             <span className="badge active" style={{ fontSize: '0.7rem', padding: '0.2rem 0.4rem' }}>
