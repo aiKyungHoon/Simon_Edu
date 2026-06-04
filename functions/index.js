@@ -1,6 +1,7 @@
 /**
  * Firebase Cloud Functions v2 Template
  * Secure Queue-based FCM Push Processor
+ * Deploy Revision: v1.0.4 - force container rollout
  * 
  * Triggered when a new document is written to the `push_queue` collection.
  * Processes the message and dispatches it to FCM.
@@ -11,7 +12,10 @@ const admin = require("firebase-admin");
 
 // Initialize Admin SDK securely
 if (admin.apps.length === 0) {
-  admin.initializeApp();
+  admin.initializeApp({
+    credential: admin.credential.applicationDefault(),
+    projectId: "simon-edu-bible-game"
+  });
 }
 
 const db = admin.firestore();
