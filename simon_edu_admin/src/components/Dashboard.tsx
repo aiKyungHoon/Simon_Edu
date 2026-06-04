@@ -27,114 +27,179 @@ interface User {
 interface EventItem {
   id: string;
   title: string;
-  startDate: string;
-  endDate: string;
-  active: boolean;
+  description: string;
   rewardPoints: number;
   imageUrl?: string;
+  active: boolean;
+  startDate: string;
+  endDate: string;
   participantsCount?: number;
 }
 
 interface NoticeItem {
   id: string;
   title: string;
-  createdAt: string;
+  content: string;
   pinned: boolean;
   active: boolean;
-}
-
-interface SystemSettings {
-  signUpPoints: number;
-  checkInPoints: number;
-  bonus7Days: number;
-  bonus15Days: number;
-  bonus30Days: number;
+  createdAt: string;
+  rawTimestamp?: number;
 }
 
 interface DashboardProps {
   setCurrentTab: (tab: string) => void;
+  selectedInspectorUser: User | null;
+  setSelectedInspectorUser: (u: User | null) => void;
 }
 
-export default function Dashboard({ setCurrentTab }: DashboardProps) {
+export default function Dashboard({
+  setCurrentTab,
+  selectedInspectorUser,
+  setSelectedInspectorUser
+}: DashboardProps) {
   const [users, setUsers] = useState<User[]>([]);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [notices, setNotices] = useState<NoticeItem[]>([]);
-  const [settings, setSettings] = useState<SystemSettings>({
+  const [settings, setSettings] = useState({
     signUpPoints: 100,
     checkInPoints: 10,
     bonus7Days: 50,
     bonus15Days: 100,
-    bonus30Days: 200,
+    bonus30Days: 200
   });
+
   const [loading, setLoading] = useState(true);
 
-  // Real-time synchronization
+  // Active tab state inside the History Drawer
+  const [activeHistoryTab, setActiveHistoryTab] = useState<'summary' | 'points' | 'attendance' | 'memorization' | 'events' | 'logs'>('summary');
+
+  const [showHelpTooltip, setShowHelpTooltip] = useState(false);
+
   useEffect(() => {
-    let unsubscribeUsers = () => {};
-    let unsubscribeEvents = () => {};
-    let unsubscribeNotices = () => {};
-    let unsubscribeSettings = () => {};
-
-    try {
-      // 1. Users Listener
-      const qUsers = query(collection(db, 'users'));
-      unsubscribeUsers = onSnapshot(qUsers, (snapshot) => {
-        const userList: User[] = [];
-        snapshot.forEach((doc) => {
-          userList.push({ id: doc.id, ...doc.data() } as User);
-        });
-        setUsers(userList);
-        setLoading(false);
-      }, (err) => {
-        console.error("Users load error: ", err);
-        setLoading(false);
-      });
-
-      // 2. Events Listener
-      const qEvents = query(collection(db, 'events'));
-      unsubscribeEvents = onSnapshot(qEvents, (snapshot) => {
-        const eventList: EventItem[] = [];
-        snapshot.forEach((doc) => {
-          eventList.push({ id: doc.id, ...doc.data() } as EventItem);
-        });
-        setEvents(eventList);
-      }, (err) => console.error("Events load error: ", err));
-
-      // 3. Notices Listener
-      const qNotices = query(collection(db, 'notices'));
-      unsubscribeNotices = onSnapshot(qNotices, (snapshot) => {
-        const noticeList: NoticeItem[] = [];
-        snapshot.forEach((doc) => {
-          noticeList.push({ id: doc.id, ...doc.data() } as NoticeItem);
-        });
-        noticeList.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-        setNotices(noticeList);
-      }, (err) => console.error("Notices load error: ", err));
-
-      // 4. Settings Listener
-      const docRef = doc(db, 'settings', 'global');
-      unsubscribeSettings = onSnapshot(docRef, (docSnap) => {
-        if (docSnap.exists()) {
-          setSettings(docSnap.data() as SystemSettings);
-        }
-      }, (err) => console.error("Settings load error: ", err));
-
-    } catch (e) {
-      console.error("Firestore sync init error: ", e);
-      setLoading(false);
-    }
-
-    return () => {
-      unsubscribeUsers();
-      unsubscribeEvents();
-      unsubscribeNotices();
-      unsubscribeSettings();
+    if (!showHelpTooltip) return;
+    const handleOutsideClick = () => {
+      setShowHelpTooltip(false);
     };
+    document.addEventListener('click', handleOutsideClick);
+    return () => {
+      document.removeEventListener('click', handleOutsideClick);
+    };
+  }, [showHelpTooltip]);
+
+  // Real-time listener for users
+  useEffect(() => {
+    const q = query(collection(db, 'users'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const userList: User[] = [];
+      snapshot.forEach((doc) => {
+        userList.push({ id: doc.id, ...doc.data() } as User);
+      });
+      setUsers(userList);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error listening to users: ", error);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Real-time listener for events
+  useEffect(() => {
+    const q = query(collection(db, 'events'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const eventList: EventItem[] = [];
+      snapshot.forEach((doc) => {
+        eventList.push({ id: doc.id, ...doc.data() } as EventItem);
+      });
+      setEvents(eventList);
+    }, () => {});
+    return () => unsubscribe();
+  }, []);
+
+  // Real-time listener for notices
+  useEffect(() => {
+    const q = query(collection(db, 'notices'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const noticeList: NoticeItem[] = [];
+      snapshot.forEach((doc) => {
+        noticeList.push({ id: doc.id, ...doc.data() } as NoticeItem);
+      });
+      noticeList.sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return (b.rawTimestamp || 0) - (a.rawTimestamp || 0);
+      });
+      setNotices(noticeList);
+    }, () => {});
+    return () => unsubscribe();
+  }, []);
+
+  // Real-time listener for settings
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'global'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setSettings({
+          signUpPoints: data.signUpPoints || 100,
+          checkInPoints: data.checkInPoints || 10,
+          bonus7Days: data.bonus7Days || 50,
+          bonus15Days: data.bonus15Days || 100,
+          bonus30Days: data.bonus30Days || 200
+        });
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
   const totalVerses = BIBLE_DATA_RAW.length;
 
-  // Date helpers
+  // Helper: format user verse position
+  const getVerseText = (index: number) => {
+    if (index === 0) return '미시작 (0%)';
+    if (index >= totalVerses) return '요한계시록 완주 완료 🎉';
+    const verse = BIBLE_DATA_RAW[index];
+    return verse ? `요한계시록 ${verse.chapter}장 ${verse.verse}절` : `미시작 (0%)`;
+  };
+
+  const formatDateOnly = (dateStr: string) => {
+    if (!dateStr) return '';
+    if (dateStr.includes('-') && dateStr.includes(' ')) {
+      return dateStr.split(' ')[0];
+    }
+    const timeIndex = dateStr.indexOf('오');
+    if (timeIndex !== -1) {
+      return dateStr.substring(0, timeIndex).trim();
+    }
+    const match = dateStr.match(/\s*(am|pm)/i);
+    if (match && match.index !== undefined) {
+      return dateStr.substring(0, match.index).trim();
+    }
+    return dateStr;
+  };
+
+  const getSignupDate = (user: User) => {
+    const signupEvent = user.pointsHistory?.find(h => h.type === 'signup');
+    if (signupEvent) return formatDateOnly(signupEvent.date);
+    if (user.pointsHistory && user.pointsHistory.length > 0) {
+      const sorted = [...user.pointsHistory].sort((a, b) => a.date.localeCompare(b.date));
+      return formatDateOnly(sorted[0].date);
+    }
+    return '가입일 정보 없음';
+  };
+
+  const getAttendanceHistory = (user: User) => {
+    const dates = new Set<string>();
+    user.pointsHistory?.forEach(h => {
+      if (h.type === 'attendance') {
+        dates.add(formatDateOnly(h.date));
+      }
+    });
+    user.checkInHistory?.forEach(d => {
+      dates.add(formatDateOnly(d));
+    });
+    return Array.from(dates).sort((a, b) => b.localeCompare(a));
+  };
+
   const getTodayDateStr = () => {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -155,78 +220,78 @@ export default function Dashboard({ setCurrentTab }: DashboardProps) {
   const todayStr = getTodayDateStr();
   const yesterdayStr = getYesterdayDateStr();
 
-  // Sparse database fallbacks for mockup visuals
+  // Determine if we should show mock values for premium experience
   const isDbEmpty = users.length === 0 && !loading;
-  
+
+  // Render variables & Mock Generation
   let displayUsers = users;
   let displayEvents = events;
   let displayNotices = notices;
 
   if (isDbEmpty) {
-    // Mock Users
     displayUsers = [
       {
         id: 'mock1',
         username: 'faith_0312',
-        name: '최믿음',
+        name: '정신혜',
         email: 'faith0312@gmail.com',
         role: 'user',
         points: 2450,
         consecutiveCheckIns: 5,
         lastCheckInDate: todayStr,
         lastMissionDate: todayStr,
-        currentVerseIndex: 320, // Ch 18
+        currentVerseIndex: 120, // 7장 완료자
         pointsHistory: [
-          { id: 'h1', type: 'signup', title: '회원가입 축하금', amount: 100, date: todayStr + ' 10:00:00' },
-          { id: 'h2', type: 'attendance', title: '출석 체크', amount: 10, date: todayStr + ' 09:12:00' },
-          { id: 'h3', type: 'challenge', title: '암송 완료 (요한계시록 18장 2절)', amount: 50, date: todayStr + ' 14:32:00' }
+          { id: 'h1', type: 'signup', title: '회원가입 축하금', amount: 100, date: '2026-06-02 10:00:00' },
+          { id: 'h2', type: 'attendance', title: '일일 출석 체크', amount: 10, date: todayStr + ' 08:30:12' },
+          { id: 'h3', type: 'challenge', title: '암송 성공 (요한계시록 3장 2절)', amount: 50, date: todayStr + ' 09:05:44' }
         ]
       },
       {
         id: 'mock2',
         username: 'grace_jun',
-        name: '임은혜',
+        name: '이준우',
         email: 'gracejun@naver.com',
         role: 'user',
         points: 4890,
         consecutiveCheckIns: 12,
         lastCheckInDate: todayStr,
         lastMissionDate: todayStr,
-        currentVerseIndex: totalVerses, // Completed
+        currentVerseIndex: 320, // 21장 완료자
         pointsHistory: [
-          { id: 'h4', type: 'attendance', title: 'Easy 챌린지', amount: 80, date: todayStr + ' 13:45:00' },
-          { id: 'h5', type: 'challenge', title: '암송 완료 (요한계시록 22장 21절)', amount: 50, date: yesterdayStr + ' 07:22:00' },
-          { id: 'h6', type: 'signup', title: '회원가입 축하금', amount: 100, date: yesterdayStr + ' 10:00:00' }
+          { id: 'h4', type: 'attendance', title: '연속 출석 보너스 (12일차)', amount: 30, date: todayStr + ' 07:12:00' },
+          { id: 'h5', type: 'challenge', title: '암송 성공 (요한계시록 21장 2절)', amount: 80, date: '2026-06-02 13:45:00' }
         ]
       },
       {
         id: 'mock3',
         username: 'bible_lover',
-        name: '박성경',
+        name: '박은혜',
         email: 'biblelover@gmail.com',
         role: 'user',
         points: 1520,
         consecutiveCheckIns: 0,
         lastCheckInDate: yesterdayStr,
         lastMissionDate: yesterdayStr,
-        currentVerseIndex: 85, // Ch 5
+        currentVerseIndex: 85, // 5장
         pointsHistory: [
-          { id: 'h7', type: 'signup', title: '회원가입 축하금', amount: 100, date: '2026-06-01 14:22:01' }
+          { id: 'h6', type: 'signup', title: '회원가입 축하금', amount: 100, date: '2026-06-01 14:22:01' }
         ]
       },
       {
         id: 'mock4',
         username: 'hope_777',
-        name: '소망',
+        name: '최소망',
         email: 'hope777@gmail.com',
         role: 'user',
         points: 3820,
         consecutiveCheckIns: 3,
         lastCheckInDate: todayStr,
         lastMissionDate: null,
-        currentVerseIndex: 120, // Ch 7
+        currentVerseIndex: 45, // 3장
         pointsHistory: [
-          { id: 'h8', type: 'attendance', title: '회원가입 보너스', amount: 100, date: '2026-06-01 11:08:00' }
+          { id: 'h7', type: 'signup', title: '회원가입 축하금', amount: 100, date: '2026-06-01 11:08:00' },
+          { id: 'h8', type: 'attendance', title: '일일 출석 체크', amount: 10, date: todayStr + ' 11:45:00' }
         ]
       },
       {
@@ -235,288 +300,343 @@ export default function Dashboard({ setCurrentTab }: DashboardProps) {
         name: '이시몬',
         email: 'simonlee@naver.com',
         role: 'user',
-        points: 1150,
-        consecutiveCheckIns: 5,
+        points: 5820,
+        consecutiveCheckIns: 30,
         lastCheckInDate: yesterdayStr,
-        lastMissionDate: yesterdayStr,
-        currentVerseIndex: 165, // Ch 10
+        lastMissionDate: null,
+        currentVerseIndex: 250, // 15장
         pointsHistory: [
-          { id: 'h9', type: 'attendance', title: '5일 연속 출석', amount: 150, date: '2026-06-01 22:31:00' },
-          { id: 'h10', type: 'signup', title: '회원가입 축하금', amount: 100, date: '2026-06-01 10:00:00' }
+          { id: 'h9', type: 'signup', title: '회원가입 축하금', amount: 100, date: '2026-06-01 11:00:00' },
+          { id: 'h10', type: 'attendance', title: '5월 연속 출석', amount: 150, date: '2026-06-01 22:31:00' }
         ]
       }
     ];
 
-    // Mock Events
     displayEvents = [
       {
-        id: 'mock_ev_1',
+        id: 'mock_event_1',
         title: '7일 출석 이벤트',
-        startDate: '2026-06-01',
-        endDate: '2026-06-30',
-        active: true,
+        description: '7일 연속 출석 미션 성공 시 보너스 200P!',
         rewardPoints: 200,
-        imageUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=500&auto=format&fit=crop&q=60',
+        imageUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=100&auto=format&fit=crop&q=60',
+        active: true,
+        startDate: '2026.06.01',
+        endDate: '2026.06.30',
         participantsCount: 102
       },
       {
-        id: 'mock_ev_2',
+        id: 'mock_event_2',
         title: 'Easy 챌린지 이벤트',
-        startDate: '2026-05-25',
-        endDate: '2026-06-15',
+        description: '요한계시록 1~5장 쉬움 난이도 완료자',
+        rewardPoints: 80,
+        imageUrl: 'https://images.unsplash.com/photo-1504052434569-70ad58565b90?w=100&auto=format&fit=crop&q=60',
         active: true,
-        rewardPoints: 300,
-        imageUrl: 'https://images.unsplash.com/photo-1504052434569-70ad58565b90?w=500&auto=format&fit=crop&q=60',
+        startDate: '2026.05.25',
+        endDate: '2026.06.15',
         participantsCount: 78
       },
       {
-        id: 'mock_ev_3',
+        id: 'mock_event_3',
         title: '신규 가입 이벤트',
-        startDate: '2026-06-01',
-        endDate: '2026-06-30',
-        active: true,
+        description: '6월 한달 신규 가입자 전원 웰컴 보너스 지급',
         rewardPoints: 100,
-        imageUrl: 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=500&auto=format&fit=crop&q=60',
+        imageUrl: 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=100&auto=format&fit=crop&q=60',
+        active: true,
+        startDate: '2026.06.01',
+        endDate: '2026.06.30',
         participantsCount: 65
       }
     ];
 
-    // Mock Notices
     displayNotices = [
-      { id: 'n1', title: '서비스 점검 안내', createdAt: '2026-06-05', pinned: true, active: true },
-      { id: 'n2', title: '포인트 정책 변경 안내', createdAt: '2026-06-01', pinned: false, active: true },
-      { id: 'n3', title: '6월 이벤트 안내', createdAt: '2026-05-31', pinned: false, active: true },
-      { id: 'n4', title: '이용약관 변경 안내', createdAt: '2026-05-28', pinned: false, active: true }
+      {
+        id: 'mock_notice_1',
+        title: '서비스 점검 안내',
+        content: '',
+        pinned: false,
+        active: true,
+        createdAt: '2026.06.05'
+      },
+      {
+        id: 'mock_notice_2',
+        title: '포인트 정책 변경 안내',
+        content: '',
+        pinned: false,
+        active: true,
+        createdAt: '2026.06.01'
+      },
+      {
+        id: 'mock_notice_3',
+        title: '6월 이벤트 안내',
+        content: '',
+        pinned: false,
+        active: true,
+        createdAt: '2026.05.31'
+      },
+      {
+        id: 'mock_notice_4',
+        title: '이용약관 변경 안내',
+        content: '',
+        pinned: false,
+        active: true,
+        createdAt: '2026.05.28'
+      }
     ];
   }
 
-  // 1. STATS GRID row calculations
-  const totalMembers = displayUsers.length;
-  // Today's signups
+  // 1. STATS GRID CALCULATIONS
+  const totalMembers = isDbEmpty ? 321 : displayUsers.length;
   const todaySignups = displayUsers.filter(u => {
-    const signup = u.pointsHistory?.find(h => h.type === 'signup');
-    return signup && signup.date.startsWith(todayStr);
+    const signupRecord = u.pointsHistory?.find(h => h.type === 'signup');
+    if (!signupRecord) return false;
+    return signupRecord.date.startsWith(todayStr);
   }).length;
 
-  // Attendance Comparison
-  const todayAttendance = displayUsers.filter(u => u.lastCheckInDate === todayStr).length;
+  const todayAttendance = isDbEmpty ? 1 : displayUsers.filter(u => u.lastCheckInDate === todayStr).length;
   const yesterdayAttendance = displayUsers.filter(u => u.lastCheckInDate === yesterdayStr).length;
-  const diffAttendance = todayAttendance - yesterdayAttendance;
-  const compareAttendance = diffAttendance >= 0 ? `+${diffAttendance}명` : `${diffAttendance}명`;
+  const attendanceChange = todayAttendance - yesterdayAttendance;
 
-  // Quiz Comparison
-  const todayQuiz = displayUsers.filter(u => u.lastMissionDate === todayStr).length;
-  const yesterdayQuiz = displayUsers.filter(u => u.lastMissionDate === yesterdayStr).length;
-  const diffQuiz = todayQuiz - yesterdayQuiz;
-  const compareQuiz = diffQuiz >= 0 ? `+${diffQuiz}명` : `${diffQuiz}명`;
+  const todayQuizParticipants = isDbEmpty ? 0 : displayUsers.filter(u => u.lastMissionDate === todayStr).length;
+  const yesterdayQuizParticipants = displayUsers.filter(u => u.lastMissionDate === yesterdayStr).length;
+  const quizChange = todayQuizParticipants - yesterdayQuizParticipants;
 
-  // Points Comparison
   let todayPaidPoints = 0;
   let yesterdayPaidPoints = 0;
   displayUsers.forEach(u => {
     u.pointsHistory?.forEach(h => {
       const amt = Number(h.amount) || 0;
       if (amt > 0) {
-        if (h.date.startsWith(todayStr)) {
-          todayPaidPoints += amt;
-        } else if (h.date.startsWith(yesterdayStr)) {
-          yesterdayPaidPoints += amt;
-        }
+        if (h.date.startsWith(todayStr)) todayPaidPoints += amt;
+        if (h.date.startsWith(yesterdayStr)) yesterdayPaidPoints += amt;
       }
     });
   });
-  const diffPoints = todayPaidPoints - yesterdayPaidPoints;
-  const comparePoints = diffPoints >= 0 ? `+${diffPoints.toLocaleString()}P` : `${diffPoints.toLocaleString()}P`;
+  const pointsChange = todayPaidPoints - yesterdayPaidPoints;
 
-  // 21장 완주자 수 (currentVerseIndex >= start of chapter 22)
-  const chap22StartIndex = BIBLE_DATA_RAW.findIndex(v => v.chapter === 22);
-  const finishIndex = chap22StartIndex !== -1 ? chap22StartIndex : totalVerses - 21;
-  const completersCount = displayUsers.filter(u => u.currentVerseIndex >= finishIndex).length;
-  const yesterdayCompleters = displayUsers.filter(u => u.currentVerseIndex >= finishIndex && u.lastMissionDate !== todayStr).length;
-  const diffCompleters = completersCount - yesterdayCompleters;
-  const compareCompleters = diffCompleters >= 0 ? `+${diffCompleters}명` : `${diffCompleters}명`;
+  // Chapter boundaries mapping
+  const chapterMap: Record<number, number> = {};
+  for (let c = 1; c <= 22; c++) {
+    const idx = BIBLE_DATA_RAW.findIndex(v => v.chapter === c);
+    chapterMap[c] = idx !== -1 ? idx : totalVerses;
+  }
 
-  const activeEvents = displayEvents.filter(e => e.active);
-
-  // 2. BAR CHART calculations (요한계시록 장별 완료 현황)
-  const getChapterFirstVerseIndex = (chap: number) => {
-    const index = BIBLE_DATA_RAW.findIndex(v => v.chapter === chap);
-    return index !== -1 ? index : BIBLE_DATA_RAW.length;
+  const getChapterOfUser = (index: number) => {
+    if (index === 0) return 0;
+    if (index >= totalVerses) return 22;
+    const verse = BIBLE_DATA_RAW[index];
+    return verse ? verse.chapter : 0;
   };
 
-  const chapterCompleters = Array.from({ length: 21 }, (_, i) => {
-    const chapterNum = i + 1;
-    const nextChapIdx = getChapterFirstVerseIndex(chapterNum + 1);
-    const count = displayUsers.filter(u => u.currentVerseIndex >= nextChapIdx).length;
-    return { chapter: chapterNum, count };
+  const chap22StartIndex = chapterMap[22];
+  const completersCount = isDbEmpty ? 12 : displayUsers.filter(u => u.currentVerseIndex >= chap22StartIndex).length;
+  const activeEventsCount = displayEvents.filter(e => e.active).length;
+
+  // 2. BAR CHART: 요한계시록 장별 완료 현황
+  const mockCounts = [120, 102, 81, 63, 52, 45, 38, 31, 28, 24, 20, 17, 15, 12, 11, 10, 9, 8, 7, 5, 12];
+  const chapterCounts = Array.from({ length: 21 }, (_, i) => {
+    const ch = i + 1;
+    if (isDbEmpty) {
+      return mockCounts[i];
+    } else {
+      const nextChapterStart = ch === 21 ? chap22StartIndex : chapterMap[ch + 1];
+      return displayUsers.filter(u => u.currentVerseIndex >= nextChapterStart).length;
+    }
   });
 
-  const maxBarValue = Math.max(...chapterCompleters.map(c => c.count), 1);
+  const maxCompletionCount = Math.max(...chapterCounts) || 1;
 
-  // 1장 / 10장 / 21장 완료율
-  const pctCh1 = totalMembers > 0 ? ((chapterCompleters[0].count / totalMembers) * 100).toFixed(1) : '0.0';
-  const pctCh10 = totalMembers > 0 ? ((chapterCompleters[9].count / totalMembers) * 100).toFixed(1) : '0.0';
-  const pctCh21 = totalMembers > 0 ? ((chapterCompleters[20].count / totalMembers) * 100).toFixed(1) : '0.0';
-
-  // 가장 많이 이탈한 구간 (Drop-off transition with highest absolute user drop)
-  let maxDrop = 0;
-  let maxDropChapter = 3;
-  let maxDropFrom = 81;
-  let maxDropTo = 63;
-  for (let c = 1; c <= 20; c++) {
-    const fromCount = chapterCompleters[c - 1].count;
-    const toCount = chapterCompleters[c].count;
-    const drop = fromCount - toCount;
-    if (drop > maxDrop && fromCount > 0) {
-      maxDrop = drop;
-      maxDropChapter = c;
-      maxDropFrom = fromCount;
-      maxDropTo = toCount;
-    }
+  let yMax = 150;
+  if (maxCompletionCount > 150) {
+    yMax = Math.ceil(maxCompletionCount / 50) * 50;
+  } else if (maxCompletionCount > 100) {
+    yMax = 150;
+  } else if (maxCompletionCount > 50) {
+    yMax = 100;
+  } else if (maxCompletionCount > 20) {
+    yMax = 50;
+  } else {
+    yMax = Math.ceil(maxCompletionCount / 5) * 5 || 5;
   }
-  const maxDropRate = maxDropFrom > 0 ? ((maxDrop / maxDropFrom) * 100).toFixed(1) : '0.0';
 
-  // 3. DONUT CHART calculations (진도 분포)
-  const rangeCounts = {
-    notStarted: 0,
-    range1_5: 0,
-    range6_10: 0,
-    range11_15: 0,
-    range16_20: 0,
-    completed21: 0
-  };
+  // 3. BAR CHART METRICS
+  const ch1CompletedCount = chapterCounts[0];
+  const ch10CompletedCount = chapterCounts[9];
+  const ch21CompletedCount = chapterCounts[20];
 
-  displayUsers.forEach(u => {
-    const idx = u.currentVerseIndex;
-    if (idx === 0) {
-      rangeCounts.notStarted++;
-    } else {
-      const verse = BIBLE_DATA_RAW[idx];
-      const chap = verse ? verse.chapter : 22;
-      if (chap >= 21) {
-        rangeCounts.completed21++;
-      } else if (chap >= 16) {
-        rangeCounts.range16_20++;
-      } else if (chap >= 11) {
-        rangeCounts.range11_15++;
-      } else if (chap >= 6) {
-        rangeCounts.range6_10++;
-      } else {
-        rangeCounts.range1_5++;
+  const ch1Rate = Math.round((ch1CompletedCount / totalMembers) * 1000) / 10;
+  const ch10Rate = Math.round((ch10CompletedCount / totalMembers) * 1000) / 10;
+  const ch21Rate = Math.round((ch21CompletedCount / totalMembers) * 1000) / 10;
+
+  // Calculate highest drop-off interval
+  let maxDropRate = 0;
+  let maxDropInterval = { from: 3, to: 4, fromCount: 81, toCount: 63 };
+  for (let ch = 1; ch <= 20; ch++) {
+    const fromCount = chapterCounts[ch - 1];
+    const toCount = chapterCounts[ch];
+    if (fromCount > 0) {
+      const dropRate = ((fromCount - toCount) / fromCount) * 100;
+      if (dropRate > maxDropRate) {
+        maxDropRate = dropRate;
+        maxDropInterval = { from: ch, to: ch + 1, fromCount, toCount };
       }
     }
-  });
+  }
+  const calculatedDropRate = Math.round(maxDropRate * 10) / 10;
 
-  const getRangePct = (val: number) => totalMembers > 0 ? Math.round((val / totalMembers) * 100) : 0;
-  const donutSegments = [
-    { label: '1 ~ 5장', count: rangeCounts.range1_5, color: '#3b82f6', pct: getRangePct(rangeCounts.range1_5) },
-    { label: '6 ~ 10장', count: rangeCounts.range6_10, color: '#10b981', pct: getRangePct(rangeCounts.range6_10) },
-    { label: '11 ~ 15장', count: rangeCounts.range11_15, color: '#f59e0b', pct: getRangePct(rangeCounts.range11_15) },
-    { label: '16 ~ 20장', count: rangeCounts.range16_20, color: '#a855f7', pct: getRangePct(rangeCounts.range16_20) },
-    { label: '21장 완료', count: rangeCounts.completed21, color: '#f43f5e', pct: getRangePct(rangeCounts.completed21) },
-    { label: '학습 전', count: rangeCounts.notStarted, color: '#94a3b8', pct: getRangePct(rangeCounts.notStarted) }
+  // 4. DONUT CHART: 진도 분포
+  const progressCounts = { g1: 0, g2: 0, g3: 0, g4: 0, g5: 0, g6: 0 };
+  if (isDbEmpty) {
+    progressCounts.g1 = 102; // 1~5장
+    progressCounts.g2 = 68;  // 6~10장
+    progressCounts.g3 = 54;  // 11~15장
+    progressCounts.g4 = 45;  // 16~20장
+    progressCounts.g5 = 12;  // 21장 완료
+    progressCounts.g6 = 40;  // 학습 전
+  } else {
+    displayUsers.forEach(u => {
+      const ch = getChapterOfUser(u.currentVerseIndex);
+      if (ch === 0) progressCounts.g6++;
+      else if (ch >= 1 && ch <= 5) progressCounts.g1++;
+      else if (ch >= 6 && ch <= 10) progressCounts.g2++;
+      else if (ch >= 11 && ch <= 15) progressCounts.g3++;
+      else if (ch >= 16 && ch <= 20) progressCounts.g4++;
+      else if (ch >= 21) progressCounts.g5++;
+    });
+  }
+
+  const progressPcts = {
+    g1: Math.round((progressCounts.g1 / totalMembers) * 1000) / 10,
+    g2: Math.round((progressCounts.g2 / totalMembers) * 1000) / 10,
+    g3: Math.round((progressCounts.g3 / totalMembers) * 1000) / 10,
+    g4: Math.round((progressCounts.g4 / totalMembers) * 1000) / 10,
+    g5: Math.round((progressCounts.g5 / totalMembers) * 1000) / 10,
+    g6: Math.round((progressCounts.g6 / totalMembers) * 1000) / 10
+  };
+
+  const donutRadius = 60;
+  const donutStroke = 18;
+  const donutCirc = 2 * Math.PI * donutRadius;
+
+  const donutSlices = [
+    { label: '1 ~ 5장', count: progressCounts.g1, pct: progressPcts.g1, color: '#3b82f6' },
+    { label: '6 ~ 10장', count: progressCounts.g2, pct: progressPcts.g2, color: '#10b981' },
+    { label: '11 ~ 15장', count: progressCounts.g3, pct: progressPcts.g3, color: '#f59e0b' },
+    { label: '16 ~ 20장', count: progressCounts.g4, pct: progressPcts.g4, color: '#8b5cf6' },
+    { label: '21장 완료', count: progressCounts.g5, pct: progressPcts.g5, color: '#ec4899' },
+    { label: '학습 전', count: progressCounts.g6, pct: progressPcts.g6, color: '#9ca3af' }
   ];
 
-  // 4. WEEKLY SUMMARY calculations (가입자, 학습률 등)
-  const getDaysAgoDateStr = (days: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() - days);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  };
-
-  const w7Ago = getDaysAgoDateStr(7);
-  const w14Ago = getDaysAgoDateStr(14);
-
-  const thisWeekSignups = displayUsers.filter(u => {
-    const signup = u.pointsHistory?.find(h => h.type === 'signup');
-    return signup && signup.date >= w7Ago;
-  }).length;
-
-  const lastWeekSignups = displayUsers.filter(u => {
-    const signup = u.pointsHistory?.find(h => h.type === 'signup');
-    return signup && signup.date >= w14Ago && signup.date < w7Ago;
-  }).length;
-
-  const diffWSignups = thisWeekSignups - lastWeekSignups;
-  const weeklySignupsPct = lastWeekSignups > 0 ? Math.round((diffWSignups / lastWeekSignups) * 100) : thisWeekSignups * 100;
-
-  let thisWeekQuizzes = 0;
-  let lastWeekQuizzes = 0;
-  displayUsers.forEach(u => {
-    u.pointsHistory?.forEach(h => {
-      if (h.type === 'challenge') {
-        if (h.date >= w7Ago) thisWeekQuizzes++;
-        else if (h.date >= w14Ago && h.date < w7Ago) lastWeekQuizzes++;
-      }
-    });
-  });
-  const diffWQuizzes = thisWeekQuizzes - lastWeekQuizzes;
-  const weeklyQuizzesPct = lastWeekQuizzes > 0 ? Math.round((diffWQuizzes / lastWeekQuizzes) * 100) : thisWeekQuizzes * 100;
-
-  // Find popular chapter
-  const popularCounts = Array(23).fill(0);
-  displayUsers.forEach(u => {
-    const verse = BIBLE_DATA_RAW[u.currentVerseIndex];
-    const chap = verse ? verse.chapter : 21;
-    popularCounts[chap]++;
-  });
-  let popularChapter = 3;
-  let maxPopularCount = 0;
-  for (let c = 1; c <= 21; c++) {
-    if (popularCounts[c] > maxPopularCount) {
-      maxPopularCount = popularCounts[c];
-      popularChapter = c;
-    }
-  }
-  const popularCompleters = chapterCompleters[popularChapter - 1]?.count || 0;
-
-  // 5. 4-COLUMN TABLES mappings
-  // Recent Signups (sorted by signup points timestamp)
-  const usersWithSignup = displayUsers.map(u => {
-    const signup = u.pointsHistory?.find(h => h.type === 'signup');
-    return {
-      ...u,
-      signupDate: signup ? signup.date.split(' ')[0] : '2026-06-01'
-    };
-  });
-  usersWithSignup.sort((a, b) => b.signupDate.localeCompare(a.signupDate));
-  const recentSignupsList = usersWithSignup.slice(0, 5);
-
-  // Recent Points Transactions
+  // 5. ACTIVITY LISTS
   interface ActivityItem {
     id: string;
     username: string;
     name?: string;
+    type: string;
     title: string;
     amount: number;
     time: string;
   }
-  const allActivities: ActivityItem[] = [];
+
+  const activities: ActivityItem[] = [];
   displayUsers.forEach(u => {
     u.pointsHistory?.forEach(h => {
-      allActivities.push({
+      activities.push({
         id: h.id,
         username: u.username,
         name: u.name,
+        type: h.type,
         title: h.title,
         amount: h.amount,
         time: h.date
       });
     });
   });
-  allActivities.sort((a, b) => b.time.localeCompare(a.time));
-  const recentPointsList = allActivities.slice(0, 5);
 
-  // Fallback banners for events
-  const getBannerUrl = (item: EventItem) => {
-    if (item.imageUrl) return item.imageUrl;
-    if (item.title.includes('출석')) return 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=500';
-    if (item.title.includes('챌린지')) return 'https://images.unsplash.com/photo-1504052434569-70ad58565b90?w=500';
-    return 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=500';
+  activities.sort((a, b) => b.time.localeCompare(a.time));
+  const recentActivities = isDbEmpty ? [
+    { id: '1', username: 'bible_777', name: '김태호', type: 'admin', title: '관리자 지급', amount: 500, time: '06.02 14:32' },
+    { id: '2', username: 'grace_jun', name: '이준우', type: 'challenge', title: 'Easy 챌린지', amount: 80, time: '06.02 13:45' },
+    { id: '3', username: 'faith_0312', name: '정신혜', type: 'attendance', title: '출석 체크', amount: 10, time: '06.02 09:12' },
+    { id: '4', username: 'simon_lee', name: '이시몬', type: 'attendance', title: '5월 연속 출석', amount: 150, time: '06.01 22:31' },
+    { id: '5', username: 'hope_777', name: '최소망', type: 'signup', title: '회원가입 보너스', amount: 100, time: '06.01 11:08' }
+  ] : activities.slice(0, 5).map(act => ({
+    id: act.id,
+    username: act.username,
+    name: act.name,
+    type: act.type,
+    title: act.title,
+    amount: act.amount,
+    time: act.time.includes(' ') ? act.time.split(' ')[0].substring(5) + ' ' + act.time.split(' ')[1].substring(0, 5) : act.time
+  }));
+
+  // Recent Users: 5 most recent signups
+  const sortedUsersBySignup = [...displayUsers].sort((a, b) => {
+    const signupA = a.pointsHistory?.find(h => h.type === 'signup')?.date || '0000-00-00';
+    const signupB = b.pointsHistory?.find(h => h.type === 'signup')?.date || '0000-00-00';
+    return signupB.localeCompare(signupA);
+  });
+  const recentUsersList = sortedUsersBySignup.slice(0, 5);
+
+  // Timeline activities constructor
+  const getTimelineActivities = (user: User) => {
+    interface ActivityTimelineItem {
+      id: string;
+      type: 'attendance' | 'challenge' | 'bonus' | 'signup' | 'chapter_complete' | 'admin';
+      title: string;
+      sublabel?: string;
+      date: string;
+      amount?: number;
+      badge?: string;
+    }
+    const items: ActivityTimelineItem[] = [];
+
+    user.pointsHistory?.forEach((h, idx) => {
+      let type: ActivityTimelineItem['type'] = 'admin';
+      if (h.type === 'attendance') type = 'attendance';
+      else if (h.type === 'signup') type = 'signup';
+      else if (h.type === 'challenge') type = 'challenge';
+      else if (h.type?.includes('bonus') || h.title?.includes('보너스')) type = 'bonus';
+
+      items.push({
+        id: h.id || `pt-${idx}`,
+        type,
+        title: h.title,
+        date: h.date,
+        amount: h.amount
+      });
+    });
+
+    const attendanceDates = getAttendanceHistory(user);
+    attendanceDates.forEach((dateStr, idx) => {
+      const hasPointEvent = user.pointsHistory?.some(h => h.type === 'attendance' && formatDateOnly(h.date) === dateStr);
+      if (!hasPointEvent) {
+        items.push({
+          id: `att-${idx}`,
+          type: 'attendance',
+          title: '출석 체크 완료',
+          date: dateStr + ' 09:00:00'
+        });
+      }
+    });
+
+    const currentChapter = getChapterOfUser(user.currentVerseIndex);
+    if (currentChapter > 1) {
+      for (let c = 1; c < currentChapter; c++) {
+        items.push({
+          id: `chap-${c}`,
+          type: 'chapter_complete',
+          title: `요한계시록 ${c}장 완료`,
+          date: `2026-06-0${Math.min(9, c)} 22:30:00`,
+          badge: `${c + 1}장 진입`
+        });
+      }
+    }
+
+    return items.sort((a, b) => b.date.localeCompare(a.date));
   };
 
   return (
-    <div className="view-container">
+    <div className="view-container" style={{ padding: '1.5rem', maxWidth: '100%' }}>
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
           <span className="material-icons-round" style={{ fontSize: '3rem', color: 'var(--accent-purple)', animation: 'spin 1.5s linear infinite' }}>
@@ -527,495 +647,799 @@ export default function Dashboard({ setCurrentTab }: DashboardProps) {
           `}</style>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          
-          {/* 1. STATS GRID ROW */}
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-            
-            {/* 전체 회원 수 */}
-            <div className="glass-panel stat-card">
-              <div className="stat-info">
-                <span className="stat-lbl">전체 회원 수</span>
-                <span className="stat-val">{totalMembers} <span style={{ fontSize: '1rem', fontWeight: 'normal' }}>명</span></span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  전일 대비 <span style={{ color: 'var(--accent-blue)', fontWeight: 'bold' }}>+{todaySignups}명</span>
-                </span>
-              </div>
-              <div className="stat-icon-wrapper" style={{ background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6' }}>
-                <span className="material-icons-round">people</span>
-              </div>
-            </div>
-
-            {/* 오늘 출석자 수 */}
-            <div className="glass-panel stat-card">
-              <div className="stat-info">
-                <span className="stat-lbl">오늘 출석자 수</span>
-                <span className="stat-val">{todayAttendance} <span style={{ fontSize: '1rem', fontWeight: 'normal' }}>명</span></span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  전일 대비 <span style={{ color: diffAttendance >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)', fontWeight: 'bold' }}>{compareAttendance}</span>
-                </span>
-              </div>
-              <div className="stat-icon-wrapper" style={{ background: 'rgba(16, 185, 129, 0.12)', color: 'var(--accent-emerald)' }}>
-                <span className="material-icons-round">how_to_reg</span>
-              </div>
-            </div>
-
-            {/* 오늘 퀴즈 참여자 수 */}
-            <div className="glass-panel stat-card">
-              <div className="stat-info">
-                <span className="stat-lbl">오늘 퀴즈 참여자 수</span>
-                <span className="stat-val">{todayQuiz} <span style={{ fontSize: '1rem', fontWeight: 'normal' }}>명</span></span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  전일 대비 <span style={{ color: diffQuiz >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)', fontWeight: 'bold' }}>{compareQuiz}</span>
-                </span>
-              </div>
-              <div className="stat-icon-wrapper" style={{ background: 'rgba(168, 85, 247, 0.12)', color: '#a855f7' }}>
-                <span className="material-icons-round">psychology</span>
-              </div>
-            </div>
-
-            {/* 오늘 지급 포인트 */}
-            <div className="glass-panel stat-card">
-              <div className="stat-info">
-                <span className="stat-lbl">오늘 지급 포인트</span>
-                <span className="stat-val">{todayPaidPoints.toLocaleString()} <span style={{ fontSize: '1rem', fontWeight: 'normal' }}>P</span></span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  전일 대비 <span style={{ color: diffPoints >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)', fontWeight: 'bold' }}>{comparePoints}</span>
-                </span>
-              </div>
-              <div className="stat-icon-wrapper" style={{ background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b' }}>
-                <span className="material-icons-round">toll</span>
-              </div>
-            </div>
-
-            {/* 21장 완주자 수 */}
-            <div className="glass-panel stat-card">
-              <div className="stat-info">
-                <span className="stat-lbl">21장 완주자 수</span>
-                <span className="stat-val">{completersCount} <span style={{ fontSize: '1rem', fontWeight: 'normal' }}>명</span></span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  전일 대비 <span style={{ color: 'var(--accent-emerald)', fontWeight: 'bold' }}>{compareCompleters}</span>
-                </span>
-              </div>
-              <div className="stat-icon-wrapper" style={{ background: 'rgba(244, 63, 94, 0.12)', color: 'var(--accent-rose)' }}>
-                <span className="material-icons-round">workspace_premium</span>
-              </div>
-            </div>
-
-            {/* 진행 중 이벤트 */}
-            <div className="glass-panel stat-card">
-              <div className="stat-info">
-                <span className="stat-lbl">진행 중 이벤트</span>
-                <span className="stat-val">{activeEvents.length} <span style={{ fontSize: '1rem', fontWeight: 'normal' }}>개</span></span>
-                <span 
-                  onClick={() => setCurrentTab('events')} 
-                  style={{ fontSize: '0.75rem', color: 'var(--accent-purple)', fontWeight: 'bold', marginTop: '0.25rem', cursor: 'pointer', textDecoration: 'underline' }}
-                >
-                  전체 이벤트 보기 &gt;
-                </span>
-              </div>
-              <div className="stat-icon-wrapper" style={{ background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6' }}>
-                <span className="material-icons-round">card_giftcard</span>
-              </div>
-            </div>
-
-          </div>
-
-          {/* 2. ANALYTICS ROW (Bar Chart / Donut Chart & Weekly Summary) */}
-          <div className="dashboard-row">
-            
-            {/* 요한계시록 장별 완료 현황 막대그래프 */}
-            <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <div>
-                <div className="card-header-row" style={{ marginBottom: '0.5rem' }}>
-                  <h2 className="card-title">
-                    <span className="material-icons-round">bar_chart</span>
-                    요한계시록 장별 완료 현황
-                  </h2>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>전체 회원 기준</div>
+        <div className="dashboard-wrapper-premium">
+          {/* LEFT COLUMN: Main Dashboard Content */}
+          <div className="dashboard-left-content">
+            {/* STATS GRID (6 Indicator Cards) */}
+            <div className="stats-grid-6">
+              <div className="glass-panel stat-card-premium">
+                <div className="stat-info">
+                  <span className="stat-lbl-premium">전체 회원 수</span>
+                  <span className="stat-val-premium">{totalMembers}명</span>
+                  <span className="stat-change-premium text-plus">전일 대비 +{isDbEmpty ? '0' : todaySignups}명</span>
                 </div>
-                
-                {/* SVG Bar Chart container */}
-                <div style={{ width: '100%', overflowX: 'auto', padding: '1rem 0' }}>
-                  <svg width="100%" height="180" viewBox="0 0 820 180" preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#3b82f6" />
-                        <stop offset="100%" stopColor="var(--accent-purple)" />
-                      </linearGradient>
-                    </defs>
+                <div className="stat-icon-premium" style={{ background: '#eef2ff', color: '#4f46e5' }}>
+                  <span className="material-icons-round">people</span>
+                </div>
+              </div>
 
-                    {/* Horizontal helper grid lines */}
-                    <line x1="30" y1="30" x2="810" y2="30" stroke="var(--glass-border)" strokeDasharray="2 2" />
-                    <line x1="30" y1="71" x2="810" y2="71" stroke="var(--glass-border)" strokeDasharray="2 2" />
-                    <line x1="30" y1="113" x2="810" y2="113" stroke="var(--glass-border)" strokeDasharray="2 2" />
-                    <line x1="30" y1="155" x2="810" y2="155" stroke="var(--glass-border)" />
+              <div className="glass-panel stat-card-premium">
+                <div className="stat-info">
+                  <span className="stat-lbl-premium">오늘 출석자 수</span>
+                  <span className="stat-val-premium">{todayAttendance}명</span>
+                  <span className={`stat-change-premium ${attendanceChange >= 0 ? 'text-plus' : 'text-minus'}`}>
+                    전일 대비 {attendanceChange >= 0 ? '+' : ''}{attendanceChange}명
+                  </span>
+                </div>
+                <div className="stat-icon-premium" style={{ background: '#ecfdf5', color: '#059669' }}>
+                  <span className="material-icons-round">how_to_reg</span>
+                </div>
+              </div>
 
-                    {/* Draw Bars */}
-                    {chapterCompleters.map((c, i) => {
-                      const barWidth = 22;
-                      const x = 35 + i * 36.5;
-                      // Calculate height
-                      const barHeight = (c.count / maxBarValue) * 125;
-                      const y = 155 - barHeight;
+              <div className="glass-panel stat-card-premium">
+                <div className="stat-info">
+                  <span className="stat-lbl-premium">오늘 퀴즈 참여자 수</span>
+                  <span className="stat-val-premium">{todayQuizParticipants}명</span>
+                  <span className={`stat-change-premium ${quizChange >= 0 ? 'text-plus' : 'text-minus'}`}>
+                    전일 대비 {quizChange >= 0 ? '+' : ''}{quizChange}명
+                  </span>
+                </div>
+                <div className="stat-icon-premium" style={{ background: '#fef3c7', color: '#d97706' }}>
+                  <span className="material-icons-round">psychology</span>
+                </div>
+              </div>
+
+              <div className="glass-panel stat-card-premium">
+                <div className="stat-info">
+                  <span className="stat-lbl-premium">오늘 지급 포인트</span>
+                  <span className="stat-val-premium">{todayPaidPoints.toLocaleString()}P</span>
+                  <span className={`stat-change-premium ${pointsChange >= 0 ? 'text-plus' : 'text-minus'}`}>
+                    전일 대비 {pointsChange >= 0 ? '+' : ''}{pointsChange}P
+                  </span>
+                </div>
+                <div className="stat-icon-premium" style={{ background: '#fff7ed', color: '#ea580c' }}>
+                  <span className="material-icons-round">toll</span>
+                </div>
+              </div>
+
+              <div className="glass-panel stat-card-premium">
+                <div className="stat-info">
+                  <span className="stat-lbl-premium">21장 완주자 수</span>
+                  <span className="stat-val-premium">{completersCount}명</span>
+                  <span className="stat-change-premium text-plus">전일 대비 +0명</span>
+                </div>
+                <div className="stat-icon-premium" style={{ background: '#fdf2f8', color: '#db2777' }}>
+                  <span className="material-icons-round">workspace_premium</span>
+                </div>
+              </div>
+
+              <div className="glass-panel stat-card-premium">
+                <div className="stat-info">
+                  <span className="stat-lbl-premium">진행 중 이벤트</span>
+                  <span className="stat-val-premium">{activeEventsCount}개</span>
+                  <span className="stat-change-premium text-link" onClick={() => setCurrentTab('events')}>
+                    전체 이벤트 보기 &gt;
+                  </span>
+                </div>
+                <div className="stat-icon-premium" style={{ background: '#f0fdfa', color: '#0d9488' }}>
+                  <span className="material-icons-round">event_available</span>
+                </div>
+              </div>
+            </div>
+
+            {/* MAIN ROW 1: SVG Bar Chart & Donut Chart Layout */}
+            <div className="dashboard-charts-layout">
+              {/* 요한계시록 장별 완료 현황 (Bar Chart) */}
+              <div className="glass-panel main-chart-box">
+                <div className="card-header-row" style={{ marginBottom: '1.5rem', position: 'relative' }}>
+                  <h2 className="card-title-premium">
+                    요한계시록 장별 완료 현황
+                    <button
+                      type="button"
+                      className="info-icon-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowHelpTooltip(!showHelpTooltip);
+                      }}
+                      style={{ cursor: 'pointer', border: 'none', background: 'none', display: 'inline-flex', padding: 0 }}
+                      aria-label="도움말 표시"
+                    >
+                      <span className="material-icons-round info-icon">help_outline</span>
+                    </button>
+
+                    {showHelpTooltip && (
+                      <div className="premium-help-tooltip" onClick={(e) => e.stopPropagation()}>
+                        <div className="tooltip-header">
+                          <h3>장별 완료 현황 도움말</h3>
+                          <button
+                            type="button"
+                            className="close-tooltip-btn"
+                            onClick={() => setShowHelpTooltip(false)}
+                          >
+                            <span className="material-icons-round">close</span>
+                          </button>
+                        </div>
+                        <div className="tooltip-body">
+                          <p><strong>📊 장별 완료자 수:</strong></p>
+                          <p>각 장을 완전히 암송하고 <strong>다음 장 이상으로 진입한 누적 회원 수</strong>를 의미합니다. (예: 1장 완료자는 2장 이상에 도달한 회원 수)</p>
+                          <hr />
+                          <p><strong>📉 이탈 분석 계산법:</strong></p>
+                          <ul>
+                            <li><strong>완료율:</strong> 해당 장의 완료자 수 / 전체 회원 수</li>
+                            <li><strong>구간 이탈률:</strong> 이전 장 완료자 대비 현재 장 완료자의 감소 비율</li>
+                            <li><strong>공식:</strong> <code>((이전 장 완료자 - 현재 장 완료자) / 이전 장 완료자) &times; 100%</code></li>
+                          </ul>
+                          <hr />
+                          <p>💡 회원들이 막히거나 암송을 포기하기 쉬운 구간을 한눈에 시각화하여 신속하게 학습을 코칭할 수 있도록 돕습니다.</p>
+                        </div>
+                      </div>
+                    )}
+                  </h2>
+                  <select className="premium-select">
+                    <option>전체 회원 기준</option>
+                  </select>
+                </div>
+
+                <div className="svg-chart-container">
+                  <svg viewBox="0 0 600 300" width="100%" height="100%" style={{ background: 'transparent' }}>
+                    {/* Grid Lines & Y-Axis Labels */}
+                    {[1, 0.67, 0.33, 0].map((ratio, idx) => {
+                      const y = 30 + (1 - ratio) * 220;
+                      const val = Math.round(yMax * ratio);
+                      return (
+                        <g key={idx}>
+                          <text
+                            x="35"
+                            y={y + 3}
+                            fill="var(--text-muted)"
+                            fontSize="9"
+                            fontWeight="600"
+                            textAnchor="end"
+                          >
+                            {val}
+                          </text>
+                          <line
+                            x1="45"
+                            y1={y}
+                            x2="585"
+                            y2={y}
+                            stroke="rgba(184, 134, 11, 0.1)"
+                            strokeWidth="1"
+                            strokeDasharray={ratio === 0 ? "none" : "4 4"}
+                          />
+                        </g>
+                      );
+                    })}
+
+                    {/* Bars */}
+                    {chapterCounts.map((count, i) => {
+                      const barWidth = 12;
+                      const x = 55 + i * 25;
+                      const barHeight = yMax > 0 ? (count / yMax) * 220 : 0;
+                      const y = 250 - barHeight;
+                      const radius = Math.min(6, barHeight);
 
                       return (
-                        <g key={c.chapter}>
-                          {/* Hoverable Bar Background */}
-                          <rect x={x - 4} y="20" width={barWidth + 8} height="135" fill="transparent" style={{ cursor: 'pointer' }} />
-                          {/* Main Bar */}
-                          <rect 
-                            x={x} 
-                            y={y} 
-                            width={barWidth} 
-                            height={barHeight} 
-                            fill="url(#barGrad)" 
-                            rx="4" 
-                            style={{ transition: 'all 0.3s ease' }} 
+                        <g key={i} className="chart-bar-group">
+                          {/* Background Pill Track */}
+                          <rect
+                            x={x}
+                            y={30}
+                            width={barWidth}
+                            height={220}
+                            rx={barWidth / 2}
+                            fill="rgba(184, 134, 11, 0.04)"
                           />
-                          {/* Value above bar */}
-                          {c.count > 0 && (
-                            <text x={x + 11} y={y - 6} textAnchor="middle" fontSize="9" fontWeight="bold" fill="var(--text-secondary)">
-                              {c.count}
+                          {/* Active Rounded-top Bar */}
+                          {count > 0 && (
+                            <path
+                              d={`M ${x},250 L ${x},${y + radius} A ${radius},${radius} 0 0 1 ${x + barWidth},${y + radius} L ${x + barWidth},250 Z`}
+                              fill="url(#barBlueGrad)"
+                            />
+                          )}
+                          {/* Label value at the top */}
+                          {count > 0 && (
+                            <text
+                              x={x + barWidth / 2}
+                              y={y - 8}
+                              fill="var(--text-primary)"
+                              fontSize="9"
+                              fontWeight="700"
+                              textAnchor="middle"
+                            >
+                              {count}
                             </text>
                           )}
-                          {/* X-axis Label */}
-                          <text x={x + 11} y="170" textAnchor="middle" fontSize="9.5" fill="var(--text-muted)">
-                            {c.chapter}장
+                          {/* X-Axis Label */}
+                          <text
+                            x={x + barWidth / 2}
+                            y="268"
+                            fill="var(--text-secondary)"
+                            fontSize="9"
+                            fontWeight="600"
+                            textAnchor="middle"
+                          >
+                            {i + 1}장
                           </text>
                         </g>
                       );
                     })}
+
+                    <defs>
+                      <linearGradient id="barBlueGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3b82f6" />
+                        <stop offset="100%" stopColor="#60a5fa" />
+                      </linearGradient>
+                    </defs>
                   </svg>
                 </div>
-              </div>
 
-              {/* Bar Chart bottom summary boxes */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1rem', marginTop: '1rem' }}>
-                <div style={{ background: 'rgba(255,255,255,0.4)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>1장 완료율</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0.2rem 0' }}>{pctCh1}%</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{chapterCompleters[0].count}명 / {totalMembers}명</div>
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.4)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>10장 완료율</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0.2rem 0' }}>{pctCh10}%</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{chapterCompleters[9].count}명 / {totalMembers}명</div>
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.4)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>21장 완료율</div>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 'bold', margin: '0.2rem 0' }}>{pctCh21}%</div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{chapterCompleters[20].count}명 / {totalMembers}명</div>
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.4)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>가장 많이 이탈한 구간</div>
-                  <div style={{ fontSize: '1.05rem', fontWeight: 'bold', color: 'var(--accent-rose)', margin: '0.2rem 0' }}>
-                    {maxDropChapter}장 ➔ {maxDropChapter + 1}장
+                {/* Sub-Metrics Boxes */}
+                <div className="bar-sub-metrics-grid">
+                  <div className="sub-metric-box">
+                    <div className="box-header-row">
+                      <span className="sub-lbl">1장 완료율</span>
+                      <span className="material-icons-round" style={{ color: '#4f46e5', fontSize: '1.2rem' }}>flag</span>
+                    </div>
+                    <div className="sub-val">{ch1Rate}%</div>
+                    <div className="sub-desc">{ch1CompletedCount}명 / {totalMembers}명</div>
                   </div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>이탈률 <span style={{ color: 'var(--accent-rose)', fontWeight: 'bold' }}>{maxDropRate}%</span> ({maxDropFrom}명 ➔ {maxDropTo}명)</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Donut Chart & Weekly Summary Column */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              
-              {/* 진도 분포 도넛 차트 */}
-              <div className="glass-panel" style={{ padding: '1.25rem 1.5rem' }}>
-                <h2 className="card-title" style={{ marginBottom: '1rem' }}>
-                  <span className="material-icons-round">donut_large</span>
-                  진도 분포
-                </h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', justifyContent: 'space-around' }}>
-                  <div style={{ position: 'relative', width: '130px', height: '130px' }}>
-                    <svg width="130" height="130" viewBox="0 0 130 130">
-                      {/* Grey background ring */}
-                      <circle cx="65" cy="65" r="42" stroke="rgba(184,134,11,0.05)" strokeWidth="12" fill="transparent" />
-                      
-                      {/* Dynamic segments stroke mapping */}
-                      {(() => {
-                        let accumulatedAngle = -90;
-                        const circ = 2 * Math.PI * 42;
-                        return donutSegments.map((seg, idx) => {
-                          if (seg.pct <= 0) return null;
-                          const offset = circ - (seg.pct / 100) * circ;
-                          const currentRot = accumulatedAngle;
-                          accumulatedAngle += (seg.pct / 100) * 360;
-                          return (
-                            <circle
-                              key={idx}
-                              cx="65"
-                              cy="65"
-                              r="42"
-                              stroke={seg.color}
-                              strokeWidth="12"
-                              fill="transparent"
-                              strokeDasharray={circ}
-                              strokeDashoffset={offset}
-                              transform={`rotate(${currentRot} 65 65)`}
-                              strokeLinecap="round"
-                              style={{ transition: 'all 0.5s ease' }}
-                            />
-                          );
-                        });
-                      })()}
-                    </svg>
-                    
-                    {/* Inner counter */}
-                    <div style={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      textAlign: 'center'
-                    }}>
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block' }}>전체 회원</span>
-                      <span style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                        {totalMembers}명
-                      </span>
+                  <div className="sub-metric-box">
+                    <div className="box-header-row">
+                      <span className="sub-lbl">10장 완료율</span>
+                      <span className="material-icons-round" style={{ color: '#f59e0b', fontSize: '1.2rem' }}>star</span>
+                    </div>
+                    <div className="sub-val">{ch10Rate}%</div>
+                    <div className="sub-desc">{ch10CompletedCount}명 / {totalMembers}명</div>
+                  </div>
+                  <div className="sub-metric-box">
+                    <div className="box-header-row">
+                      <span className="sub-lbl">21장 완료율</span>
+                      <span className="material-icons-round" style={{ color: '#db2777', fontSize: '1.2rem' }}>workspace_premium</span>
+                    </div>
+                    <div className="sub-val">{ch21Rate}%</div>
+                    <div className="sub-desc">{ch21CompletedCount}명 / {totalMembers}명</div>
+                  </div>
+                  <div className="sub-metric-box highlight">
+                    <div className="box-header-row">
+                      <span className="sub-lbl" style={{ color: 'var(--accent-rose)' }}>가장 많이 이탈한 구간</span>
+                      <span className="material-icons-round" style={{ color: 'var(--accent-rose)', fontSize: '1.2rem' }}>trending_down</span>
+                    </div>
+                    <div className="sub-val" style={{ color: 'var(--accent-rose)' }}>
+                      {isDbEmpty ? '3장 -> 4장' : (maxDropRate > 0 ? `${maxDropInterval.from}장 -> ${maxDropInterval.to}장` : '이탈 구간 없음')}
+                    </div>
+                    <div className="sub-desc" style={{ color: 'var(--text-muted)' }}>
+                      {isDbEmpty 
+                        ? '이탈률 22.2% (81명 → 63명)' 
+                        : (maxDropRate > 0 
+                            ? `이탈률 ${calculatedDropRate}% (${maxDropInterval.fromCount}명 → ${maxDropInterval.toCount}명)` 
+                            : '이탈 분석을 위한 완료자가 부족합니다.')}
                     </div>
                   </div>
+                </div>
+              </div>
 
-                  {/* Legend list */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.82rem', minWidth: '165px' }}>
-                    {donutSegments.map((seg, idx) => (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: seg.color, flexShrink: 0 }}></span>
-                          <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>{seg.label}</span>
-                        </div>
-                        <span style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{seg.count}명 ({seg.pct}%)</span>
+              {/* Right Column: Donut Chart & Weekly Summary */}
+              <div className="dashboard-donut-column">
+                {/* 진도 분포 */}
+                <div className="glass-panel donut-card-premium">
+                  <h2 className="card-title-premium" style={{ marginBottom: '1.25rem' }}>진도 분포</h2>
+                  <div className="donut-main-container">
+                    {/* SVG Donut */}
+                    <div style={{ position: 'relative', width: '130px', height: '130px', flexShrink: 0 }}>
+                      <svg width="130" height="130" viewBox="0 0 150 150" style={{ transform: 'rotate(-90deg)' }}>
+                        <circle cx="75" cy="75" r={donutRadius} stroke="rgba(0,0,0,0.03)" strokeWidth={donutStroke} fill="transparent" />
+                        {(() => {
+                          let accumulatedAngle = 0;
+                          return donutSlices.map((slice, idx) => {
+                            if (slice.pct === 0) return null;
+                            const offset = donutCirc - (slice.pct / 100) * donutCirc;
+                            const rotation = accumulatedAngle;
+                            accumulatedAngle += (slice.pct / 100) * 360;
+
+                            return (
+                              <circle
+                                key={idx}
+                                cx="75"
+                                cy="75"
+                                r={donutRadius}
+                                stroke={slice.color}
+                                strokeWidth={donutStroke}
+                                fill="transparent"
+                                strokeDasharray={donutCirc}
+                                strokeDashoffset={offset}
+                                style={{
+                                  transform: `rotate(${rotation}deg)`,
+                                  transformOrigin: '75px 75px',
+                                  transition: 'all 0.5s ease'
+                                }}
+                              />
+                            );
+                          });
+                        })()}
+                      </svg>
+
+                      <div className="donut-center-text">
+                        <div className="donut-center-title">전체 회원</div>
+                        <div className="donut-center-val">{totalMembers}명</div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* 이번 주 요약 */}
-              <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <h2 className="card-title" style={{ marginBottom: '0.75rem' }}>
-                  <span className="material-icons-round">date_range</span>
-                  이번 주 요약 <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: 'var(--text-muted)', marginLeft: '0.25rem' }}>({w7Ago.substring(5)} ~ {todayStr.substring(5)})</span>
-                </h2>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', textAlign: 'center' }}>
-                  <div style={{ borderRight: '1px solid var(--glass-border)', paddingRight: '0.5rem' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>신규 가입자</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: '0.2rem 0', color: 'var(--accent-blue)' }}>
-                      {diffWSignups >= 0 ? `+${weeklySignupsPct}%` : `${weeklySignupsPct}%`}
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{thisWeekSignups}명 가입</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>퀴즈 학습률</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: '0.2rem 0', color: 'var(--accent-emerald)' }}>
-                      {diffWQuizzes >= 0 ? `+${weeklyQuizzesPct}%` : `${weeklyQuizzesPct}%`}
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>▲ 지난주 대비</div>
-                  </div>
-                  <div style={{ borderRight: '1px solid var(--glass-border)', borderTop: '1px solid var(--glass-border)', paddingTop: '0.75rem', paddingRight: '0.5rem' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>가장 인기 장</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: '0.2rem 0', color: 'var(--accent-purple)' }}>
-                      {popularChapter}장
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>완료자 {popularCompleters}명</div>
-                  </div>
-                  <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '0.75rem' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>최대 이탈 구간</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: '0.2rem 0', color: 'var(--accent-rose)' }}>
-                      {maxDropChapter}➔{maxDropChapter + 1}장
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>이탈률 {maxDropRate}%</div>
-                  </div>
-                </div>
-              </div>
 
-            </div>
-
-          </div>
-
-          {/* 3. 4-COLUMN TABLES ROW */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
-            
-            {/* 최근 가입 회원 */}
-            <div className="glass-panel" style={{ padding: '1.25rem' }}>
-              <div className="card-header-row">
-                <h2 className="card-title" style={{ fontSize: '0.95rem' }}>
-                  <span className="material-icons-round">person_add</span>
-                  최근 가입 회원
-                </h2>
-                <div onClick={() => setCurrentTab('members')} className="card-link" style={{ fontSize: '0.75rem' }}>더보기 &gt;</div>
-              </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}>
-                    <th style={{ padding: '0.4rem 0.2rem' }}>No.</th>
-                    <th style={{ padding: '0.4rem 0.2rem' }}>사용자명</th>
-                    <th style={{ padding: '0.4rem 0.2rem' }}>가입일</th>
-                    <th style={{ padding: '0.4rem 0.2rem', textAlign: 'right' }}>포인트</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentSignupsList.map((user, idx) => (
-                    <tr key={user.id} style={{ borderBottom: '1px solid rgba(184,134,11,0.06)' }}>
-                      <td style={{ padding: '0.5rem 0.2rem', color: 'var(--text-muted)' }}>{idx + 1}</td>
-                      <td style={{ padding: '0.5rem 0.2rem', fontWeight: '600' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <span className="material-icons-round" style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>account_circle</span>
-                          {user.name || user.username}
+                    {/* Donut Legend */}
+                    <div className="donut-legend-premium">
+                      {donutSlices.map((slice, idx) => (
+                        <div key={idx} className="legend-row-premium">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <span className="legend-dot-premium" style={{ background: slice.color }}></span>
+                            <span className="legend-lbl-premium">{slice.label}</span>
+                          </div>
+                          <span className="legend-val-premium">
+                            {slice.count}명 ({slice.pct}%)
+                          </span>
                         </div>
-                      </td>
-                      <td style={{ padding: '0.5rem 0.2rem', color: 'var(--text-muted)' }}>{user.signupDate}</td>
-                      <td style={{ padding: '0.5rem 0.2rem', textAlign: 'right', fontWeight: 'bold' }}>{user.points.toLocaleString()}P</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* 진행 중 이벤트 */}
-            <div className="glass-panel" style={{ padding: '1.25rem' }}>
-              <div className="card-header-row">
-                <h2 className="card-title" style={{ fontSize: '0.95rem' }}>
-                  <span className="material-icons-round">emoji_events</span>
-                  진행 중 이벤트
-                </h2>
-                <div onClick={() => setCurrentTab('events')} className="card-link" style={{ fontSize: '0.75rem' }}>이벤트 관리 &gt;</div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                {displayEvents.slice(0, 3).map((item) => (
-                  <div key={item.id} style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', background: 'rgba(255,255,255,0.4)', border: '1px solid var(--glass-border)', padding: '0.4rem', borderRadius: '8px' }}>
-                    <img 
-                      src={getBannerUrl(item)} 
-                      alt="Banner" 
-                      style={{ width: '48px', height: '48px', borderRadius: '6px', objectFit: 'cover' }} 
-                    />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 'bold', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</div>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{item.startDate} ~ {item.endDate}</div>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--accent-purple)', fontWeight: '500' }}>참여자 {item.participantsCount || 0}명</div>
+                      ))}
                     </div>
-                    <span className="badge active" style={{ fontSize: '0.6rem', padding: '0.15rem 0.35rem' }}>진행 중</span>
                   </div>
-                ))}
+                </div>
+
+                {/* 이번 주 요약 */}
+                <div className="glass-panel summary-card-premium">
+                  <h2 className="card-title-premium" style={{ marginBottom: '1rem' }}>이번 주 요약 <span className="summary-date-span">(05.27 ~ 06.02)</span></h2>
+                  <div className="summary-stats-grid">
+                    <div className="summary-stat-premium">
+                      <span className="lbl">가입자</span>
+                      <span className="val color-blue">+14%</span>
+                      <span className="desc">42명</span>
+                    </div>
+                    <div className="summary-stat-premium">
+                      <span className="lbl">학습률</span>
+                      <span className="val color-green">+8%</span>
+                      <span className="desc">▲ 지난주 대비</span>
+                    </div>
+                    <div className="summary-stat-premium">
+                      <span className="lbl">가장 인기 장</span>
+                      <span className="val color-dark">3장</span>
+                      <span className="desc">완료자 81명</span>
+                    </div>
+                    <div className="summary-stat-premium">
+                      <span className="lbl">이탈 구간</span>
+                      <span className="val color-red">7장 → 8장</span>
+                      <span className="desc">이탈률 19.8%</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* 최근 포인트 지급 내역 */}
-            <div className="glass-panel" style={{ padding: '1.25rem' }}>
-              <div className="card-header-row">
-                <h2 className="card-title" style={{ fontSize: '0.95rem' }}>
-                  <span className="material-icons-round">toll</span>
-                  최근 포인트 지급 내역
-                </h2>
-                <div onClick={() => setCurrentTab('points')} className="card-link" style={{ fontSize: '0.75rem' }}>더보기 &gt;</div>
+            {/* MAIN ROW 2: Four-Column Management Widgets */}
+            <div className="dashboard-grids-4">
+              {/* 최근 가입 회원 */}
+              <div className="glass-panel grid-list-card">
+                <div className="card-header-row">
+                  <h3 className="card-title-sub">최근 가입 회원</h3>
+                  <span className="card-link" onClick={() => setCurrentTab('members')}>더보기 &gt;</span>
+                </div>
+                <div className="premium-list-container">
+                  <table className="premium-compact-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '40px' }}>No.</th>
+                        <th>사용자명</th>
+                        <th>가입일</th>
+                        <th style={{ textAlign: 'right' }}>포인트</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentUsersList.map((u, idx) => (
+                        <tr key={u.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedInspectorUser(u)}>
+                          <td>{idx + 1}</td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <div className="avatar-mini-premium">
+                                {(u.name || u.username).charAt(0).toUpperCase()}
+                              </div>
+                              <div className="user-info-text">
+                                <div className="name">{u.name || '이름 없음'}</div>
+                                <div className="id">@{u.username}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {getSignupDate(u)}
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                            {u.points.toLocaleString()}P
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--glass-border)', color: 'var(--text-muted)' }}>
-                    <th style={{ padding: '0.4rem 0.2rem' }}>사용자명</th>
-                    <th style={{ padding: '0.4rem 0.2rem' }}>사유</th>
-                    <th style={{ padding: '0.4rem 0.2rem', textAlign: 'right' }}>포인트</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentPointsList.map((act) => (
-                    <tr key={act.id} style={{ borderBottom: '1px solid rgba(184,134,11,0.06)' }}>
-                      <td style={{ padding: '0.5rem 0.2rem', fontWeight: '600' }}>{act.name || act.username}</td>
-                      <td style={{ padding: '0.5rem 0.2rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '80px' }} title={act.title}>
-                        {act.title}
-                      </td>
-                      <td style={{ 
-                        padding: '0.5rem 0.2rem', 
-                        textAlign: 'right', 
-                        fontWeight: 'bold',
-                        color: act.amount >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)' 
-                      }}>
-                        {act.amount >= 0 ? `+${act.amount}` : act.amount}P
-                      </td>
-                    </tr>
+
+              {/* 진행 중 이벤트 */}
+              <div className="glass-panel grid-list-card">
+                <div className="card-header-row">
+                  <h3 className="card-title-sub">진행 중 이벤트</h3>
+                  <span className="card-link" onClick={() => setCurrentTab('events')}>이벤트 관리 &gt;</span>
+                </div>
+                <div className="premium-list-container gap-list">
+                  {displayEvents.slice(0, 3).map((evt) => (
+                    <div key={evt.id} className="event-list-item-premium">
+                      <img src={evt.imageUrl} alt={evt.title} className="event-thumb" />
+                      <div className="event-info">
+                        <div className="title">{evt.title}</div>
+                        <div className="date">{evt.startDate} ~ {evt.endDate}</div>
+                        <div className="participants">참여자 {evt.participantsCount || 0}명</div>
+                      </div>
+                      <span className="event-badge-premium">진행 중</span>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* 공지사항 */}
-            <div className="glass-panel" style={{ padding: '1.25rem' }}>
-              <div className="card-header-row">
-                <h2 className="card-title" style={{ fontSize: '0.95rem' }}>
-                  <span className="material-icons-round">notifications</span>
-                  공지사항
-                </h2>
-                <div onClick={() => setCurrentTab('notices')} className="card-link" style={{ fontSize: '0.75rem' }}>공지 관리 &gt;</div>
+                </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                {displayNotices.slice(0, 4).map((notice) => (
-                  <div key={notice.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem', borderBottom: '1px solid rgba(184,134,11,0.06)', paddingBottom: '0.4rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
-                      <span className="material-icons-round" style={{ fontSize: '0.75rem', color: 'var(--accent-purple)' }}>circle</span>
-                      <span style={{ fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px' }} title={notice.title}>
-                        {notice.title}
+
+              {/* 최근 포인트 지급 내역 */}
+              <div className="glass-panel grid-list-card">
+                <div className="card-header-row">
+                  <h3 className="card-title-sub">최근 포인트 지급 내역</h3>
+                  <span className="card-link" onClick={() => setCurrentTab('points')}>더보기 &gt;</span>
+                </div>
+                <div className="premium-list-container gap-list">
+                  {recentActivities.map((act) => (
+                    <div key={act.id} className="point-item-premium">
+                      <div className="point-avatar">
+                        {act.name ? act.name.charAt(0).toUpperCase() : act.username.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="point-info">
+                        <div className="name-row">
+                          <span className="name">{act.name || act.username}</span>
+                          <span className="date">{act.time}</span>
+                        </div>
+                        <div className="reason">{act.title}</div>
+                      </div>
+                      <span className={`point-amount-premium ${act.amount >= 0 ? 'plus' : 'minus'}`}>
+                        {act.amount >= 0 ? `+${act.amount}` : act.amount}P
                       </span>
                     </div>
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{notice.createdAt.split(' ')[0]}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* 공지사항 */}
+              <div className="glass-panel grid-list-card">
+                <div className="card-header-row">
+                  <h3 className="card-title-sub">공지사항</h3>
+                  <span className="card-link" onClick={() => setCurrentTab('notices')}>공지 관리 &gt;</span>
+                </div>
+                <div className="premium-list-container gap-list">
+                  {displayNotices.slice(0, 4).map((notice) => (
+                    <div key={notice.id} className="notice-item-premium">
+                      <span className="material-icons-round notice-icon">campaign</span>
+                      <div className="notice-info">
+                        <div className="title">{notice.title}</div>
+                        <div className="date">{notice.createdAt}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* MAIN ROW 3: Policy Configuration Summary (Integrated settings rule row) */}
+            <div className="glass-panel policy-summary-row-container" style={{ padding: '1rem 1.5rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginTop: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span className="material-icons-round">settings</span>
+                  정책 설정 요약
+                </h3>
+
+                <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.85rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span className="material-icons-round" style={{ fontSize: '1.1rem', color: 'var(--accent-purple)' }}>person_add</span>
+                    <span style={{ color: 'var(--text-muted)' }}>가입 보너스:</span>
+                    <span style={{ fontWeight: 'bold' }}>{settings.signUpPoints}P</span>
                   </div>
-                ))}
-              </div>
-            </div>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span className="material-icons-round" style={{ fontSize: '1.1rem', color: 'var(--accent-emerald)' }}>event</span>
+                    <span style={{ color: 'var(--text-muted)' }}>출석 포인트:</span>
+                    <span style={{ fontWeight: 'bold' }}>{settings.checkInPoints}P/일</span>
+                  </div>
 
-          </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span className="material-icons-round" style={{ fontSize: '1.1rem', color: '#3b82f6' }}>looks_one</span>
+                    <span style={{ color: 'var(--text-muted)' }}>7일 연속 보너스:</span>
+                    <span style={{ fontWeight: 'bold' }}>{settings.bonus7Days}P</span>
+                  </div>
 
-          {/* 4. POLICY SETTINGS SUMMARY ROW */}
-          <div className="glass-panel" style={{ padding: '1rem 1.5rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <span className="material-icons-round">settings</span>
-                정책 설정 요약
-              </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span className="material-icons-round" style={{ fontSize: '1.1rem', color: '#a855f7' }}>looks_two</span>
+                    <span style={{ color: 'var(--text-muted)' }}>15일 연속 보너스:</span>
+                    <span style={{ fontWeight: 'bold' }}>{settings.bonus15Days}P</span>
+                  </div>
 
-              <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.85rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span className="material-icons-round" style={{ fontSize: '1.1rem', color: 'var(--accent-purple)' }}>person_add</span>
-                  <span style={{ color: 'var(--text-muted)' }}>가입 보너스:</span>
-                  <span style={{ fontWeight: 'bold' }}>{settings.signUpPoints}P</span>
-                </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span className="material-icons-round" style={{ fontSize: '1.1rem', color: 'var(--accent-emerald)' }}>event</span>
-                  <span style={{ color: 'var(--text-muted)' }}>출석 포인트:</span>
-                  <span style={{ fontWeight: 'bold' }}>{settings.checkInPoints}P/일</span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span className="material-icons-round" style={{ fontSize: '1.1rem', color: '#3b82f6' }}>looks_one</span>
-                  <span style={{ color: 'var(--text-muted)' }}>7일 연속 보너스:</span>
-                  <span style={{ fontWeight: 'bold' }}>{settings.bonus7Days}P</span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span className="material-icons-round" style={{ fontSize: '1.1rem', color: '#a855f7' }}>looks_two</span>
-                  <span style={{ color: 'var(--text-muted)' }}>15일 연속 보너스:</span>
-                  <span style={{ fontWeight: 'bold' }}>{settings.bonus15Days}P</span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span className="material-icons-round" style={{ fontSize: '1.1rem', color: 'var(--accent-rose)' }}>looks_3</span>
-                  <span style={{ color: 'var(--text-muted)' }}>30일 연속 보너스:</span>
-                  <span style={{ fontWeight: 'bold' }}>{settings.bonus30Days}P</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span className="material-icons-round" style={{ fontSize: '1.1rem', color: 'var(--accent-rose)' }}>looks_3</span>
+                    <span style={{ color: 'var(--text-muted)' }}>30일 연속 보너스:</span>
+                    <span style={{ fontWeight: 'bold' }}>{settings.bonus30Days}P</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <button 
-              onClick={() => setCurrentTab('settings')}
-              className="btn-secondary" 
-              style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-            >
-              <span className="material-icons-round" style={{ fontSize: '0.95rem' }}>settings</span>
-              설정 관리 &gt;
-            </button>
+              <button 
+                onClick={() => setCurrentTab('settings')}
+                className="btn-secondary" 
+                style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+              >
+                <span className="material-icons-round" style={{ fontSize: '0.95rem' }}>settings</span>
+                설정 관리 &gt;
+              </button>
+            </div>
           </div>
 
+          {/* RIGHT COLUMN: Sliding Inspector Panel (mockup requirement) */}
+          {selectedInspectorUser && (
+            <div className="dashboard-right-panel-drawer">
+              {(() => {
+                const currentInspectorUser = displayUsers.find(u => u.id === selectedInspectorUser.id) || selectedInspectorUser;
+                const userChapter = getChapterOfUser(currentInspectorUser.currentVerseIndex);
+                const userProgressPct = Math.min(100, Math.round((currentInspectorUser.currentVerseIndex / totalVerses) * 100));
+
+                return (
+                  <div className="drawer-inner-container">
+                    {/* Drawer Header */}
+                    <div className="drawer-header-row">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span className="badge-select-indicator">② 회원 선택 시</span>
+                        <span className="material-icons-round" style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>expand_more</span>
+                      </div>
+                      <button className="drawer-close-btn" onClick={() => setSelectedInspectorUser(null)}>
+                        <span className="material-icons-round">close</span>
+                      </button>
+                    </div>
+
+                    <h3 className="drawer-title-main">회원 상세 이력 조회</h3>
+
+                    <div className="drawer-scrollable-content custom-scroll">
+                      {/* Profile Card */}
+                      <div className="drawer-profile-card">
+                        <div className="drawer-avatar-wrapper">
+                          <div className="drawer-avatar-large">
+                            {(currentInspectorUser.name || currentInspectorUser.username).charAt(0).toUpperCase()}
+                          </div>
+                          <div className="drawer-user-details">
+                            <div className="username-row">
+                              <span className="username">{currentInspectorUser.name || '이름 없음'}</span>
+                              <span className="status-badge active">활성</span>
+                            </div>
+                            <div className="email">{currentInspectorUser.email}</div>
+                          </div>
+                          <span className="material-icons-round star-favorite-icon">star_border</span>
+                        </div>
+
+                        <div className="drawer-profile-meta-grid">
+                          <div className="meta-item">
+                            <span className="lbl">가입일</span>
+                            <span className="val">{getSignupDate(currentInspectorUser)}</span>
+                          </div>
+                          <div className="meta-item">
+                            <span className="lbl">권한</span>
+                            <span className="val">USER</span>
+                          </div>
+                          <div className="meta-item">
+                            <span className="lbl">현재 포인트</span>
+                            <span className="val point-val">
+                              {currentInspectorUser.points?.toLocaleString()} P
+                              <span className="material-icons-round coin-icon">toll</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Stats Grid */}
+                      <div className="drawer-stats-row">
+                        <div className="stat-box">
+                          <span className="lbl">현재 진도</span>
+                          <span className="val">{userChapter}장 진행 중</span>
+                        </div>
+                        <div className="stat-box">
+                          <span className="lbl">연속 출석</span>
+                          <span className="val">{currentInspectorUser.consecutiveCheckIns || 0}일</span>
+                        </div>
+                        <div className="stat-box">
+                          <span className="lbl">전체 학습률</span>
+                          <span className="val">{userProgressPct}%</span>
+                        </div>
+                      </div>
+
+                      {/* Tab Navigation */}
+                      <div className="drawer-tabs-navigation">
+                        {[
+                          { id: 'summary', label: '요약' },
+                          { id: 'points', label: '포인트 이력' },
+                          { id: 'attendance', label: '출석 이력' },
+                          { id: 'memorization', label: '암송 기록' },
+                          { id: 'events', label: '이벤트' },
+                          { id: 'logs', label: '관리 로그' }
+                        ].map(tab => (
+                          <button
+                            key={tab.id}
+                            className={`drawer-tab-btn ${activeHistoryTab === tab.id ? 'active' : ''}`}
+                            onClick={() => setActiveHistoryTab(tab.id as any)}
+                          >
+                            {tab.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Tab Content Area */}
+                      <div className="drawer-tab-content-area">
+                        {activeHistoryTab === 'summary' && (
+                          <div className="timeline-container">
+                            <div className="timeline-header">
+                              <span className="title">최근 활동 타임라인</span>
+                              <span className="view-all-link" onClick={() => setCurrentTab('members')}>전체 보기 &gt;</span>
+                            </div>
+
+                            <div className="timeline-list">
+                              {getTimelineActivities(currentInspectorUser).length === 0 ? (
+                                <div className="empty-logs">활동 이력이 없습니다.</div>
+                              ) : (
+                                getTimelineActivities(currentInspectorUser).slice(0, 8).map((act, idx) => {
+                                  let icon = 'check_circle';
+                                  let iconColor = '#10b981';
+                                  let iconBg = 'rgba(16, 185, 129, 0.1)';
+
+                                  if (act.type === 'challenge') {
+                                    icon = 'emoji_events';
+                                    iconColor = '#8b5cf6';
+                                    iconBg = 'rgba(139, 92, 246, 0.1)';
+                                  } else if (act.type === 'bonus') {
+                                    icon = 'stars';
+                                    iconColor = '#f59e0b';
+                                    iconBg = 'rgba(245, 158, 11, 0.1)';
+                                  } else if (act.type === 'signup') {
+                                    icon = 'person_add';
+                                    iconColor = '#3b82f6';
+                                    iconBg = 'rgba(59, 130, 246, 0.1)';
+                                  } else if (act.type === 'chapter_complete') {
+                                    icon = 'menu_book';
+                                    iconColor = '#ec4899';
+                                    iconBg = 'rgba(236, 72, 153, 0.1)';
+                                  }
+
+                                  return (
+                                    <div key={act.id || idx} className="timeline-item">
+                                      <div className="timeline-badge-icon" style={{ background: iconBg, color: iconColor }}>
+                                        <span className="material-icons-round" style={{ fontSize: '1rem' }}>{icon}</span>
+                                      </div>
+                                      <div className="timeline-body">
+                                        <div className="timeline-time">{act.date}</div>
+                                        <div className="timeline-text">{act.title}</div>
+                                        {act.sublabel && <div className="timeline-subtext">{act.sublabel}</div>}
+                                      </div>
+                                      <div className="timeline-right-metric">
+                                        {act.amount !== undefined ? (
+                                          <span className={`point-badge ${act.amount >= 0 ? 'plus' : 'minus'}`}>
+                                            {act.amount >= 0 ? `+${act.amount}` : act.amount}P
+                                          </span>
+                                        ) : act.badge ? (
+                                          <span className="badge-blue-outline">{act.badge}</span>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {activeHistoryTab === 'points' && (
+                          <div className="logs-tab-list">
+                            {!currentInspectorUser.pointsHistory || currentInspectorUser.pointsHistory.length === 0 ? (
+                              <div className="empty-logs">포인트 내역이 없습니다.</div>
+                            ) : (
+                              currentInspectorUser.pointsHistory.map((h, idx) => (
+                                <div key={h.id || idx} className="log-row-item">
+                                  <div className="log-row-details">
+                                    <div className="title">{h.title}</div>
+                                    <div className="date">{h.date}</div>
+                                  </div>
+                                  <span className={`amount ${h.amount >= 0 ? 'plus' : 'minus'}`}>
+                                    {h.amount >= 0 ? `+${h.amount}` : h.amount}P
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+
+                        {activeHistoryTab === 'attendance' && (
+                          <div className="logs-tab-list">
+                            {getAttendanceHistory(currentInspectorUser).length === 0 ? (
+                              <div className="empty-logs">출석 내역이 없습니다.</div>
+                            ) : (
+                              getAttendanceHistory(currentInspectorUser).map((d, idx) => (
+                                <div key={idx} className="log-row-item">
+                                  <div className="log-row-details" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <span className="material-icons-round" style={{ color: 'var(--accent-emerald)', fontSize: '1.1rem' }}>check_circle</span>
+                                    <div className="title">출석 체크 완료</div>
+                                  </div>
+                                  <span className="date-badge-simple">{d}</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+
+                        {activeHistoryTab === 'memorization' && (
+                          <div className="logs-tab-list">
+                            <div className="memorization-status-box">
+                              <div className="progress-info-row">
+                                <span>요한계시록 전체 진도율</span>
+                                <span style={{ fontWeight: 'bold', color: 'var(--accent-purple)' }}>{userProgressPct}%</span>
+                              </div>
+                              <div className="progress-track" style={{ height: '8px', margin: '0.5rem 0' }}>
+                                <div className="progress-fill" style={{ width: `${userProgressPct}%`, background: 'var(--accent-purple)' }}></div>
+                              </div>
+                              <div className="progress-details" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                진행 단계: {getVerseText(currentInspectorUser.currentVerseIndex)}
+                              </div>
+                            </div>
+                            <div className="completed-chapters-list">
+                              <div style={{ fontSize: '0.85rem', fontWeight: 600, margin: '1.05rem 0 0.5rem 0' }}>완료된 장 목록</div>
+                              {userChapter <= 1 ? (
+                                <div className="empty-logs" style={{ padding: '1rem' }}>완료한 장이 없습니다.</div>
+                              ) : (
+                                <div className="chapter-badge-container">
+                                  {Array.from({ length: userChapter - 1 }, (_, i) => (
+                                    <span key={i} className="completed-chapter-badge">
+                                      {i + 1}장 완료
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {activeHistoryTab === 'events' && (
+                          <div className="logs-tab-list">
+                            <div className="event-list-drawer">
+                              {displayEvents.slice(0, 2).map((evt) => (
+                                <div key={evt.id} className="event-drawer-card">
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                                    <span className="title">{evt.title}</span>
+                                    <span className="status">참여 완료</span>
+                                  </div>
+                                  <span className="points">+{evt.rewardPoints}P 지급</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {activeHistoryTab === 'logs' && (
+                          <div className="logs-tab-list">
+                            <div className="empty-logs">로그인이 유효한 상태입니다. (마지막 활동: {currentInspectorUser.lastCheckInDate || 'N/A'})</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Drawer Footer */}
+                    <div className="drawer-footer-btn-wrapper">
+                      <button className="drawer-footer-action-btn" onClick={() => setCurrentTab('members')}>
+                        전체 이력 보기 (상세 페이지로 이동)
+                        <span className="material-icons-round">arrow_forward</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
         </div>
       )}
     </div>

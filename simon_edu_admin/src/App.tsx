@@ -46,6 +46,99 @@ export default function App() {
   const [loadingUsers, setLoadingUsers] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string>('');
 
+  // Lifted Search Inspector states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedInspectorUser, setSelectedInspectorUser] = useState<User | null>(null);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const getDisplayUsers = (): User[] => {
+    if (users.length > 0) return users;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    return [
+      {
+        id: 'mock1',
+        username: 'faith_0312',
+        name: '정신혜',
+        email: 'faith0312@gmail.com',
+        role: 'user',
+        points: 2450,
+        consecutiveCheckIns: 5,
+        lastCheckInDate: todayStr,
+        lastMissionDate: todayStr,
+        currentVerseIndex: 120,
+        pointsHistory: [
+          { id: 'h1', type: 'signup', title: '회원가입 축하금', amount: 100, date: '2026-06-02 10:00:00' },
+          { id: 'h2', type: 'attendance', title: '일일 출석 체크', amount: 10, date: todayStr + ' 08:30:12' },
+          { id: 'h3', type: 'challenge', title: '암송 성공 (요한계시록 3장 2절)', amount: 50, date: todayStr + ' 09:05:44' }
+        ]
+      },
+      {
+        id: 'mock2',
+        username: 'grace_jun',
+        name: '이준우',
+        email: 'gracejun@naver.com',
+        role: 'user',
+        points: 4890,
+        consecutiveCheckIns: 12,
+        lastCheckInDate: todayStr,
+        lastMissionDate: todayStr,
+        currentVerseIndex: 320,
+        pointsHistory: [
+          { id: 'h4', type: 'attendance', title: '연속 출석 보너스 (12일차)', amount: 30, date: todayStr + ' 07:12:00' },
+          { id: 'h5', type: 'challenge', title: '암송 성공 (요한계시록 21장 2절)', amount: 80, date: '2026-06-02 13:45:00' }
+        ]
+      },
+      {
+        id: 'mock3',
+        username: 'bible_lover',
+        name: '박은혜',
+        email: 'biblelover@gmail.com',
+        role: 'user',
+        points: 1520,
+        consecutiveCheckIns: 0,
+        lastCheckInDate: yesterdayStr,
+        lastMissionDate: yesterdayStr,
+        currentVerseIndex: 85,
+        pointsHistory: [
+          { id: 'h6', type: 'signup', title: '회원가입 축하금', amount: 100, date: '2026-06-01 14:22:01' }
+        ]
+      },
+      {
+        id: 'mock4',
+        username: 'hope_777',
+        name: '최소망',
+        email: 'hope777@gmail.com',
+        role: 'user',
+        points: 3820,
+        consecutiveCheckIns: 3,
+        lastCheckInDate: todayStr,
+        lastMissionDate: null,
+        currentVerseIndex: 45,
+        pointsHistory: [
+          { id: 'h7', type: 'signup', title: '회원가입 축하금', amount: 100, date: '2026-06-01 11:08:00' },
+          { id: 'h8', type: 'attendance', title: '일일 출석 체크', amount: 10, date: todayStr + ' 11:45:00' }
+        ]
+      },
+      {
+        id: 'mock5',
+        username: 'simon_lee',
+        name: '이시몬',
+        email: 'simonlee@naver.com',
+        role: 'user',
+        points: 5820,
+        consecutiveCheckIns: 30,
+        lastCheckInDate: yesterdayStr,
+        lastMissionDate: null,
+        currentVerseIndex: 250,
+        pointsHistory: [
+          { id: 'h9', type: 'signup', title: '회원가입 축하금', amount: 100, date: '2026-06-01 11:00:00' },
+          { id: 'h10', type: 'attendance', title: '5월 연속 출석', amount: 150, date: '2026-06-01 22:31:00' }
+        ]
+      }
+    ];
+  };
+
   // 1. Firebase Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -136,7 +229,13 @@ export default function App() {
 
     switch (currentTab) {
       case 'dashboard':
-        return <Dashboard setCurrentTab={setCurrentTab} />;
+        return (
+          <Dashboard
+            setCurrentTab={setCurrentTab}
+            selectedInspectorUser={selectedInspectorUser}
+            setSelectedInspectorUser={setSelectedInspectorUser}
+          />
+        );
       case 'members':
         return <Members users={users} adminEmail={adminEmail} />;
       case 'points':
@@ -154,7 +253,13 @@ export default function App() {
       case 'logs':
         return <Logs />;
       default:
-        return <Dashboard setCurrentTab={setCurrentTab} />;
+        return (
+          <Dashboard
+            setCurrentTab={setCurrentTab}
+            selectedInspectorUser={selectedInspectorUser}
+            setSelectedInspectorUser={setSelectedInspectorUser}
+          />
+        );
     }
   };
 
@@ -227,7 +332,7 @@ export default function App() {
         <header className="top-header">
           <div className="header-left">
             {/* Hamburger menu button visible only on mobile */}
-            <button className="btn-icon-action mobile-menu-btn" onClick={() => setIsSidebarOpen(true)} style={{ marginRight: '0.5rem' }}>
+            <button className="btn-icon-action mobile-menu-btn mobile-menu-toggle-btn" onClick={() => setIsSidebarOpen(true)} style={{ marginRight: '0.5rem' }}>
               <span className="material-icons-round">menu</span>
             </button>
             <span className="material-icons-round header-tab-icon" style={{ color: 'var(--accent-purple)' }}>
@@ -242,6 +347,101 @@ export default function App() {
             </span>
             <h1 className="header-title">{getTabTitle(currentTab)}</h1>
           </div>
+
+          {/* Premium Header Search Bar */}
+          {currentTab === 'dashboard' && (
+            <div className="header-search-bar-premium">
+              <select className="header-search-select-premium">
+                <option>전체</option>
+              </select>
+              <div className="header-search-input-wrapper-premium">
+                <input
+                  type="text"
+                  className="header-search-input-premium"
+                  placeholder="사용자명 또는 이메일 검색..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setShowDropdown(true);
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                />
+                {searchQuery && (
+                  <button
+                    className="header-search-clear-premium"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedInspectorUser(null);
+                      setShowDropdown(false);
+                    }}
+                  >
+                    <span className="material-icons-round">close</span>
+                  </button>
+                )}
+
+                {/* Floating Dropdown */}
+                {showDropdown && searchQuery.trim() !== '' && (
+                  <div className="header-search-dropdown-premium custom-scroll">
+                    {(() => {
+                      const displayUsersList = getDisplayUsers();
+                      const filteredList = displayUsersList.filter(u => {
+                        const matchName = u.name?.toLowerCase().includes(searchQuery.toLowerCase());
+                        const matchUsername = u.username.toLowerCase().includes(searchQuery.toLowerCase());
+                        return matchName || matchUsername;
+                      });
+
+                      if (filteredList.length === 0) {
+                        return (
+                          <div style={{ padding: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', fontSize: '0.85rem' }}>
+                            검색 결과가 없습니다.
+                          </div>
+                        );
+                      }
+
+                      return filteredList.map(u => (
+                        <div
+                          key={u.id}
+                          className="header-search-dropdown-item-premium"
+                          onMouseDown={() => {
+                            setSelectedInspectorUser(u);
+                            setSearchQuery(u.name || u.username);
+                            setShowDropdown(false);
+                          }}
+                        >
+                          <div className="header-avatar-mini-premium">
+                            {(u.name || u.username).charAt(0).toUpperCase()}
+                          </div>
+                          <div className="header-user-info-premium">
+                            <div className="name">{u.name || '이름 없음'}</div>
+                            <div className="sub">@{u.username} | {u.email}</div>
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
+              </div>
+              <button
+                className="header-search-btn-premium"
+                onClick={() => {
+                  const displayUsersList = getDisplayUsers();
+                  const filtered = displayUsersList.filter(u => {
+                    const matchName = u.name?.toLowerCase().includes(searchQuery.toLowerCase());
+                    const matchUsername = u.username.toLowerCase().includes(searchQuery.toLowerCase());
+                    return matchName || matchUsername;
+                  });
+                  if (filtered.length > 0) {
+                    setSelectedInspectorUser(filtered[0]);
+                    setSearchQuery(filtered[0].name || filtered[0].username);
+                  }
+                  setShowDropdown(false);
+                }}
+              >
+                <span className="material-icons-round" style={{ fontSize: '1.1rem' }}>search</span>
+                검색
+              </button>
+            </div>
+          )}
 
           <div className="header-right">
             <div className="date-badge">

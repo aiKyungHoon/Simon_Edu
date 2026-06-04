@@ -202,15 +202,15 @@ export default function Logs() {
               ) : (
                 filteredLogs.map((log) => (
                   <tr key={log.id}>
-                    <td style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{log.adminEmail}</td>
-                    <td>
+                    <td data-label="수행 관리자" style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{log.adminEmail}</td>
+                    <td data-label="작업 구분">
                       <span className={`badge admin`} style={{ fontSize: '0.7rem' }}>
                         {getLogTypeLabel(log.type)}
                       </span>
                     </td>
-                    <td>{log.details}</td>
-                    <td style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{log.targetUserName}</td>
-                    <td style={{ fontFamily: 'var(--font-en)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{log.timestamp}</td>
+                    <td data-label="상세 내용">{log.details}</td>
+                    <td data-label="작업 대상" style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>{log.targetUserName}</td>
+                    <td data-label="수행 일시" style={{ fontFamily: 'var(--font-en)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{log.timestamp}</td>
                   </tr>
                 ))
               )}

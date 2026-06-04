@@ -321,9 +321,9 @@ export default function Stats({ users }: StatsProps) {
                         onClick={() => setSelectedUser(user)}
                         style={{ cursor: 'pointer', background: selectedUser?.id === user.id ? 'var(--sidebar-active)' : 'transparent' }}
                       >
-                        <td style={{ padding: '0.5rem', fontWeight: 'bold' }}>{user.name || user.username}</td>
-                        <td style={{ padding: '0.5rem', fontFamily: 'var(--font-en)' }}>{pct}%</td>
-                        <td style={{ padding: '0.5rem', fontSize: '0.75rem' }}>{getVersePositionText(user.currentVerseIndex)}</td>
+                        <td data-label="회원" style={{ padding: '0.5rem', fontWeight: 'bold' }}>{user.name || user.username}</td>
+                        <td data-label="진도율" style={{ padding: '0.5rem', fontFamily: 'var(--font-en)' }}>{pct}%</td>
+                        <td data-label="위치" style={{ padding: '0.5rem', fontSize: '0.75rem' }}>{getVersePositionText(user.currentVerseIndex)}</td>
                       </tr>
                     );
                   })

@@ -295,7 +295,6 @@ export default function Events({ adminEmail }: EventsProps) {
                 </span>
               </div>
 
-              {/* Title & Reward */}
               <div>
                 <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>{event.title}</h3>
                 <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--accent-amber)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -411,7 +410,7 @@ export default function Events({ adminEmail }: EventsProps) {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="events-modal-grid">
                 <div className="form-group">
                   <label htmlFor="evtStart">시작 일자</label>
                   <input

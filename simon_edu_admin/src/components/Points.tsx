@@ -118,7 +118,7 @@ export default function Points({ users, adminEmail }: PointsProps) {
   };
 
   return (
-    <div className="view-container" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
+    <div className="view-container points-grid-container">
       {/* LEFT COLUMN: HISTORY LIST */}
       <div className="glass-panel">
         <div className="card-header-row">
@@ -160,26 +160,26 @@ export default function Points({ users, adminEmail }: PointsProps) {
               ) : (
                 filteredHistories.map((h) => (
                   <tr key={h.id}>
-                    <td>
+                    <td data-label="사용자">
                       <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{h.username}</span>
                       {h.name && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.25rem' }}>({h.name})</span>}
                     </td>
-                    <td>{h.title}</td>
-                    <td>
+                    <td data-label="내용">{h.title}</td>
+                    <td data-label="구분">
                       <span className={`badge ${h.type || 'signup'}`}>
                         {h.type === 'challenge' ? '암송 챌린지' :
                          h.type === 'attendance' ? '출석 체크' :
                          h.type === 'signup' ? '가입 축하금' : '관리자 조정'}
                       </span>
                     </td>
-                    <td style={{
+                    <td data-label="포인트" style={{
                       fontWeight: 'bold',
                       fontFamily: 'var(--font-en)',
                       color: h.amount >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)'
                     }}>
                       {h.amount >= 0 ? `+${h.amount}` : h.amount} P
                     </td>
-                    <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{h.date}</td>
+                    <td data-label="일시" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{h.date}</td>
                   </tr>
                 ))
               )}

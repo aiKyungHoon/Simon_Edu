@@ -138,7 +138,7 @@ export default function Settings({ adminEmail }: SettingsProps) {
               기본 보상 포인트 설정
             </h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+            <div className="settings-points-grid">
               <div className="form-group">
                 <label htmlFor="signUpPts">신규 회원가입 보너스 (P)</label>
                 <input
@@ -167,7 +167,7 @@ export default function Settings({ adminEmail }: SettingsProps) {
             <div style={{ borderTop: '1px solid var(--glass-border)', marginTop: '1.25rem', paddingTop: '1.25rem' }}>
               <h3 style={{ fontSize: '0.9rem', fontWeight: 'bold', marginBottom: '1rem', color: 'var(--text-primary)' }}>연속 출석 체크 보너스 포인트</h3>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+              <div className="settings-bonus-grid">
                 <div className="form-group">
                   <label htmlFor="b7">7일 연속 보너스</label>
                   <input

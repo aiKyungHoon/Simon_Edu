@@ -135,9 +135,9 @@ export default function Quizzes({ adminEmail }: QuizzesProps) {
   };
 
   return (
-    <div className="view-container" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+    <div className="view-container quiz-grid-container">
       {/* LEFT COLUMN: CHAPTERS & VERSES LIST */}
-      <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '78vh' }}>
+      <div className="glass-panel quiz-panel-left">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 className="card-title">
             <span className="material-icons-round">menu_book</span>
@@ -157,7 +157,7 @@ export default function Quizzes({ adminEmail }: QuizzesProps) {
             }}
           >
             {Array.from({ length: 22 }, (_, i) => i + 1).map((ch) => (
-              <option key={ch} value={ch}>{ch}장</option>
+              <option key={ch} value={ch} style={{ color: 'var(--text-primary)' }}>{ch}장</option>
             ))}
           </select>
         </div>
@@ -172,14 +172,14 @@ export default function Quizzes({ adminEmail }: QuizzesProps) {
                 style={{
                   padding: '1rem',
                   borderRadius: '10px',
-                  background: isSelected ? 'var(--sidebar-active)' : 'rgba(255, 255, 255, 0.4)',
+                  background: isSelected ? 'var(--sidebar-active)' : 'rgba(255, 255, 255, 0.02)',
                   border: `1px solid ${isSelected ? 'var(--accent-purple)' : 'var(--glass-border)'}`,
                   cursor: 'pointer',
                   transition: 'all var(--transition-fast)'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                  <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                  <span style={{ fontWeight: 'bold', color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
                     요한계시록 {v.chapter}장 {v.verse}절
                   </span>
                   <span className={`badge ${v.difficulty || 'normal'}`}>
@@ -188,10 +188,13 @@ export default function Quizzes({ adminEmail }: QuizzesProps) {
                 </div>
                 <p style={{
                   fontSize: '0.825rem',
-                  color: 'var(--text-secondary)',
-                  whiteSpace: 'nowrap',
+                  color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
                   overflow: 'hidden',
-                  textOverflow: 'ellipsis'
+                  textOverflow: 'ellipsis',
+                  lineHeight: '1.4'
                 }}>
                   {v.text}
                 </p>
@@ -202,7 +205,7 @@ export default function Quizzes({ adminEmail }: QuizzesProps) {
       </div>
 
       {/* RIGHT COLUMN: EDITOR PANEL */}
-      <div className="glass-panel" style={{ height: '78vh', overflowY: 'auto' }}>
+      <div className="glass-panel quiz-panel-right">
         {selectedVerse ? (
           <div>
             <h2 className="card-title" style={{ marginBottom: '1.25rem' }}>
@@ -243,7 +246,7 @@ export default function Quizzes({ adminEmail }: QuizzesProps) {
                   </button>
                 </div>
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', background: 'rgba(184, 134, 11, 0.05)', padding: '0.75rem', borderRadius: '8px', minHeight: '50px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', background: 'rgba(184, 134, 11, 0.05)', padding: '0.75rem', borderRadius: '8px', minHeight: '50px', border: '1px solid var(--glass-border)' }}>
                   {editKeywords.length === 0 ? (
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>등록된 빈칸 키워드가 없습니다. 단어를 추가해 주세요.</span>
                   ) : (
@@ -274,12 +277,13 @@ export default function Quizzes({ adminEmail }: QuizzesProps) {
                     border: '1px solid var(--glass-border)',
                     color: 'var(--text-primary)',
                     padding: '0.65rem',
-                    borderRadius: '8px'
+                    borderRadius: '8px',
+                    fontWeight: '600'
                   }}
                 >
-                  <option value="easy">쉬움 (빈칸 적음)</option>
-                  <option value="normal">보통 (일반)</option>
-                  <option value="hard">어려움 (빈칸 많음)</option>
+                  <option value="easy" style={{ color: 'var(--text-primary)' }}>쉬움 (빈칸 적음)</option>
+                  <option value="normal" style={{ color: 'var(--text-primary)' }}>보통 (일반)</option>
+                  <option value="hard" style={{ color: 'var(--text-primary)' }}>어려움 (빈칸 많음)</option>
                 </select>
               </div>
 
