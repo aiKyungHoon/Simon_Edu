@@ -91,6 +91,8 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
               if (_fcmToken != null) {
                 _syncTokenToWebView(_fcmToken);
               }
+              final osName = Platform.isIOS ? 'iOS' : 'Android';
+              _controller?.runJavaScript('if (window.app && window.app.updateDevicePlatform) { window.app.updateDevicePlatform("$osName"); }');
               
               // Synchronize auth state and active view state after page finish
               _controller?.runJavaScript('''

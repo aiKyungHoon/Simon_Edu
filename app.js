@@ -2690,6 +2690,22 @@ class SimonEduApp {
       console.error("Error updating push token in Firestore:", err);
     });
   }
+
+  updateDevicePlatform(os) {
+    if (!this.currentUser) return;
+    if (this.currentUser.os === os) return; // avoid duplicate updates
+    
+    this.currentUser.os = os;
+    if (this.currentUser.isTrial) return;
+    
+    db.collection('users').doc(this.currentUser.id).update({
+      os: os
+    }).then(() => {
+      console.log("Device platform successfully updated in Firestore:", os);
+    }).catch(err => {
+      console.error("Error updating device platform in Firestore:", err);
+    });
+  }
 }
 
 // Instantiate and bind to window
