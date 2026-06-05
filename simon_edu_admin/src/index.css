@@ -281,6 +281,11 @@ body {
   flex: 1;
 }
 
+.dashboard-view-container {
+  padding: 1.5rem;
+  max-width: 100%;
+}
+
 /* GLASS PANEL CARDS */
 .glass-panel {
   background: var(--glass-bg);
@@ -1174,8 +1179,10 @@ body {
   }
 
   .main-content {
-    width: 100vw;
-    min-width: 100vw;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
   }
 
   .top-header {
@@ -2792,6 +2799,10 @@ body {
     padding: 1rem !important;
   }
   
+  .dashboard-view-container {
+    padding: 1rem !important;
+  }
+  
   .admin-table {
     min-width: 950px;
   }
@@ -2815,6 +2826,7 @@ body {
   .admin-table td {
     display: block !important;
     width: 100% !important;
+    min-width: 0 !important; /* Force override of the min-width: 950px */
     box-sizing: border-box;
   }
   
@@ -2883,6 +2895,10 @@ body {
     overflow-x: hidden !important;
   }
 
+  .dashboard-view-container {
+    padding: 0.75rem !important;
+  }
+
   .stats-grid-6 {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 0.75rem !important;
@@ -2890,6 +2906,8 @@ body {
 
   .main-chart-box {
     min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
   }
 
   .dashboard-left-content,
@@ -2897,6 +2915,13 @@ body {
   .dashboard-grids-4,
   .dashboard-wrapper-premium {
     gap: 1rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .dashboard-donut-column {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   .sub-metric-box {

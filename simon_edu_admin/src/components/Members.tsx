@@ -278,7 +278,7 @@ export default function Members({ users, adminEmail }: MembersProps) {
       </div>
 
       {/* MEMBERS TABLE */}
-      <div className="glass-panel">
+      <div className="glass-panel desktop-only-view">
         <div className="table-container" style={{ margin: 0 }}>
           <table className="admin-table">
             <thead>
@@ -373,6 +373,110 @@ export default function Members({ users, adminEmail }: MembersProps) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* MEMBERS MOBILE CARDS */}
+      <div className="mobile-only-view">
+        {filteredUsers.length === 0 ? (
+          <div className="glass-panel" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+            일치하는 사용자가 없습니다.
+          </div>
+        ) : (
+          filteredUsers.map((user) => {
+            const status = user.status || 'active';
+            const displayName = user.name || user.username;
+            const avatarChar = displayName.charAt(0).toUpperCase();
+            return (
+              <div className="mobile-user-card" key={user.id}>
+                <div className="mobile-user-header">
+                  <div className="mobile-user-info">
+                    <div className="mobile-user-avatar">{avatarChar}</div>
+                    <div className="mobile-user-name-group">
+                      <span className="mobile-user-title">{displayName}</span>
+                      <span className="mobile-user-subtitle">@{user.username}</span>
+                    </div>
+                  </div>
+                  <div className="mobile-user-badges">
+                    {user.os && (
+                      <span className="badge" style={{ 
+                        background: user.os.toLowerCase() === 'ios' ? 'rgba(0, 122, 255, 0.1)' : 'rgba(52, 199, 89, 0.1)',
+                        color: user.os.toLowerCase() === 'ios' ? '#007AFF' : '#34C759',
+                        border: `1px solid ${user.os.toLowerCase() === 'ios' ? 'rgba(0, 122, 255, 0.2)' : 'rgba(52, 199, 89, 0.2)'}`,
+                        fontSize: '0.7rem',
+                        padding: '0.15rem 0.35rem',
+                        marginRight: '0.15rem'
+                      }}>
+                        {user.os}
+                      </span>
+                    )}
+                    <span className={`badge ${user.role}`}>
+                      {user.role === 'admin' ? '관리자' : '일반'}
+                    </span>
+                    <span className={`badge ${status}`}>
+                      {status === 'suspended' ? '정지됨' : '정상'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mobile-user-grid">
+                  <div className="mobile-user-grid-item full-width">
+                    <span className="mobile-user-grid-lbl">이메일</span>
+                    <span className="mobile-user-grid-val">{user.email}</span>
+                  </div>
+                  <div className="mobile-user-grid-item">
+                    <span className="mobile-user-grid-lbl">보유 포인트</span>
+                    <span className="mobile-user-grid-val" style={{ color: 'var(--accent-purple)', fontWeight: 'bold' }}>
+                      {user.points.toLocaleString()} P
+                    </span>
+                  </div>
+                  <div className="mobile-user-grid-item">
+                    <span className="mobile-user-grid-lbl">연속 출석일</span>
+                    <span className="mobile-user-grid-val">{user.consecutiveCheckIns}일</span>
+                  </div>
+                  <div className="mobile-user-grid-item full-width">
+                    <span className="mobile-user-grid-lbl">현재 말씀 위치</span>
+                    <span className="mobile-user-grid-val" style={{ fontSize: '0.8rem' }}>
+                      {getVerseText(user.currentVerseIndex)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mobile-user-actions">
+                  <button
+                    onClick={() => setSelectedUser(user)}
+                    className="btn-action edit"
+                  >
+                    상세 정보
+                  </button>
+                  <button
+                    onClick={() => handleToggleRole(user)}
+                    className="btn-action reset"
+                  >
+                    권한 전환
+                  </button>
+                  <button
+                    onClick={() => handleToggleSuspend(user)}
+                    className="btn-action danger"
+                    style={{
+                      background: status === 'suspended' ? 'rgba(52, 211, 153, 0.15)' : 'rgba(244, 63, 94, 0.15)',
+                      color: status === 'suspended' ? 'var(--accent-emerald)' : 'var(--accent-rose)'
+                    }}
+                  >
+                    {status === 'suspended' ? '정지 해제' : '계정 정지'}
+                  </button>
+                  <button
+                    onClick={() => handleDeleteUser(user)}
+                    className="btn-icon-action"
+                    style={{ color: 'var(--accent-rose)', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    title="계정 삭제"
+                  >
+                    <span className="material-icons-round" style={{ fontSize: '1.1rem' }}>delete</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* MEMBER DETAIL MODAL */}

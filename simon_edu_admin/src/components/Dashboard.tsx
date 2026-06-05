@@ -653,7 +653,7 @@ export default function Dashboard({
   };
 
   return (
-    <div className="view-container" style={{ padding: '1.5rem', maxWidth: '100%' }}>
+    <div className="view-container dashboard-view-container">
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
           <span className="material-icons-round" style={{ fontSize: '3rem', color: 'var(--accent-purple)', animation: 'spin 1.5s linear infinite' }}>
