@@ -227,6 +227,45 @@ class SimonEduApp {
     }, error => {
       console.error("Firestore snapshot sync error:", error);
     });
+
+    // Sync custom quizzes / verse overrides in real-time
+    db.collection('customQuizzes').onSnapshot(snapshot => {
+      const overrides = {};
+      snapshot.forEach(doc => {
+        overrides[doc.id] = doc.data();
+      });
+
+      // Merge overrides with window.BIBLE_DATA
+      if (window.BIBLE_DATA) {
+        window.BIBLE_DATA = window.BIBLE_DATA.map(v => {
+          const key = `ch${v.chapter}_v${v.verse}`;
+          if (overrides[key]) {
+            return { ...v, ...overrides[key] };
+          }
+          return v;
+        });
+      }
+
+      // If game is active and currently playing, update the current verse data in real-time
+      if (this.gameActive && this.currentQuizVerse) {
+        const key = `ch${this.currentQuizVerse.chapter}_v${this.currentQuizVerse.verse}`;
+        if (overrides[key]) {
+          this.currentQuizVerse = { ...this.currentQuizVerse, ...overrides[key] };
+        }
+      }
+    }, error => {
+      console.error("Firestore customQuizzes snapshot sync error:", error);
+    });
+
+    // Sync global settings in real-time
+    db.collection('settings').doc('global').onSnapshot(doc => {
+      if (doc.exists) {
+        this.globalSettings = doc.data();
+        this.renderChallengeCard();
+      }
+    }, error => {
+      console.error("Firestore settings sync error:", error);
+    });
   }
 
   saveDatabase() {
@@ -984,6 +1023,150 @@ class SimonEduApp {
 
     // 5.4 Render Leaderboard
     this.renderLeaderboardWidget();
+
+    // 5.5 Render Scripture Challenge Card
+    this.renderChallengeCard();
+  }
+
+  renderChallengeCard() {
+    const card = document.getElementById('challengeCard');
+    if (!card) return;
+
+    if (!this.globalSettings || !this.globalSettings.activeChallengeChapter) {
+      card.style.display = 'none';
+      return;
+    }
+
+    const chapter = this.globalSettings.activeChallengeChapter;
+    const bonus = this.globalSettings.challengeBonusPoints || 50;
+
+    // Set texts safely
+    const titleEl = document.getElementById('challengeChapterTitle');
+    if (titleEl) titleEl.textContent = `요한계시록 ${chapter}장 전체 암송 챌린지`;
+
+    const bonusEl = document.getElementById('challengeBonusPointsDisplay');
+    if (bonusEl) bonusEl.textContent = `+${bonus}P`;
+
+    const textEl = document.getElementById('challengeProgressText');
+    if (textEl) {
+      textEl.innerHTML = `관리자가 지정한 특별 챌린지입니다. 요한계시록 ${chapter}장 전체 구절을 암송 완료하면 <strong style="color: var(--accent-amber);">+${bonus}P</strong> 보너스를 드립니다!`;
+    }
+
+    // Calculate progress if user logged in
+    if (this.currentUser) {
+      const progress = this.currentUser.challengeProgress || {};
+      const challengeVerses = window.BIBLE_DATA.filter(v => v.chapter === chapter);
+      const totalCount = challengeVerses.length;
+      
+      let completedCount = 0;
+      if (progress.chapter === chapter) {
+        completedCount = progress.completedCount || 0;
+      }
+
+      const containerEl = document.getElementById('challengeProgressContainer');
+      if (containerEl) containerEl.style.display = 'flex';
+      
+      const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+      
+      const barEl = document.getElementById('challengeProgressBar');
+      if (barEl) barEl.style.width = `${pct}%`;
+
+      const labelEl = document.getElementById('challengeProgressLabel');
+      if (labelEl) labelEl.textContent = `${completedCount} / ${totalCount}`;
+
+      const btn = document.getElementById('btnStartChallenge');
+      const badge = document.getElementById('challengeBadge');
+      if (progress.claimed && progress.chapter === chapter) {
+        if (btn) {
+          btn.innerHTML = '챌린지 완수 완료 <span class="material-icons-round">emoji_events</span>';
+          btn.style.background = 'var(--sidebar-active)';
+          btn.style.cursor = 'default';
+          btn.setAttribute('onclick', '');
+        }
+        if (badge) {
+          badge.textContent = '완료';
+          badge.style.background = 'var(--accent-emerald)';
+        }
+      } else {
+        if (btn) {
+          btn.innerHTML = '챌린지 도전하기 <span class="material-icons-round">local_fire_department</span>';
+          btn.style.background = 'linear-gradient(135deg, var(--accent-purple), var(--accent-blue))';
+          btn.style.cursor = 'pointer';
+          btn.setAttribute('onclick', 'app.startChallenge()');
+        }
+        if (badge) {
+          badge.textContent = '진행 중';
+          badge.style.background = 'var(--accent-purple)';
+        }
+      }
+    } else {
+      const containerEl = document.getElementById('challengeProgressContainer');
+      if (containerEl) containerEl.style.display = 'none';
+    }
+
+    card.style.display = 'block';
+  }
+
+  startChallenge() {
+    if (!this.currentUser) return;
+    if (!this.globalSettings || !this.globalSettings.activeChallengeChapter) return;
+
+    const challengeChapter = this.globalSettings.activeChallengeChapter;
+    const challengeVerses = window.BIBLE_DATA.filter(v => v.chapter === challengeChapter);
+    if (challengeVerses.length === 0) {
+      alert("챌린지 장의 말씀 데이터를 찾을 수 없습니다.");
+      return;
+    }
+
+    const progress = this.currentUser.challengeProgress || {};
+    // If user's challenge chapter is different, initialize it
+    if (progress.chapter !== challengeChapter) {
+      progress.chapter = challengeChapter;
+      progress.completedCount = 0;
+      progress.claimed = false;
+      
+      // Save initialization to Firestore
+      db.collection('users').doc(this.currentUser.id).update({
+        challengeProgress: progress
+      });
+    }
+
+    if (progress.claimed) {
+      alert("이미 이번 스페셜 챌린지를 완수하셨습니다!");
+      return;
+    }
+
+    const nextIdx = progress.completedCount || 0;
+    if (nextIdx >= challengeVerses.length) {
+      alert("모든 구절을 완료하셨습니다. 보너스를 확인해 주세요!");
+      return;
+    }
+
+    const targetVerse = challengeVerses[nextIdx];
+    // Find the absolute index in window.BIBLE_DATA
+    const absoluteIdx = window.BIBLE_DATA.findIndex(v => v.chapter === targetVerse.chapter && v.verse === targetVerse.verse);
+    if (absoluteIdx === -1) {
+      alert("구절 인덱스 오류가 발생했습니다.");
+      return;
+    }
+
+    this.isTestMode = false;
+    this.challengeActive = true;
+    this.currentQuizVerse = window.BIBLE_DATA[absoluteIdx];
+
+    // Automatically sync game difficulty with the verse's custom difficulty if set
+    if (this.currentQuizVerse && this.currentQuizVerse.difficulty) {
+      const diffMap = {
+        'easy': 'easy',
+        'normal': 'medium',
+        'hard': 'hard'
+      };
+      const targetDiff = diffMap[this.currentQuizVerse.difficulty] || 'medium';
+      this.setDifficulty(targetDiff);
+    }
+
+    this.switchView('game');
+    this.initializeQuiz();
   }
 
   // 5.3.1 Attendance Calendar Widget logic
@@ -1733,6 +1916,18 @@ class SimonEduApp {
 
     this.isTestMode = true;
     this.currentQuizVerse = bibleData[selectedIdx];
+
+    // Automatically sync game difficulty with the verse's custom difficulty if set
+    if (this.currentQuizVerse && this.currentQuizVerse.difficulty) {
+      const diffMap = {
+        'easy': 'easy',
+        'normal': 'medium',
+        'hard': 'hard'
+      };
+      const targetDiff = diffMap[this.currentQuizVerse.difficulty] || 'medium';
+      this.setDifficulty(targetDiff);
+    }
+
     this.switchView('game');
     this.initializeQuiz();
   }
@@ -1751,6 +1946,18 @@ class SimonEduApp {
     }
 
     this.currentQuizVerse = bibleData[curIdx];
+
+    // Automatically sync game difficulty with the verse's custom difficulty if set
+    if (this.currentQuizVerse && this.currentQuizVerse.difficulty) {
+      const diffMap = {
+        'easy': 'easy',
+        'normal': 'medium',
+        'hard': 'hard'
+      };
+      const targetDiff = diffMap[this.currentQuizVerse.difficulty] || 'medium';
+      this.setDifficulty(targetDiff);
+    }
+
     this.switchView('game');
     this.initializeQuiz();
   }
@@ -1781,6 +1988,19 @@ class SimonEduApp {
     this.gameHearts = 3;
     this.gameTimeRemaining = 60;
     this.currentQuizBlanks = [];
+    this.isCustomQuestionStage = false;
+
+    // Reset button states
+    const btnSubmit = document.getElementById('btnSubmitQuiz');
+    if (btnSubmit) {
+      btnSubmit.textContent = "정답 확인 및 제출";
+    }
+
+    const btnHint = document.getElementById('btnHint');
+    if (btnHint) {
+      btnHint.textContent = "힌트 보기 (5초 소모)";
+      btnHint.setAttribute('onclick', 'app.showHint()');
+    }
 
     // Header Setup
     document.getElementById('gameVerseTitle').textContent = `요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 시험` + (this.isTestMode ? ' [테스트]' : '');
@@ -1794,20 +2014,43 @@ class SimonEduApp {
     
     // Build Blank Interface
     const text = this.currentQuizVerse.text;
-    const keywords = this.currentQuizVerse.keywords;
     
-    // Determine how many keywords to turn into blanks based on difficulty
+    // Determine active keywords based on difficulty and custom configs
+    let activeKeywords = [];
     let blanksCount = 1;
+    let isCustomList = false;
+
     if (this.currentDifficulty === 'easy') {
-      blanksCount = Math.max(1, Math.min(2, Math.round(keywords.length * 0.3)));
-    } else if (this.currentDifficulty === 'medium') {
-      blanksCount = Math.max(2, Math.min(3, Math.round(keywords.length * 0.6)));
+      if (this.currentQuizVerse.easyKeywords && this.currentQuizVerse.easyKeywords.length > 0) {
+        activeKeywords = this.currentQuizVerse.easyKeywords;
+        blanksCount = activeKeywords.length;
+        isCustomList = true;
+      } else {
+        activeKeywords = this.currentQuizVerse.keywords || [];
+        blanksCount = Math.max(1, Math.min(2, Math.round(activeKeywords.length * 0.3)));
+      }
+    } else if (this.currentDifficulty === 'medium' || this.currentDifficulty === 'normal') {
+      if (this.currentQuizVerse.normalKeywords && this.currentQuizVerse.normalKeywords.length > 0) {
+        activeKeywords = this.currentQuizVerse.normalKeywords;
+        blanksCount = activeKeywords.length;
+        isCustomList = true;
+      } else {
+        activeKeywords = this.currentQuizVerse.keywords || [];
+        blanksCount = Math.max(2, Math.min(3, Math.round(activeKeywords.length * 0.6)));
+      }
     } else { // Hard
-      blanksCount = keywords.length; // Hide all available key phrases
+      if (this.currentQuizVerse.hardKeywords && this.currentQuizVerse.hardKeywords.length > 0) {
+        activeKeywords = this.currentQuizVerse.hardKeywords;
+        blanksCount = activeKeywords.length;
+        isCustomList = true;
+      } else {
+        activeKeywords = this.currentQuizVerse.keywords || [];
+        blanksCount = activeKeywords.length; // Hide all available key phrases
+      }
     }
 
-    // Select random keywords to hide
-    const shuffledKeywords = [...keywords].sort(() => 0.5 - Math.random());
+    // Select keywords to hide
+    const shuffledKeywords = isCustomList ? [...activeKeywords] : [...activeKeywords].sort(() => 0.5 - Math.random());
     const selectedBlanks = shuffledKeywords.slice(0, blanksCount);
     
     // Replace text elements with blank input fields
@@ -1902,6 +2145,11 @@ class SimonEduApp {
   submitQuiz() {
     if (!this.gameActive) return;
 
+    if (this.isCustomQuestionStage) {
+      this.submitCustomQuestion();
+      return;
+    }
+
     let allCorrect = true;
     let firstWrongInput = null;
 
@@ -1927,7 +2175,11 @@ class SimonEduApp {
     });
 
     if (allCorrect) {
-      this.triggerQuizSuccess();
+      if (this.currentQuizVerse.customQuestion && this.currentQuizVerse.customAnswer) {
+        this.startCustomQuestionStage();
+      } else {
+        this.triggerQuizSuccess(false);
+      }
     } else {
       // Deduct one heart
       this.gameHearts--;
@@ -1945,19 +2197,111 @@ class SimonEduApp {
     }
   }
 
-  triggerQuizSuccess() {
+  startCustomQuestionStage() {
+    this.isCustomQuestionStage = true;
+    
+    // Play a nice success effect for the first stage
+    this.playConfetti('checkin');
+
+    const card = document.getElementById('verseTestCard');
+    if (card) {
+      card.innerHTML = `
+        <div class="custom-quiz-container" style="display:flex; flex-direction:column; gap:1rem; padding: 1.5rem; background:rgba(184,134,11,0.05); border-radius:12px; border:1px solid var(--glass-border); text-align:center;">
+          <div style="font-weight:700; color:var(--accent-amber); font-size:1.1rem; display:flex; align-items:center; justify-content:center; gap:0.5rem;">
+            <span class="material-icons-round">help_outline</span>
+            🎁 보너스 서술형 퀴즈 (+20P)
+          </div>
+          <div style="font-size:1.05rem; font-weight:600; color:var(--text-primary); line-height:1.5; margin:0.5rem 0;">
+            ${this.currentQuizVerse.customQuestion}
+          </div>
+          <input type="text" id="customQuizInput" class="blank-input" style="width:100%; max-width:400px; margin:0 auto; padding:0.6rem; text-align:center; font-size:1rem;" placeholder="정답을 입력하세요..." autocomplete="off">
+        </div>
+      `;
+    }
+
+    // Update buttons
+    const btnSubmit = document.getElementById('btnSubmitQuiz');
+    if (btnSubmit) {
+      btnSubmit.textContent = "보너스 정답 제출";
+    }
+
+    const btnHint = document.getElementById('btnHint');
+    if (btnHint) {
+      btnHint.textContent = "보너스 퀴즈 건너뛰기";
+      btnHint.setAttribute('onclick', 'app.skipCustomQuestion()');
+    }
+
+    // Focus input
+    setTimeout(() => {
+      const input = document.getElementById('customQuizInput');
+      if (input) {
+        input.focus();
+        // Allow Enter key to submit
+        input.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            this.submitQuiz();
+          }
+        });
+      }
+    }, 100);
+  }
+
+  submitCustomQuestion() {
+    const input = document.getElementById('customQuizInput');
+    if (!input) return;
+
+    const userVal = input.value.trim().toLowerCase().replace(/\s+/g, '');
+    const correctVal = this.currentQuizVerse.customAnswer.trim().toLowerCase().replace(/\s+/g, '');
+
+    if (userVal === correctVal) {
+      input.classList.remove('wrong');
+      input.classList.add('correct');
+      input.disabled = true;
+      this.playConfetti('quiz');
+      
+      // Delay success slightly for better transition feel
+      setTimeout(() => {
+        this.triggerQuizSuccess(true);
+      }, 800);
+    } else {
+      input.classList.remove('correct');
+      input.classList.add('wrong');
+      
+      // Deduct one heart for bonus question mismatch
+      this.gameHearts--;
+      this.renderHearts();
+      input.focus();
+
+      if (this.gameHearts <= 0) {
+        this.triggerQuizFail("기회를 모두 소진하셨습니다!");
+      } else {
+        alert(`오답입니다! 기회가 ${this.gameHearts}번 남았습니다. 정답이 생각나지 않으면 건너뛰기를 누르실 수 있습니다.`);
+      }
+    }
+  }
+
+  skipCustomQuestion() {
+    if (!this.gameActive) return;
+    this.triggerQuizSuccess(false);
+  }
+
+  triggerQuizSuccess(hasCustomBonus = false) {
     this.clearIntervals();
     this.gameActive = false;
 
     // Calculate score
     let basePoints = 100;
     if (this.currentDifficulty === 'easy') basePoints = 80;
-    else if (this.currentDifficulty === 'medium') basePoints = 100;
+    else if (this.currentDifficulty === 'medium' || this.currentDifficulty === 'normal') basePoints = 100;
     else if (this.currentDifficulty === 'hard') basePoints = 130;
 
     // Time bonus: 2P per second remaining
     const timeBonus = this.gameTimeRemaining * 2;
-    const totalAward = basePoints + timeBonus;
+    let totalAward = basePoints + timeBonus;
+    if (hasCustomBonus) {
+      totalAward += 20;
+    }
 
     // 체험모드 유저 예외처리 분기
     if (this.currentUser && this.currentUser.isTrial) {
@@ -1980,6 +2324,7 @@ class SimonEduApp {
         요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 [테스트 모드] 시험을 완료했습니다!<br><br>
         기본 포인트: <strong>+${basePoints} P (테스트 모드 - 미지급)</strong><br>
         남은 시간 보너스 (${this.gameTimeRemaining}s): <strong>+${timeBonus} P (테스트 모드 - 미지급)</strong><br>
+        ${hasCustomBonus ? `서술형 보너스: <strong>+20 P (테스트 모드 - 미지급)</strong><br>` : ''}
         <hr style="margin: 0.75rem 0; border:0; border-top:1px solid var(--glass-border);">
         <strong style="color:var(--accent-amber); font-size:1.1rem;">테스트 모드 완료 (포인트가 지급되지 않습니다)</strong>
       `;
@@ -1992,7 +2337,7 @@ class SimonEduApp {
     // Check if auto check-in is possible
     const todayStr = this.getRelativeDateStr(0);
     const checkInResult = this.calculateCheckInReward();
-    const nextVerseIndex = this.currentUser.currentVerseIndex + 1;
+    const nextVerseIndex = this.challengeActive ? this.currentUser.currentVerseIndex : (this.currentUser.currentVerseIndex + 1);
 
     const totalEarned = totalAward + (checkInResult ? checkInResult.pointsAwarded : 0);
     const newNotification = {
@@ -2018,11 +2363,52 @@ class SimonEduApp {
       pointsHistory: firebase.firestore.FieldValue.arrayUnion(quizHistory)
     };
 
+    let isChallengeCompletedThisTurn = false;
+    let challengeBonusPointsValue = 0;
+
+    if (this.challengeActive) {
+      const progress = { ...(this.currentUser.challengeProgress || {}) };
+      progress.completedCount = (progress.completedCount || 0) + 1;
+      progress.chapter = this.globalSettings.activeChallengeChapter;
+      
+      updateData.challengeProgress = progress;
+
+      const challengeVerses = window.BIBLE_DATA.filter(v => v.chapter === progress.chapter);
+      if (progress.completedCount >= challengeVerses.length && !progress.claimed) {
+        progress.claimed = true;
+        isChallengeCompletedThisTurn = true;
+        challengeBonusPointsValue = this.globalSettings.challengeBonusPoints || 50;
+        
+        updateData.points = firebase.firestore.FieldValue.increment(totalAward + challengeBonusPointsValue);
+        
+        const challengeBonusHistory = {
+          id: 'hist_' + (Date.now() + 2) + '_' + Math.random().toString(36).substr(2, 5),
+          type: 'challenge_bonus',
+          title: `스페셜 챌린지 완수 보너스 (계시록 ${progress.chapter}장)`,
+          amount: challengeBonusPointsValue,
+          date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+        };
+        const challengeBonusNotification = {
+          id: 'notif_' + (Date.now() + 2) + '_' + Math.random().toString(36).substr(2, 9),
+          message: `🔥 요한계시록 ${progress.chapter}장 챌린지 올클리어! 보너스 +${challengeBonusPointsValue}P 적립`,
+          timestamp: Date.now(),
+          read: false
+        };
+        updateData.pointsHistory = firebase.firestore.FieldValue.arrayUnion(quizHistory, challengeBonusHistory);
+        updateData.notifications = firebase.firestore.FieldValue.arrayUnion(newNotification, challengeBonusNotification);
+      }
+    }
+
     if (checkInResult) {
       updateData.lastCheckInDate = todayStr;
       updateData.consecutiveCheckIns = checkInResult.consecutiveCheckIns;
       updateData.checkInHistory = firebase.firestore.FieldValue.arrayUnion(todayStr);
-      updateData.points = firebase.firestore.FieldValue.increment(totalEarned);
+      // Adjust points to prevent double increments if challenge complete also adjusted it
+      if (isChallengeCompletedThisTurn) {
+        updateData.points = firebase.firestore.FieldValue.increment(totalEarned + challengeBonusPointsValue);
+      } else {
+        updateData.points = firebase.firestore.FieldValue.increment(totalEarned);
+      }
       
       const checkInHistoryObj = {
         id: 'hist_' + (Date.now() + 1) + '_' + Math.random().toString(36).substr(2, 5),
@@ -2031,7 +2417,20 @@ class SimonEduApp {
         amount: checkInResult.pointsAwarded,
         date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
       };
-      updateData.pointsHistory = firebase.firestore.FieldValue.arrayUnion(quizHistory, checkInHistoryObj);
+      
+      if (isChallengeCompletedThisTurn) {
+        const progress = updateData.challengeProgress;
+        const challengeBonusHistory = {
+          id: 'hist_' + (Date.now() + 2) + '_' + Math.random().toString(36).substr(2, 5),
+          type: 'challenge_bonus',
+          title: `스페셜 챌린지 완수 보너스 (계시록 ${progress.chapter}장)`,
+          amount: challengeBonusPointsValue,
+          date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+        };
+        updateData.pointsHistory = firebase.firestore.FieldValue.arrayUnion(quizHistory, checkInHistoryObj, challengeBonusHistory);
+      } else {
+        updateData.pointsHistory = firebase.firestore.FieldValue.arrayUnion(quizHistory, checkInHistoryObj);
+      }
     }
 
     db.collection('users').doc(this.currentUser.id).update(updateData).then(() => {
@@ -2041,6 +2440,7 @@ class SimonEduApp {
         요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 시험을 완료했습니다!<br><br>
         기본 포인트: <strong>+${basePoints} P</strong><br>
         남은 시간 보너스 (${this.gameTimeRemaining}s): <strong>+${timeBonus} P</strong><br>
+        ${hasCustomBonus ? `서술형 보너스: <strong>+20 P</strong><br>` : ''}
       `;
 
       if (checkInResult) {
@@ -2050,10 +2450,17 @@ class SimonEduApp {
         `;
       }
 
-      const totalEarned = totalAward + (checkInResult ? checkInResult.pointsAwarded : 0);
+      if (isChallengeCompletedThisTurn) {
+        htmlContent += `
+          🔥 챌린지 완료 보너스: <strong style="color: var(--accent-purple);">+${challengeBonusPointsValue} P</strong><br>
+          <span style="font-size:0.8rem; color:var(--accent-purple); font-weight: bold;">🎉 축하합니다! 요한계시록 ${this.globalSettings.activeChallengeChapter}장 챌린지를 완수했습니다!</span><br>
+        `;
+      }
+
+      const finalTotalEarned = totalAward + (checkInResult ? checkInResult.pointsAwarded : 0) + (isChallengeCompletedThisTurn ? challengeBonusPointsValue : 0);
       htmlContent += `
         <hr style="margin: 0.75rem 0; border:0; border-top:1px solid var(--glass-border);">
-        총 획득한 포인트: <strong style="color:var(--accent-amber); font-size:1.15rem;">+${totalEarned} P</strong>
+        총 획득한 포인트: <strong style="color:var(--accent-amber); font-size:1.15rem;">+${finalTotalEarned} P</strong>
       `;
       modalBody.innerHTML = htmlContent;
 
@@ -2066,6 +2473,11 @@ class SimonEduApp {
           this.renderAttendanceWidget();
         }, 400);
       }
+      if (isChallengeCompletedThisTurn) {
+        setTimeout(() => {
+          this.showPointsFloater(challengeBonusPointsValue, "챌린지 완료 보너스! 🏆");
+        }, 800);
+      }
       this.playConfetti('quiz');
       this.openModal('modalComplete');
 
@@ -2073,6 +2485,9 @@ class SimonEduApp {
       let toastMsg = `📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 성공! (+${totalAward}P)`;
       if (checkInResult) {
         toastMsg += ` & 오늘의 출석체크 자동 완료! (+${checkInResult.pointsAwarded}P)`;
+      }
+      if (isChallengeCompletedThisTurn) {
+        toastMsg += ` & 챌린지 완료 보너스! (+${challengeBonusPointsValue}P)`;
       }
       this.showToast(toastMsg);
     }).catch(err => {
@@ -2097,6 +2512,7 @@ class SimonEduApp {
     this.clearIntervals();
     this.gameActive = false;
     this.isTestMode = false;
+    this.challengeActive = false;
     this.switchView('dashboard');
   }
 

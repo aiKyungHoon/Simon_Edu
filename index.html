@@ -7,7 +7,7 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.5.0">
+  <link rel="stylesheet" href="style.css?v=1.5.2">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
@@ -202,6 +202,32 @@
       <div class="dashboard-grid-left">
         <div id="dashboardView" class="view-container">
       <div class="dashboard-single-container">
+        <!-- Scripture Challenge Card -->
+        <div id="challengeCard" class="dashboard-card glass-panel" style="display: none; background: linear-gradient(135deg, rgba(147, 51, 234, 0.12), rgba(59, 130, 246, 0.12)); border: 1px solid rgba(147, 51, 234, 0.25); margin-bottom: 1.5rem; position: relative; overflow: hidden; padding: 1.5rem;">
+          <div style="position: absolute; right: -15px; top: -15px; font-size: 5rem; opacity: 0.08; transform: rotate(15deg); pointer-events: none; color: var(--accent-purple);" class="material-icons-round">local_fire_department</div>
+          <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+            <span class="material-icons-round" style="color: var(--accent-purple);">local_fire_department</span>
+            <span style="font-weight: 800;">스페셜 암송 챌린지!</span>
+            <span class="badge active" id="challengeBadge" style="margin-left: auto; background: var(--accent-purple); color: white; font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 6px;">진행 중</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;">
+            <h3 id="challengeChapterTitle" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">요한계시록 7장 전체 암송</h3>
+            <p id="challengeProgressText" style="font-size: 0.825rem; color: var(--text-secondary); margin: 0; line-height: 1.4;">
+              관리자가 지정한 특별 챌린지입니다. 요한계시록 7장 전체 구절을 암송 완료하면 <strong style="color: var(--accent-amber);" id="challengeBonusPointsDisplay">+50P</strong> 보너스를 드립니다!
+            </p>
+            <div id="challengeProgressContainer" style="display: none; align-items: center; gap: 0.75rem; width: 100%; margin-top: 0.5rem;">
+              <div style="flex: 1; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; border: 1px solid var(--glass-border);">
+                <div id="challengeProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--accent-purple), var(--accent-blue)); border-radius: 4px; transition: width 0.3s ease;"></div>
+              </div>
+              <span id="challengeProgressLabel" style="font-size: 0.75rem; font-weight: bold; color: var(--text-secondary); min-width: 40px; text-align: right;">0 / 17</span>
+            </div>
+            <button class="btn-start-mission" id="btnStartChallenge" onclick="app.startChallenge()" style="background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue)); border: none; box-shadow: 0 4px 15px rgba(147, 51, 234, 0.3); margin-top: 0.5rem; width: 100%; height: 44px; display: flex; justify-content: center; align-items: center; gap: 0.5rem; font-weight: bold; color: white; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-family: var(--font-kr);">
+              챌린지 도전하기
+              <span class="material-icons-round" style="font-size: 1.1rem;">local_fire_department</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Daily Mission Card -->
         <div class="dashboard-card glass-panel">
           <div class="card-title">
@@ -1768,7 +1794,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
-  <script src="bible_data.js?v=1.5.1"></script>
-  <script src="app.js?v=1.5.1"></script>
+  <script src="bible_data.js?v=1.5.2"></script>
+  <script src="app.js?v=1.5.2"></script>
 </body>
 </html>
