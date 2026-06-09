@@ -2408,7 +2408,7 @@ class SimonEduApp {
     if (pointsLabel) {
       if (diff === 'easy') pointsLabel.textContent = '100';
       else if (diff === 'medium' || diff === 'normal') pointsLabel.textContent = '200';
-      else if (diff === 'hard') pointsLabel.textContent = '200';
+      else if (diff === 'hard') pointsLabel.textContent = '300';
       else if (diff === 'master') pointsLabel.textContent = '500';
     }
 
@@ -2490,13 +2490,13 @@ class SimonEduApp {
     }
     
     // 난이도별 기본 포인트 & 빈칸 비율
-    // 쉬움:30%(100P), 보통:50%(200P), 어려움:70%(200P), 마스터:100%(500P)
+    // 쉬움:30%(100P), 보통:50%(200P), 어려움:70%(300P), 마스터:100%(500P)
     let blankRatio = 0.3;
     let basePoints = 100;
     const diff = this.currentDifficulty;
     if (diff === 'easy') { blankRatio = 0.3; basePoints = 100; }
     else if (diff === 'medium' || diff === 'normal') { blankRatio = 0.5; basePoints = 200; }
-    else if (diff === 'hard') { blankRatio = 0.7; basePoints = 200; }
+    else if (diff === 'hard') { blankRatio = 0.7; basePoints = 300; }
     else if (diff === 'master') { blankRatio = 1.0; basePoints = 500; }
     this._quizBasePoints = basePoints;
 

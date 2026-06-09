@@ -16,7 +16,7 @@
     (function() {
       const params = new URLSearchParams(window.location.search);
       const IS_APP_WEBVIEW = params.get('platform') === 'app';
-      const WEB_VER = '1.5.4';
+      const WEB_VER = '1.5.5';
       const APP_WEB_VER = '1.5.1';
       const VERSION_KEY = IS_APP_WEBVIEW ? 'simon_app_web_version' : 'simon_web_version';
       const ACTIVE_VER = IS_APP_WEBVIEW ? APP_WEB_VER : WEB_VER;
@@ -646,7 +646,7 @@
                 <li style="margin-bottom: 0.5rem;">어절(띄어쓰기) 기준 랜덤 빈칸</li>
                 <li style="margin-bottom: 0.5rem;"><strong>쉬움</strong>: 30% 빈칸 (+100P)</li>
                 <li style="margin-bottom: 0.5rem;"><strong>보통</strong>: 50% 빈칸 (+200P)</li>
-                <li style="margin-bottom: 0.5rem;"><strong>어려움</strong>: 70% 빈칸 (+200P)</li>
+                <li style="margin-bottom: 0.5rem;"><strong>어려움</strong>: 70% 빈칸 (+300P)</li>
                 <li style="margin-bottom: 0.5rem;"><strong>마스터</strong>: 전체 빈칸 (+500P)</li>
                 <li style="margin-bottom: 0.5rem;">⏱ 5초당 10P 차감 (최저 10P 보장)</li>
                 <li style="margin-bottom: 0.5rem;">힌트 사용 시 5초 차감</li>
@@ -2127,6 +2127,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <script src="bible_data.js?v=1.5.2"></script>
-  <script src="app.js?v=1.5.4"></script>
+  <script src="app.js?v=1.5.5"></script>
 </body>
 </html>
