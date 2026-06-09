@@ -482,22 +482,42 @@ export default function PushManagement({ users, adminEmail }: PushManagementProp
 
               {targetType === 'roles' && (
                 <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                  <label>수신 권한 선택</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.5rem', marginTop: '0.25rem' }}>
-                    {ROLE_OPTIONS.filter((role) => role.value !== 'user').map((role) => (
-                      <label key={role.value} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={targetRoles.includes(role.value)}
-                          onChange={(e) => {
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>수신 권한 선택</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.4rem' }}>
+                    {ROLE_OPTIONS.filter((role) => role.value !== 'user').map((role) => {
+                      const isSelected = targetRoles.includes(role.value);
+                      return (
+                        <button
+                          key={role.value}
+                          type="button"
+                          onClick={() => {
                             setTargetRoles((prev) => (
-                              e.target.checked ? [...new Set([...prev, role.value])] : prev.filter((r) => r !== role.value)
+                              isSelected ? prev.filter((r) => r !== role.value) : [...new Set([...prev, role.value])]
                             ));
                           }}
-                        />
-                        {role.label}
-                      </label>
-                    ))}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.5rem 0.9rem',
+                            borderRadius: '8px',
+                            border: `1px solid ${isSelected ? 'var(--accent-purple)' : 'var(--glass-border)'}`,
+                            background: isSelected ? 'var(--sidebar-active)' : 'var(--glass-bg)',
+                            color: isSelected ? 'var(--accent-purple)' : 'var(--text-secondary)',
+                            fontSize: '0.85rem',
+                            fontWeight: isSelected ? 700 : 500,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          <span className="material-icons-round" style={{ fontSize: '1.1rem' }}>
+                            {isSelected ? 'check_box' : 'check_box_outline_blank'}
+                          </span>
+                          {role.label}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

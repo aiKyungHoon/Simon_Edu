@@ -630,7 +630,7 @@
         <!-- Game Instruction Sidebar -->
         <div class="game-side-panel glass-panel">
           <div>
-            <div class="game-info-section">
+            <div class="game-info-section" id="gameDifficultySection">
               <div class="game-info-title">시험 난이도</div>
               <div class="difficulty-selector">
                 <button class="btn-diff easy active" id="btnDiffEasy" onclick="app.setDifficulty('easy')">쉬움</button>
@@ -654,7 +654,7 @@
             </div>
           </div>
           
-          <div class="game-info-section" style="margin-top: 2rem;">
+          <div class="game-info-section" style="margin-top: 2rem;" id="gameGuideSection">
             <div class="game-info-title">학습 가이드</div>
             <p class="verse-description" id="verseGuideText">
               하루에 한 절씩 마스터하여 요한계시록 전체를 암송해 나가는 게임식 학습입니다. 성공 시 랭킹 점수가 올라갑니다.

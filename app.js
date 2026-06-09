@@ -1302,23 +1302,28 @@ class SimonEduApp {
       return;
     }
 
-    const nextIdx = progress.completedCount || 0;
-    if (nextIdx >= challengeVerses.length) {
-      alert("모든 구절을 완료하셨습니다. 보너스를 확인해 주세요!");
-      return;
-    }
+    // Combine all verses into one single challenge
+    const combinedText = challengeVerses.map(v => v.text).join(' ');
+    const firstVerse = challengeVerses[0];
+    const lastVerse = challengeVerses[challengeVerses.length - 1];
+    
+    let displayChapter = firstVerse.chapter;
+    let displayVerse = firstVerse.verse === lastVerse.verse 
+      ? firstVerse.verse 
+      : `${firstVerse.verse}~${lastVerse.verse}`;
 
-    const targetVerse = challengeVerses[nextIdx];
-    // Find the absolute index in window.BIBLE_DATA
-    const absoluteIdx = window.BIBLE_DATA.findIndex(v => v.chapter === targetVerse.chapter && v.verse === targetVerse.verse);
-    if (absoluteIdx === -1) {
-      alert("구절 인덱스 오류가 발생했습니다.");
-      return;
+    if (firstVerse.chapter !== lastVerse.chapter) {
+      displayVerse = `${firstVerse.chapter}장 ${firstVerse.verse}절 ~ ${lastVerse.chapter}장 ${lastVerse.verse}절`;
     }
-
+    
     this.isTestMode = false;
     this.challengeActive = true;
-    this.currentQuizVerse = window.BIBLE_DATA[absoluteIdx];
+    
+    this.currentQuizVerse = {
+        chapter: displayChapter,
+        verse: displayVerse,
+        text: combinedText
+    };
 
     // 스페셜 챌린지는 항상 마스터 난이도 고정
     this.setDifficulty('master');
@@ -2484,6 +2489,18 @@ class SimonEduApp {
     document.getElementById('gameTimer').textContent = this.gameTimeRemaining;
     this.renderHearts();
 
+    // HIDE OR SHOW DIFFICULTY AND GUIDE SECTIONS
+    const diffSection = document.getElementById('gameDifficultySection');
+    const guideSection = document.getElementById('gameGuideSection');
+    
+    if (this.challengeActive) {
+      if (diffSection) diffSection.style.display = 'none';
+      if (guideSection) guideSection.style.display = 'none';
+    } else {
+      if (diffSection) diffSection.style.display = 'block';
+      if (guideSection) guideSection.style.display = 'block';
+    }
+
     const pointsStatElem = document.querySelector('.game-stat-item.points');
     if (pointsStatElem) {
       pointsStatElem.style.display = this.isTestMode ? 'none' : 'flex';
@@ -2849,8 +2866,8 @@ class SimonEduApp {
 
     if (this.challengeActive) {
       const progress = { ...(this.currentUser.challengeProgress || {}) };
-      progress.completedCount = (progress.completedCount || 0) + 1;
       const challengeVersesForProgress = this._getChallengeVersesFromSettings();
+      progress.completedCount = challengeVersesForProgress.length;
       const challengeRangeKey = this._getChallengeRangeKey();
       const firstChallengeVerse = challengeVersesForProgress[0] || { chapter: this.globalSettings.activeChallengeChapter || 1, verse: 1 };
       const lastChallengeVerse = challengeVersesForProgress[challengeVersesForProgress.length - 1] || firstChallengeVerse;
@@ -3030,18 +3047,22 @@ class SimonEduApp {
       settings.examEndChapter || 22,
       settings.examEndVerse || 21
     );
-    return verses.map((verse, idx) => {
-      const words = (verse.text || '').split(' ').filter(Boolean);
-      const blanked = words.map(() => '____').join(' ');
-      const reference = `요한계시록 ${verse.chapter}장 ${verse.verse}절`;
-      return {
-        id: `verse_${verse.chapter}_${verse.verse}_${idx}`,
-        reference,
-        question: `${reference} 전체 말씀을 암송해 입력하세요.`,
-        blanked,
-        answer: verse.text || ''
-      };
-    });
+    if (verses.length === 0) return [];
+    
+    // Combine all verses into a single question
+    const combinedText = verses.map(v => v.text).join(' ');
+    const blanked = combinedText.split(' ').filter(Boolean).map(() => '____').join(' ');
+    const reference = verses.length > 1 
+      ? `요한계시록 ${verses[0].chapter}장 ${verses[0].verse}절 ~ ${verses[verses.length-1].chapter}장 ${verses[verses.length-1].verse}절`
+      : `요한계시록 ${verses[0].chapter}장 ${verses[0].verse}절`;
+      
+    return [{
+      id: `exam_combined`,
+      reference,
+      question: `${reference} 전체 말씀을 암송해 입력하세요.`,
+      blanked,
+      answer: combinedText
+    }];
   }
 
   openExamJoinForm() {
