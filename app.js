@@ -92,6 +92,8 @@ class SimonEduApp {
     this.eventIncorrectCount = 0;
     this.examSubmissions = null;
     this.activeEvents = [];
+    this.currentRankingTab = 'all';
+    this.currentEventDetail = null;
 
     this.crews = [];
     this.battles = [];
@@ -207,6 +209,19 @@ class SimonEduApp {
     );
   }
 
+  createNotification({ title = '알림', message = '', type = 'notice', extra = {} }) {
+    return {
+      id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      title,
+      message,
+      type,
+      isRead: false,
+      read: false,
+      timestamp: Date.now(),
+      ...extra
+    };
+  }
+
   // 1. Database Initialization & Cloud Firestore real-time listener
   initDatabase() {
     db.collection('users').onSnapshot(snapshot => {
@@ -319,12 +334,21 @@ class SimonEduApp {
         const eventData = { id: doc.id, ...doc.data() };
         const startsOk = !eventData.startDate || eventData.startDate <= today;
         const endsOk = !eventData.endDate || eventData.endDate >= today;
-        if (eventData.active && startsOk && endsOk) {
+        if (eventData.active !== false && startsOk && endsOk) {
           this.activeEvents.push(eventData);
         }
       });
       this.updateExamEntryVisibility();
       this.renderChallengeCard();
+      this.renderHomeEventsAndNotices();
+      const eventsView = document.getElementById('eventsView');
+      if (eventsView && eventsView.classList.contains('active')) {
+        this.renderEventsView();
+      }
+      const journeyView = document.getElementById('journeyView');
+      if (journeyView && journeyView.classList.contains('active')) {
+        this.renderJourneyView();
+      }
       const examView = document.getElementById('examView');
       if (examView && examView.classList.contains('active') && !this.hasActiveExamEvent()) {
         this.switchView('dashboard');
@@ -418,6 +442,7 @@ class SimonEduApp {
       email: seed.email,
       role: seed.role,
       points: seed.points,
+      faithXP: seed.points,
       consecutiveCheckIns: seed.consecutiveCheckIns,
       lastCheckInDate: lastCheckInDate,
       checkInHistory: checkInHistory,
@@ -490,23 +515,23 @@ class SimonEduApp {
   // Theme presets
   static THEMES = {
     gold: {
-      bg: '#fdf8e6',
-      g1: 'rgba(253, 224, 71, 0.22)',
-      g2: 'rgba(217, 119, 6, 0.12)',
-      glass: 'rgba(255, 255, 255, 0.72)',
-      glassHover: 'rgba(255, 255, 255, 0.88)',
-      glassBorder: 'rgba(184, 134, 11, 0.2)',
-      textPrimary: '#3d341c',
-      textSecondary: '#6b5c37',
-      textMuted: '#96855b',
-      glassBorderFocus: 'rgba(184, 134, 11, 0.6)',
-      accentPurple: '#b8860b',
-      accentPurpleGlow: 'rgba(184, 134, 11, 0.12)',
-      accentBlue: '#926f15',
-      headerBg: 'rgba(253, 248, 230, 0.8)',
-      stampBg: 'rgba(184, 134, 11, 0.06)',
-      leaderboardItemBg: 'rgba(255, 255, 255, 0.75)',
-      footerBg: 'rgba(253, 248, 230, 0.95)'
+      bg: '#F7F3E8',
+      g1: 'rgba(200, 146, 17, 0.22)',
+      g2: 'rgba(163, 117, 13, 0.12)',
+      glass: 'rgba(255, 255, 255, 0.78)',
+      glassHover: 'rgba(255, 255, 255, 0.92)',
+      glassBorder: 'rgba(200, 146, 17, 0.2)',
+      textPrimary: '#3D341C',
+      textSecondary: '#5C4F2A',
+      textMuted: '#8E7B45',
+      glassBorderFocus: 'rgba(200, 146, 17, 0.6)',
+      accentPurple: '#C89211',
+      accentPurpleGlow: 'rgba(200, 146, 17, 0.12)',
+      accentBlue: '#A3750D',
+      headerBg: 'rgba(247, 243, 232, 0.85)',
+      stampBg: 'rgba(200, 146, 17, 0.05)',
+      leaderboardItemBg: 'rgba(255, 255, 255, 0.85)',
+      footerBg: 'rgba(247, 243, 232, 0.95)'
     },
     dark: {
       bg: '#0a0b10',
@@ -752,6 +777,7 @@ class SimonEduApp {
             email: email,
             role: 'user',
             points: 0,
+            faithXP: 0,
             consecutiveCheckIns: 0,
             lastCheckInDate: null,
             checkInHistory: [],
@@ -854,8 +880,9 @@ class SimonEduApp {
       viewName = 'dashboard';
     }
 
-    const singleDashboardViews = ['game', 'exam', 'settings'];
+    const singleDashboardViews = ['game', 'exam', 'settings', 'events', 'eventDetail', 'journey'];
     document.body.classList.toggle('single-dashboard-view', singleDashboardViews.includes(viewName));
+    document.body.classList.toggle('hide-bottom-nav', ['game', 'exam', 'auth'].includes(viewName));
 
     if (this.currentUser && this.currentUser.isTrial) {
       if (viewName === 'ranking' || viewName === 'crew') {
@@ -884,7 +911,7 @@ class SimonEduApp {
 
     const gridContainer = document.querySelector('.dashboard-grid-container');
     if (gridContainer) {
-      if (['dashboard', 'attendance', 'ranking', 'crew', 'game', 'exam', 'settings'].includes(viewName)) {
+      if (['dashboard', 'attendance', 'ranking', 'crew', 'events', 'eventDetail', 'journey', 'game', 'exam', 'settings'].includes(viewName)) {
         gridContainer.style.display = '';
       } else {
         gridContainer.style.display = 'none';
@@ -917,6 +944,10 @@ class SimonEduApp {
         this.renderLeaderboardWidget();
       } else if (viewName === 'crew') {
         this.renderCrewHub();
+      } else if (viewName === 'events') {
+        this.renderEventsView();
+      } else if (viewName === 'journey') {
+        this.renderJourneyView();
       }
 
       // Smooth scroll to target view
@@ -933,6 +964,7 @@ class SimonEduApp {
       if (activeTab) {
         activeTab.classList.add('active');
       }
+      this.updateBottomNavActive(viewName);
       return;
     }
 
@@ -955,6 +987,12 @@ class SimonEduApp {
       this.renderLeaderboardWidget();
     } else if (viewName === 'crew') {
       this.renderCrewHub();
+    } else if (viewName === 'events') {
+      this.renderEventsView();
+    } else if (viewName === 'eventDetail') {
+      this.renderEventDetailView();
+    } else if (viewName === 'journey') {
+      this.renderJourneyView();
     } else if (viewName === 'admin') {
       this.switchView('dashboard');
     } else if (viewName === 'settings') {
@@ -979,6 +1017,22 @@ class SimonEduApp {
     if (activeTab) {
       activeTab.classList.add('active');
     }
+    this.updateBottomNavActive(viewName);
+  }
+
+  updateBottomNavActive(viewName) {
+    document.querySelectorAll('.bottom-nav-item').forEach(item => item.classList.remove('active'));
+    const map = {
+      dashboard: 'bottomNavDashboard',
+      attendance: 'bottomNavDashboard',
+      ranking: 'bottomNavJourney',
+      events: 'bottomNavEvents',
+      eventDetail: 'bottomNavEvents',
+      journey: 'bottomNavJourney',
+      settings: 'bottomNavSettings'
+    };
+    const active = document.getElementById(map[viewName] || 'bottomNavDashboard');
+    if (active) active.classList.add('active');
   }
 
   handlePointBadgeClick() {
@@ -995,6 +1049,7 @@ class SimonEduApp {
       id: 'trial_user',
       name: '체험 사용자',
       points: 0,
+      faithXP: 0,
       currentVerseIndex: 0,
       lastMissionDate: null,
       isTrial: true
@@ -1125,7 +1180,7 @@ class SimonEduApp {
       circle.style.strokeDashoffset = offset;
     }
 
-    const startBtn = document.querySelector('.btn-start-mission');
+    const startBtn = document.getElementById('btnDailyMissionStart');
     const todayStr = this.getRelativeDateStr(0);
     const hasDoneMissionToday = false; // Unlimited missions requested
 
@@ -1172,12 +1227,640 @@ class SimonEduApp {
 
     // 5.3 Render Attendance Widget
     this.renderAttendanceWidget();
+    this.renderHomeAttendanceSummary();
 
     // 5.4 Render Leaderboard
     this.renderLeaderboardWidget();
 
     // 5.5 Render Scripture Challenge Card
     this.renderChallengeCard();
+    this.renderHomeEventsAndNotices();
+    this.renderJourneyView();
+  }
+
+  renderHomeAttendanceSummary() {
+    if (!this.currentUser) return;
+
+    const todayStr = this.getRelativeDateStr(0);
+    const consecutive = this.currentUser.consecutiveCheckIns || 0;
+    const doneToday = this.currentUser.lastCheckInDate === todayStr;
+    const milestones = [5, 10, 15, 30];
+    const nextMilestone = milestones.find(day => consecutive < day);
+    const remainText = nextMilestone
+      ? `다음 보상까지 ${Math.max(nextMilestone - consecutive, 0)}일`
+      : '모든 연속 출석 보상 달성';
+
+    const statusEl = document.getElementById('homeAttendanceStatus');
+    if (statusEl) {
+      statusEl.innerHTML = doneToday
+        ? `<span class="material-icons-round">verified</span> 오늘 출석 완료`
+        : `<span class="material-icons-round">event_available</span> 오늘 출석 전`;
+    }
+
+    const streakEl = document.getElementById('homeAttendanceStreak');
+    if (streakEl) {
+      streakEl.textContent = `연속 출석 ${consecutive}일 · ${remainText}`;
+    }
+
+    const btn = document.getElementById('btnHomeAttendance');
+    if (btn) {
+      btn.disabled = doneToday;
+      btn.classList.toggle('completed', doneToday);
+      btn.textContent = doneToday ? '오늘 출석 완료' : '출석 보상 받기';
+    }
+  }
+
+  getEventTypeLabel(eventItem) {
+    const type = eventItem?.eventType || 'event';
+    if (type === 'mission_exam') return '사명자 시험';
+    if (type === 'special_challenge') return '특별 암송 이벤트';
+    if (type === 'attendance') return '출석 이벤트';
+    return '이벤트';
+  }
+
+  getEventIcon(eventItem) {
+    const type = eventItem?.eventType || 'event';
+    if (type === 'mission_exam') return 'assignment_turned_in';
+    if (type === 'special_challenge') return 'local_fire_department';
+    if (type === 'attendance') return 'event_available';
+    return 'campaign';
+  }
+
+  renderHomeEventsAndNotices() {
+    this.renderHomeEventBanners();
+    this.renderHomeNoticeList();
+  }
+
+  renderHomeEventBanners() {
+    const list = document.getElementById('homeEventBanners');
+    if (!list) return;
+
+    const events = (this.activeEvents || []).filter(evt => this._eventTargetsCurrentUser(evt));
+    if (events.length === 0) {
+      list.innerHTML = '<div class="home-empty-state">진행 중인 이벤트가 없습니다.</div>';
+      return;
+    }
+
+    list.innerHTML = events.slice(0, 3).map(evt => {
+      const bannerUrl = this.getEventBannerUrl(evt);
+      const bgStyle = bannerUrl
+        ? `background-image: linear-gradient(0deg, rgba(20,20,20,0.72), rgba(20,20,20,0.18)), url('${this.escapeHtml(bannerUrl)}');`
+        : '';
+      return `
+        <button class="event-banner-card ${bannerUrl ? 'has-image' : ''}" style="${bgStyle}" onclick="app.openEventFromHome('${evt.id}')">
+          <div class="event-banner-overlay">
+            <span class="material-icons-round">${this.getEventIcon(evt)}</span>
+            <div>
+              <div class="event-banner-title">${this.escapeHtml(evt.title || this.getEventTypeLabel(evt))}</div>
+              <div class="event-banner-meta">${this.getEventTypeLabel(evt)} · ${this.escapeHtml(evt.endDate || '진행 중')}</div>
+            </div>
+          </div>
+        </button>
+      `;
+    }).join('');
+  }
+
+  renderHomeNoticeList() {
+    const list = document.getElementById('homeNoticeList');
+    if (!list) return;
+    const notices = this.getNoticeItems().slice(0, 3);
+    if (notices.length === 0) {
+      list.innerHTML = '<div class="home-empty-state">등록된 공지사항이 없습니다.</div>';
+      return;
+    }
+    list.innerHTML = notices.map(notice => `
+      <button class="notice-item-compact" onclick="app.openNotice('${notice.id}')">
+        <div class="notice-item-title-col">
+          <span class="material-icons-round" style="font-size:1rem;color:var(--accent-amber);">notifications</span>
+          <span class="notice-item-compact-title">${this.escapeHtml(notice.title)}</span>
+        </div>
+        <span class="notice-item-compact-date">${this.escapeHtml(notice.date)}</span>
+      </button>
+    `).join('');
+  }
+
+  renderEventsView() {
+    this.renderHomeEventsAndNotices();
+    const eventsList = document.getElementById('eventsPageList');
+    const noticesList = document.getElementById('noticesPageList');
+
+    if (eventsList) {
+      const events = (this.activeEvents || []).filter(evt => this._eventTargetsCurrentUser(evt));
+      if (events.length === 0) {
+        eventsList.innerHTML = '<div class="home-empty-state">진행 중인 이벤트가 없습니다.</div>';
+      } else {
+        eventsList.innerHTML = events.map(evt => `
+          <button class="app-list-item" onclick="app.openEventFromHome('${evt.id}')">
+            <div class="app-list-icon">
+              <span class="material-icons-round">${this.getEventIcon(evt)}</span>
+            </div>
+            <div class="app-list-body">
+              <strong>${this.escapeHtml(evt.title || this.getEventTypeLabel(evt))}</strong>
+              <span>${this.getEventTypeLabel(evt)} · ${this.escapeHtml(evt.endDate || '진행 중')}</span>
+            </div>
+            <span class="material-icons-round app-list-arrow">chevron_right</span>
+          </button>
+        `).join('');
+      }
+    }
+
+    if (noticesList) {
+      const notices = this.getNoticeItems();
+      noticesList.innerHTML = notices.map(notice => `
+        <button class="app-list-item" onclick="app.openNotice('${notice.id}')">
+          <div class="app-list-icon notice">
+            <span class="material-icons-round">notifications</span>
+          </div>
+          <div class="app-list-body">
+            <strong>${this.escapeHtml(notice.title)}</strong>
+            <span>${this.escapeHtml(notice.date)}</span>
+          </div>
+          <span class="material-icons-round app-list-arrow">chevron_right</span>
+        </button>
+      `).join('');
+    }
+  }
+
+  renderJourneyView() {
+    if (!this.currentUser || !window.BIBLE_DATA) return;
+
+    const bibleData = window.BIBLE_DATA || [];
+    const curIdx = Math.min(this.currentUser.currentVerseIndex || 0, bibleData.length);
+    const journeyTotalChapters = 21;
+    const completedChapterCount = this.getCompletedChapterCount(this.currentUser);
+    const progressPercent = Math.min(Math.round((completedChapterCount / journeyTotalChapters) * 100), 100);
+    const chapters = [...new Set(bibleData.map(v => v.chapter))].filter(chapter => chapter <= journeyTotalChapters);
+    const currentVerse = bibleData[curIdx] || bibleData[bibleData.length - 1] || { chapter: 1 };
+    const currentChapter = Math.min(currentVerse.chapter || 1, journeyTotalChapters);
+
+    const textEl = document.getElementById('journeyProgressText');
+    if (textEl) {
+      textEl.textContent = `현재 요한계시록 ${currentChapter}장 진행 중`;
+    }
+    const countEl = document.getElementById('journeyChapterCount');
+    if (countEl) {
+      countEl.textContent = `${currentChapter} / ${journeyTotalChapters}장`;
+    }
+    const pctEl = document.getElementById('journeyProgressPercent');
+    if (pctEl) {
+      pctEl.textContent = `진행률 ${progressPercent}%`;
+    }
+
+    const barEl = document.getElementById('journeyProgressBar');
+    if (barEl) barEl.style.width = `${progressPercent}%`;
+
+    const grid = document.getElementById('journeyChapterGrid');
+    if (!grid) return;
+
+    grid.innerHTML = chapters.map(chapter => {
+      const chapterVerses = bibleData.filter(v => v.chapter === chapter);
+      const firstIndex = bibleData.findIndex(v => v.chapter === chapter);
+      const lastIndex = firstIndex + chapterVerses.length - 1;
+      const isCompleted = curIdx > lastIndex;
+      const isOngoing = !isCompleted && curIdx >= firstIndex;
+      const statusClass = isCompleted ? 'completed' : (isOngoing ? 'ongoing' : 'locked');
+      const icon = isCompleted ? 'check_circle' : (isOngoing ? 'play_circle' : 'lock');
+      const label = isCompleted ? '완료' : (isOngoing ? '진행 중' : '대기');
+      return `
+        <button class="chapter-status-card ${statusClass}" ${isOngoing || isCompleted ? `onclick="app.jumpToChapter(${chapter})"` : 'disabled'}>
+          <span class="material-icons-round status-icon">${icon}</span>
+          <strong>${chapter}장</strong>
+          <span>${label}</span>
+        </button>
+      `;
+    }).join('');
+
+    this.renderJourneyRewards(completedChapterCount);
+    this.renderJourneyRanking();
+    this.renderFriendsPanel();
+  }
+
+  renderJourneyRewards(completedChapterCount) {
+    const list = document.getElementById('journeyRewardList');
+    if (!list) return;
+    const rewards = [
+      { chapter: 1, points: 200 },
+      { chapter: 5, points: 500 },
+      { chapter: 10, points: 1000 },
+      { chapter: 21, points: 3000, title: '요한계시록 마스터' }
+    ];
+    list.innerHTML = rewards.map(reward => {
+      const claimed = (this.currentUser.journeyRewardsClaimed || []).includes(reward.chapter);
+      const unlocked = completedChapterCount >= reward.chapter;
+      const label = reward.title ? `${reward.title} 칭호 지급` : `${reward.chapter}장 완독`;
+      return `
+        <div class="journey-reward-item ${unlocked ? 'unlocked' : ''}">
+          <div class="journey-reward-info">
+            <span class="journey-reward-title">${label}</span>
+            <span class="journey-reward-points">+${reward.points.toLocaleString()}P</span>
+          </div>
+          <button class="btn-reward-claim ${claimed ? 'claimed' : ''}" ${unlocked && !claimed ? `onclick="app.claimJourneyReward(${reward.chapter})"` : 'disabled'}>
+            ${claimed ? '수령 완료' : (unlocked ? '보상 받기' : '잠김')}
+          </button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async claimJourneyReward(chapter) {
+    if (!this.currentUser || this.currentUser.isTrial) return;
+    const rewards = {
+      1: { points: 200 },
+      5: { points: 500 },
+      10: { points: 1000 },
+      21: { points: 3000, title: '요한계시록 마스터' }
+    };
+    const reward = rewards[chapter];
+    if (!reward) return;
+    const claimed = this.currentUser.journeyRewardsClaimed || [];
+    if (claimed.includes(chapter)) return;
+    if (this.getCompletedChapterCount(this.currentUser) < chapter) {
+      alert('아직 완독 조건을 달성하지 않았습니다.');
+      return;
+    }
+    const notification = this.createNotification({
+      title: '성경여정 완료',
+      type: 'journey_complete',
+      message: reward.title
+        ? `성경여정 ${chapter}장 보상 +${reward.points}P 및 '${reward.title}' 칭호가 지급되었습니다.`
+        : `성경여정 ${chapter}장 완독 보상 +${reward.points}P가 지급되었습니다.`
+    });
+    const updateData = {
+      journeyRewardsClaimed: firebase.firestore.FieldValue.arrayUnion(chapter),
+      points: firebase.firestore.FieldValue.increment(reward.points),
+      faithXP: firebase.firestore.FieldValue.increment(reward.points),
+      notifications: firebase.firestore.FieldValue.arrayUnion(notification)
+    };
+    if (reward.title) {
+      updateData.title = reward.title;
+      updateData.badges = firebase.firestore.FieldValue.arrayUnion(reward.title);
+    }
+    await db.collection('users').doc(this.currentUser.id).update(updateData);
+    this.showPointsFloater(reward.points, '성경여정 보상');
+    this.showToast('성경여정 보상이 지급되었습니다.');
+  }
+
+  renderJourneyRanking() {
+    const rankList = document.getElementById('journeyRankingList');
+    if (!rankList) return;
+    let sourceUsers = [...this.users];
+    if (this.currentRankingTab === 'friends') {
+      const friendIds = this.getFriendIds();
+      sourceUsers = sourceUsers.filter(user => friendIds.includes(user.id) || user.id === this.currentUser.id);
+    }
+    const xpGetter = this.currentRankingTab === 'weekly'
+      ? (user) => this.getWeeklyFaithXp(user)
+      : (user) => this.getRankingXp(user);
+    const sortedUsers = sourceUsers
+      .sort((a, b) => xpGetter(b) - xpGetter(a))
+      .slice(0, 10);
+    if (sortedUsers.length === 0) {
+      rankList.innerHTML = '<div class="home-empty-state">아직 랭킹 데이터가 없습니다.</div>';
+      return;
+    }
+    rankList.innerHTML = sortedUsers.map((user, index) => `
+      <button class="app-list-item" onclick="app.openAllRankings()">
+        <div class="rank-badge ${index === 0 ? 'rank-1' : index === 1 ? 'rank-2' : index === 2 ? 'rank-3' : ''}">${index + 1}</div>
+        <div class="app-list-body">
+          <strong>${this.escapeHtml(user.username || user.name || '사용자')}</strong>
+          <span>${xpGetter(user).toLocaleString()} Faith XP · ${this.getUserTitle(user)}</span>
+        </div>
+        <span class="material-icons-round app-list-arrow">chevron_right</span>
+      </button>
+    `).join('');
+  }
+
+  setRankingTab(tabName) {
+    this.currentRankingTab = tabName;
+    document.querySelectorAll('.ranking-tab').forEach(tab => tab.classList.remove('active'));
+    const tabId = `rankTab${tabName.charAt(0).toUpperCase()}${tabName.slice(1)}`;
+    const target = document.getElementById(tabId);
+    if (target) target.classList.add('active');
+    this.renderJourneyRanking();
+  }
+
+  renderFriendsPanel() {
+    const list = document.getElementById('friendsList');
+    const feed = document.getElementById('friendActivityFeed');
+    if (!list || !feed) return;
+    const friends = this.getFriendUsers().slice(0, 8);
+    if (friends.length === 0) {
+      list.innerHTML = '<div class="home-empty-state">친구 목록이 없습니다.</div>';
+    } else {
+      list.innerHTML = friends.map(friend => {
+        const verse = this.getCurrentUserVerse(friend);
+        return `
+          <div class="friend-item">
+            <div class="friend-avatar ${this.isUserOnline(friend) ? 'online' : ''}">${this.escapeHtml((friend.name || 'U').charAt(0))}</div>
+            <div class="friend-details">
+              <span class="friend-name">${this.escapeHtml(friend.name || friend.username || '사용자')}</span>
+              <span class="friend-progress">현재 ${verse.chapter}장 암송중</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    const activities = this.getFriendActivities(friends).slice(0, 10);
+    if (activities.length === 0) {
+      feed.innerHTML = '<div class="home-empty-state">최근 친구 활동이 없습니다.</div>';
+    } else {
+      feed.innerHTML = activities.map(activity => `
+        <div class="activity-item">
+          <span class="material-icons-round activity-icon">${activity.icon}</span>
+          <div class="activity-content-col">
+            <div class="activity-text">${this.escapeHtml(activity.text)}</div>
+            <div class="activity-time">${this.escapeHtml(activity.time)}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+
+  getCompletedChapterCount(user) {
+    const bibleData = window.BIBLE_DATA || [];
+    const curIdx = user.currentVerseIndex || 0;
+    const completed = new Set();
+    bibleData.forEach((verse, index) => {
+      if (verse.chapter <= 21 && index < curIdx) completed.add(verse.chapter);
+    });
+    return completed.size;
+  }
+
+  getRankingXp(user) {
+    return Number(user.faithXP ?? user.faithXp ?? user.points ?? 0);
+  }
+
+  getWeeklyFaithXp(user) {
+    return Number(user.weeklyFaithXP ?? user.weeklyFaithXp ?? user.faithXPThisWeek ?? user.faithXpThisWeek ?? user.faithXP ?? user.faithXp ?? user.points ?? 0);
+  }
+
+  getUserTitle(user) {
+    if (user.title) return user.title;
+    if ((user.badges || []).includes('요한계시록 마스터') || this.getCompletedChapterCount(user) >= 21) return '요한계시록 마스터';
+    const xp = this.getRankingXp(user);
+    if (xp >= 12000) return '충성된 증인';
+    if (xp >= 7000) return '말씀지기';
+    if (xp >= 3000) return '서기관';
+    return '제사장';
+  }
+
+  getFriendIds() {
+    const friends = this.currentUser?.friends || this.currentUser?.friendIds || [];
+    return Array.isArray(friends) ? friends : [];
+  }
+
+  getFriendUsers() {
+    const friendIds = this.getFriendIds();
+    if (friendIds.length === 0) {
+      return this.users.filter(user => user.id !== this.currentUser?.id).slice(0, 5);
+    }
+    return this.users.filter(user => friendIds.includes(user.id));
+  }
+
+  getCurrentUserVerse(user) {
+    const bibleData = window.BIBLE_DATA || [];
+    return bibleData[user.currentVerseIndex || 0] || { chapter: 1, verse: 1 };
+  }
+
+  isUserOnline(user) {
+    const lastActive = Number(user.lastActiveAt || user.lastLoginAt || 0);
+    return Boolean(lastActive && Date.now() - lastActive < 1000 * 60 * 10);
+  }
+
+  getFriendActivities(friends) {
+    const result = [];
+    friends.forEach(friend => {
+      const history = Array.isArray(friend.pointsHistory) ? friend.pointsHistory.slice(-4) : [];
+      history.forEach(item => {
+        const type = item.type || '';
+        const icon = type === 'attendance' ? 'event_available' : type === 'event' ? 'campaign' : 'auto_stories';
+        const action = type === 'attendance' ? '출석 달성' : type === 'event' ? '이벤트 참여' : '장 완독';
+        result.push({
+          icon,
+          text: `${friend.name || friend.username || '친구'}님이 ${action}: ${item.title || ''}`,
+          time: item.date || '최근'
+        });
+      });
+    });
+    return result.reverse();
+  }
+
+  jumpToChapter(chapter) {
+    if (!window.BIBLE_DATA) return;
+    const idx = window.BIBLE_DATA.findIndex(v => v.chapter === chapter);
+    if (idx < 0) return;
+    if ((this.currentUser.currentVerseIndex || 0) < idx) {
+      alert('아직 도달하지 않은 장입니다.');
+      return;
+    }
+    this.currentUser.currentVerseIndex = idx;
+    this.switchView('dashboard');
+    this.renderDashboard();
+  }
+
+  getNoticeItems() {
+    const noticeEvents = (this.activeEvents || [])
+      .filter(evt => this._eventTargetsCurrentUser(evt))
+      .filter(evt => evt.eventType === 'notice' || evt.category === 'notice')
+      .map(evt => ({
+        id: evt.id,
+        title: evt.title || '공지사항',
+        body: evt.description || '',
+        date: evt.startDate || evt.createdAt || '진행 중'
+      }));
+
+    if (noticeEvents.length > 0) return noticeEvents;
+
+    return [
+      {
+        id: 'default-attendance',
+        title: '출석체크는 오늘의 말씀 상단에서 진행할 수 있습니다.',
+        body: '매일 앱에 접속하면 홈 상단에서 출석 상태와 다음 보상까지 남은 일수를 확인할 수 있습니다.',
+        date: '상시'
+      },
+      {
+        id: 'default-points',
+        title: '암송 챌린지 포인트 기준이 적용되었습니다.',
+        body: '쉬움 100P, 보통 200P, 어려움 300P, 마스터 500P 기준으로 운영됩니다.',
+        date: '운영 안내'
+      },
+      {
+        id: 'default-exam',
+        title: '사명자 시험은 관리자 이벤트 등록 시 홈에 노출됩니다.',
+        body: '관리자가 사명자 시험 이벤트를 활성화하면 오늘의 말씀 홈과 이벤트 탭에서 응시할 수 있습니다.',
+        date: '운영 안내'
+      }
+    ];
+  }
+
+  openEventFromHome(eventId) {
+    const eventItem = (this.activeEvents || []).find(evt => evt.id === eventId);
+    if (!eventItem) return;
+    this.currentEvent = eventItem;
+    this.currentEventDetail = eventItem;
+    this.switchView('eventDetail');
+  }
+
+  renderEventDetailView() {
+    const container = document.getElementById('eventDetailContent');
+    if (!container) return;
+    const eventItem = this.currentEventDetail || this.currentEvent || (this.activeEvents || [])[0];
+    if (!eventItem) {
+      container.innerHTML = '<div class="home-empty-state">이벤트 정보를 찾을 수 없습니다.</div>';
+      return;
+    }
+    this.currentEventDetail = eventItem;
+    this.currentEvent = eventItem;
+    const status = this.getEventParticipationStatus(eventItem);
+    const typeLabel = this.getEventTypeLabel(eventItem);
+    const targetLabel = this.getEventTargetLabel(eventItem);
+    const buttonLabel = status === 'completed' ? '결과 보기' : status === 'in_progress' ? '이어하기' : '정보 입력 후 시험 시작하기';
+    const bannerUrl = this.getEventBannerUrl(eventItem);
+    const imageHtml = bannerUrl
+      ? `<div class="event-detail-banner"><img src="${this.escapeHtml(bannerUrl)}" alt="이벤트 배너"></div>`
+      : `<div class="event-detail-banner no-image"><span class="material-icons-round">${this.getEventIcon(eventItem)}</span></div>`;
+    container.innerHTML = `
+      ${imageHtml}
+      <div class="event-detail-card glass-panel">
+        <div class="event-detail-head">
+          <div>
+            <p class="home-section-eyebrow">${typeLabel}</p>
+            <h2>${this.escapeHtml(eventItem.title || typeLabel)}</h2>
+          </div>
+          <span class="event-status-badge ${status}">${this.getEventStatusLabel(status)}</span>
+        </div>
+        <div class="event-detail-info-row">
+          <span>기간: ${this.escapeHtml(eventItem.startDate || '-')} ~ ${this.escapeHtml(eventItem.endDate || '-')}</span>
+          <span>대상: ${this.escapeHtml(targetLabel)}</span>
+        </div>
+        <div class="event-detail-section">
+          <h3>이벤트 안내</h3>
+          <div class="event-detail-content">${this.escapeHtml(eventItem.description || '이벤트 안내가 등록되지 않았습니다.')}</div>
+          <ul class="event-guide-list">
+            <li>목적: ${this.escapeHtml(eventItem.purpose || '대상자 참여 및 학습 점검')}</li>
+            <li>참여 방법: 정보를 입력한 후 시작 버튼을 눌러 진행합니다.</li>
+            <li>유의사항: 입력된 정보는 결과 및 관리자 확인용으로 저장됩니다.</li>
+            <li>지급 보상: +${Number(eventItem.rewardPoints || eventItem.examMaxPoints || 500).toLocaleString()}P</li>
+            <li>합격 시 특별 칭호 지급 가능</li>
+          </ul>
+        </div>
+        <div class="examinee-info-section">
+          <h3>응시자 정보 입력</h3>
+          <p>시험 시작 전 필수 입력 항목입니다.</p>
+          <div class="event-form-grid">
+            <div class="form-group" style="margin:0;">
+              <label for="eventDetailRegion">지역 (필수)</label>
+              <input type="text" id="eventDetailRegion" class="input-field" placeholder="예: 서울 강남교회" value="${this.escapeHtml(this.currentUser?.examRegion || '')}">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label for="eventDetailName">이름 (필수)</label>
+              <input type="text" id="eventDetailName" class="input-field" placeholder="예: 홍길동" value="${this.escapeHtml(this.currentUser?.examApplicantName || this.currentUser?.name || '')}">
+            </div>
+          </div>
+        </div>
+        <button class="btn-primary event-detail-start-btn" onclick="app.startEventFromDetail()">${buttonLabel}</button>
+      </div>
+    `;
+  }
+
+  getEventParticipationStatus(eventItem) {
+    const key = `simon_event_status_${eventItem.id}_${this.currentUser?.id || 'guest'}`;
+    return localStorage.getItem(key) || 'available';
+  }
+
+  setEventParticipationStatus(eventItem, status) {
+    const key = `simon_event_status_${eventItem.id}_${this.currentUser?.id || 'guest'}`;
+    localStorage.setItem(key, status);
+  }
+
+  getEventStatusLabel(status) {
+    if (status === 'completed') return '완료';
+    if (status === 'in_progress') return '진행 중';
+    return '참여 가능';
+  }
+
+  getEventTargetLabel(eventItem) {
+    const groups = Array.isArray(eventItem.targetGroups)
+      ? eventItem.targetGroups
+      : (Array.isArray(eventItem.targetRoles) ? eventItem.targetRoles : []);
+    const users = Array.isArray(eventItem.targetUsers) ? eventItem.targetUsers : [];
+    if (users.length > 0) return `특정 회원 ${users.length}명`;
+    if (groups.length === 0) return '전체';
+    const roleLabels = {
+      user: '일반',
+      zone_leader: '구역장',
+      team_leader: '팀장',
+      department_head: '임과장',
+      admin: '관리자',
+      missionary: '사명자'
+    };
+    return groups.map(role => roleLabels[role] || role).join(', ');
+  }
+
+  getEventBannerUrl(eventItem) {
+    if (!eventItem) return '';
+    if (typeof eventItem.homeBanner === 'string') return eventItem.homeBanner;
+    return eventItem.imageUrl || eventItem.bannerUrl || '';
+  }
+
+  async startEventFromDetail() {
+    if (!this.currentUser || !this.currentEventDetail) return;
+    const regionInput = document.getElementById('eventDetailRegion');
+    const nameInput = document.getElementById('eventDetailName');
+    const region = regionInput ? regionInput.value.trim() : '';
+    const name = nameInput ? nameInput.value.trim() : '';
+    if (!region || !name) {
+      alert('지역과 이름을 모두 입력해 주세요.');
+      return;
+    }
+    this.currentEvent = this.currentEventDetail;
+    this.currentUser.examRegion = region;
+    this.currentUser.examApplicantName = name;
+    this.setEventParticipationStatus(this.currentEventDetail, 'in_progress');
+    try {
+      await db.collection('event_participants').doc(`${this.currentEventDetail.id}_${this.currentUser.id}`).set({
+        eventId: this.currentEventDetail.id,
+        eventTitle: this.currentEventDetail.title || '',
+        userId: this.currentUser.id,
+        username: this.currentUser.username || '',
+        name,
+        region,
+        startedAt: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+        status: 'in_progress'
+      }, { merge: true });
+    } catch (err) {
+      console.error('Event participant save error:', err);
+    }
+    if (this.currentEventDetail.eventType === 'mission_exam') {
+      this.switchView('exam');
+      setTimeout(() => {
+        const regionEl = document.getElementById('examInlineRegion');
+        const nameEl = document.getElementById('examInlineName');
+        if (regionEl) regionEl.value = region;
+        if (nameEl) nameEl.value = name;
+      }, 80);
+      return;
+    }
+    if (this.currentEventDetail.eventType === 'special_challenge') {
+      this.startChallenge();
+      return;
+    }
+    this.startEventQuiz();
+  }
+
+  openNotice(noticeId) {
+    const notice = this.getNoticeItems().find(item => item.id === noticeId);
+    if (!notice) return;
+    alert(`${notice.title}\n\n${notice.body || ''}`);
+  }
+
+  escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   renderChallengeCard() {
@@ -1617,12 +2300,12 @@ class SimonEduApp {
     list.innerHTML = '';
 
     // Sort all users by points descending
-    const sortedUsers = [...this.users].sort((a, b) => b.points - a.points);
+    const sortedUsers = [...this.users].sort((a, b) => this.getRankingXp(b) - this.getRankingXp(a));
     
     // Compute joint ranks (standard competition ranking: 1-2-2-4)
     let currentRank = 1;
     for (let i = 0; i < sortedUsers.length; i++) {
-      if (i > 0 && sortedUsers[i].points < sortedUsers[i - 1].points) {
+      if (i > 0 && this.getRankingXp(sortedUsers[i]) < this.getRankingXp(sortedUsers[i - 1])) {
         currentRank = i + 1;
       }
       sortedUsers[i].rank = currentRank;
@@ -1680,8 +2363,8 @@ class SimonEduApp {
         item.innerHTML = `
           <div class="${rankBadgeClass}">${rank}</div>
           <div class="leaderboard-avatar">${user.name.charAt(0)}</div>
-          <div class="leaderboard-name">${user.name} ${isMe ? '<span style="color:#d8b4fe; font-size:0.75rem;">(나)</span>' : ''}</div>
-          <div class="leaderboard-points">${user.points.toLocaleString()} P</div>
+          <div class="leaderboard-name">${user.username || user.name} ${isMe ? '<span style="color:#d8b4fe; font-size:0.75rem;">(나)</span>' : ''}<span class="rank-item-badge">${this.getUserTitle(user)}</span></div>
+          <div class="leaderboard-points">${this.getRankingXp(user).toLocaleString()} Faith XP</div>
           ${!isMe && !this.hideBattleMode ? `
           <button class="btn-mini" onclick="app.requestOneOnOneBattle('${user.id}', '${user.name}')" style="margin-left: 0.75rem;" title="1대1 대결 신청">
             ⚔️
@@ -1718,12 +2401,12 @@ class SimonEduApp {
     list.innerHTML = '';
 
     // Sort all users by points descending
-    const sortedUsers = [...this.users].sort((a, b) => b.points - a.points);
+    const sortedUsers = [...this.users].sort((a, b) => this.getRankingXp(b) - this.getRankingXp(a));
     
     // Compute joint ranks
     let currentRank = 1;
     for (let i = 0; i < sortedUsers.length; i++) {
-      if (i > 0 && sortedUsers[i].points < sortedUsers[i - 1].points) {
+      if (i > 0 && this.getRankingXp(sortedUsers[i]) < this.getRankingXp(sortedUsers[i - 1])) {
         currentRank = i + 1;
       }
       sortedUsers[i].rank = currentRank;
@@ -1748,7 +2431,7 @@ class SimonEduApp {
         const popupMyPctText = document.getElementById('popupMyPctText');
 
         if (popupMyRankText) popupMyRankText.textContent = `${myRank} 위`;
-        if (popupMyPointsText) popupMyPointsText.textContent = `${myUser.points.toLocaleString()} P`;
+        if (popupMyPointsText) popupMyPointsText.textContent = `${this.getRankingXp(myUser).toLocaleString()} Faith XP`;
         if (popupMyPctText) popupMyPctText.textContent = `전체 중 상위 ${rankPercentage}%`;
       }
     }
@@ -1780,8 +2463,8 @@ class SimonEduApp {
       item.innerHTML = `
         <div class="${rankBadgeClass}">${rank}</div>
         <div class="all-ranking-avatar">${user.name.charAt(0)}</div>
-        <div class="all-ranking-name">${user.name} ${isMe ? '<span style="color:var(--text-muted); font-size:0.75rem; font-weight:normal;">(나)</span>' : ''}</div>
-        <div class="all-ranking-points">${user.points.toLocaleString()} P</div>
+        <div class="all-ranking-name">${user.username || user.name} ${isMe ? '<span style="color:var(--text-muted); font-size:0.75rem; font-weight:normal;">(나)</span>' : ''}<span class="rank-item-badge">${this.getUserTitle(user)}</span></div>
+        <div class="all-ranking-points">${this.getRankingXp(user).toLocaleString()} Faith XP</div>
         ${!isMe && !this.hideBattleMode ? `
         <button class="btn-mini" onclick="app.requestOneOnOneBattle('${user.id}', '${user.name}')" style="margin-left: 0.75rem;" title="1대1 대결 신청">
           ⚔️
@@ -1811,12 +2494,11 @@ class SimonEduApp {
 
   // 6. Points system
   addPoints(userId, amount) {
-    const newNotification = {
-      id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-      message: `🎁 관리자 보너스 +${amount}P`,
-      timestamp: Date.now(),
-      read: false
-    };
+    const newNotification = this.createNotification({
+      title: '포인트 지급',
+      type: 'points',
+      message: `🎁 관리자 보너스 +${amount}P`
+    });
     const adminHistory = {
       id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       type: 'admin',
@@ -1826,19 +2508,28 @@ class SimonEduApp {
     };
     db.collection('users').doc(userId).update({
       points: firebase.firestore.FieldValue.increment(amount),
+      faithXP: firebase.firestore.FieldValue.increment(amount),
       notifications: firebase.firestore.FieldValue.arrayUnion(newNotification),
       pointsHistory: firebase.firestore.FieldValue.arrayUnion(adminHistory)
+    }).then(() => {
+      db.collection('notifications').add({
+        userId,
+        title: newNotification.title,
+        message: newNotification.message,
+        type: newNotification.type,
+        isRead: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(err => console.error("Error adding notification document:", err));
     }).catch(err => console.error("Error adding points:", err));
   }
 
   addNotification(message) {
     if (!this.currentUser) return;
-    const newNotification = {
-      id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-      message: message,
-      timestamp: Date.now(),
-      read: false
-    };
+    const newNotification = this.createNotification({
+      title: '알림',
+      type: 'notice',
+      message
+    });
     if (this.currentUser.isTrial) {
       if (!this.currentUser.notifications) this.currentUser.notifications = [];
       this.currentUser.notifications.push(newNotification);
@@ -1847,6 +2538,15 @@ class SimonEduApp {
     }
     db.collection('users').doc(this.currentUser.id).update({
       notifications: firebase.firestore.FieldValue.arrayUnion(newNotification)
+    }).then(() => {
+      db.collection('notifications').add({
+        userId: this.currentUser.id,
+        title: newNotification.title,
+        message: newNotification.message,
+        type: newNotification.type,
+        isRead: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(err => console.error("Error adding notification document:", err));
     }).catch(err => console.error("Error adding notification:", err));
   }
 
@@ -1870,15 +2570,26 @@ class SimonEduApp {
 
   _eventTargetsCurrentUser(eventItem) {
     if (!eventItem || !this.currentUser || this.currentUser.isTrial) return false;
-    const targetRoles = Array.isArray(eventItem.targetRoles) ? eventItem.targetRoles : [];
-    if (targetRoles.length === 0) return true;
-    return targetRoles.includes(this.currentUser.role || 'user');
+    const targetUsers = Array.isArray(eventItem.targetUsers) ? eventItem.targetUsers : [];
+    if (targetUsers.length > 0) {
+      return targetUsers.includes(this.currentUser.id) ||
+        targetUsers.includes(this.currentUser.username) ||
+        targetUsers.includes(this.currentUser.email);
+    }
+    const targetGroups = Array.isArray(eventItem.targetGroups)
+      ? eventItem.targetGroups
+      : (Array.isArray(eventItem.targetRoles) ? eventItem.targetRoles : []);
+    if (targetGroups.length === 0) return true;
+    return targetGroups.includes(this.currentUser.role || 'user');
   }
 
   maybeShowEventAnnouncement() {
     if (!this.currentUser || this.currentUser.isTrial || !Array.isArray(this.activeEvents)) return;
     const eventItem = this.activeEvents.find(evt => {
       if (!this._eventTargetsCurrentUser(evt)) return false;
+      if (evt.popup !== true && evt.popup !== undefined) return false;
+      const todayHideKey = `simon_event_hide_today_${evt.id}_${this.getRelativeDateStr(0)}`;
+      if (localStorage.getItem(todayHideKey) === '1') return false;
       return localStorage.getItem(`simon_event_seen_${evt.id}`) !== '1';
     });
     if (!eventItem) return;
@@ -1898,8 +2609,9 @@ class SimonEduApp {
     if (pointsEl) pointsEl.textContent = eventItem.rewardPoints || 0;
     if (endEl) endEl.textContent = eventItem.endDate || '-';
     if (imageContainer && imageEl) {
-      if (eventItem.imageUrl) {
-        imageEl.src = eventItem.imageUrl;
+      const bannerUrl = this.getEventBannerUrl(eventItem);
+      if (bannerUrl) {
+        imageEl.src = bannerUrl;
         imageContainer.style.display = 'block';
       } else {
         imageContainer.style.display = 'none';
@@ -1912,11 +2624,14 @@ class SimonEduApp {
   clickEventAnnounceJoin() {
     if (!this.currentEvent) return;
     this.closeModal('modalEventAnnouncement');
-    const nameInput = document.getElementById('eventJoinName');
-    const regionInput = document.getElementById('eventJoinRegion');
-    if (nameInput && this.currentUser?.name) nameInput.value = this.currentUser.name;
-    if (regionInput) regionInput.value = '';
-    this.openModal('modalEventJoin');
+    this.currentEventDetail = this.currentEvent;
+    this.switchView('eventDetail');
+  }
+
+  hideCurrentEventForToday() {
+    if (!this.currentEvent) return;
+    localStorage.setItem(`simon_event_hide_today_${this.currentEvent.id}_${this.getRelativeDateStr(0)}`, '1');
+    this.closeModal('modalEventAnnouncement');
   }
 
   async submitEventJoinForm() {
@@ -2048,6 +2763,7 @@ class SimonEduApp {
         completedAt: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
         status: 'completed'
       }, { merge: true });
+      this.setEventParticipationStatus(this.currentEvent, 'completed');
 
       const history = {
         id: 'hist_event_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
@@ -2058,6 +2774,7 @@ class SimonEduApp {
       };
       await db.collection('users').doc(this.currentUser.id).update({
         points: firebase.firestore.FieldValue.increment(reward),
+      faithXP: firebase.firestore.FieldValue.increment(reward),
         pointsHistory: firebase.firestore.FieldValue.arrayUnion(history)
       });
       this.currentUser.points = (this.currentUser.points || 0) + reward;
@@ -2100,7 +2817,7 @@ class SimonEduApp {
     if (!this.currentUser) return;
     
     const notifications = this.currentUser.notifications || [];
-    const updatedNotifications = notifications.map(n => ({ ...n, read: true }));
+    const updatedNotifications = notifications.map(n => ({ ...n, read: true, isRead: true }));
     
     if (this.currentUser.isTrial) {
       this.currentUser.notifications = updatedNotifications;
@@ -2121,7 +2838,7 @@ class SimonEduApp {
     const notifications = this.currentUser.notifications || [];
     const sortedNotifs = [...notifications].sort((a, b) => b.timestamp - a.timestamp);
     
-    const unreadCount = sortedNotifs.filter(n => !n.read).length;
+    const unreadCount = sortedNotifs.filter(n => !(n.isRead ?? n.read)).length;
     const badge = document.getElementById('notificationBadge');
     if (badge) {
       if (unreadCount > 0) {
@@ -2143,11 +2860,12 @@ class SimonEduApp {
     list.innerHTML = '';
     sortedNotifs.forEach(n => {
       const item = document.createElement('div');
-      item.className = `notification-item ${n.read ? 'read' : 'unread'}`;
+      const isRead = Boolean(n.isRead ?? n.read);
+      item.className = `notification-item ${isRead ? 'read' : 'unread'}`;
       
       const timeStr = this.formatRelativeTime(n.timestamp);
       
-      if (n.type === 'battle_invite' && !n.read) {
+      if (n.type === 'battle_invite' && !isRead) {
         item.innerHTML = `
           <div class="notification-content" style="display: flex; flex-direction: column; gap: 0.5rem; text-align: left;">
             <span>${n.message}</span>
@@ -2158,7 +2876,7 @@ class SimonEduApp {
           </div>
           <div class="notification-time">${timeStr}</div>
         `;
-      } else if (n.type === 'battle_accepted' && !n.read) {
+      } else if (n.type === 'battle_accepted' && !isRead) {
         // 신청자에게 수락 알림 + 즉시 시작 버튼
         item.innerHTML = `
           <div class="notification-content" style="display: flex; flex-direction: column; gap: 0.5rem; text-align: left;">
@@ -2295,12 +3013,11 @@ class SimonEduApp {
     const notifMsg = gotBonus 
       ? `📅 ${consecutiveCheckIns}일 연속 출석 보너스! +${pointsAwarded}P`
       : `📅 일일 출석 완료! +${pointsAwarded}P`;
-    const newNotification = {
-      id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-      message: notifMsg,
-      timestamp: Date.now(),
-      read: false
-    };
+    const newNotification = this.createNotification({
+      title: gotBonus ? '출석 보상' : '출석체크',
+      type: 'attendance',
+      message: notifMsg
+    });
 
     const attendanceHistory = {
       id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
@@ -2315,6 +3032,7 @@ class SimonEduApp {
       consecutiveCheckIns: consecutiveCheckIns,
       checkInHistory: firebase.firestore.FieldValue.arrayUnion(todayStr),
       points: firebase.firestore.FieldValue.increment(pointsAwarded),
+      faithXP: firebase.firestore.FieldValue.increment(pointsAwarded),
       notifications: firebase.firestore.FieldValue.arrayUnion(newNotification),
       pointsHistory: firebase.firestore.FieldValue.arrayUnion(attendanceHistory)
     }).then(() => {
@@ -2467,10 +3185,13 @@ class SimonEduApp {
     
     this.gameActive = true;
     this.gameHearts = 3;
-    this.gameTimeRemaining = 60;
+    this._quizDurationSeconds = this.currentDifficulty === 'master' ? 300 : 60;
+    this.gameTimeRemaining = this._quizDurationSeconds;
     this.currentQuizBlanks = [];
     this.isCustomQuestionStage = false;
     this._quizElapsedSeconds = 0; // 시간 차감용
+    this._submitConfirmed = false;
+    this._quizStartedAt = Date.now();
 
     // Reset button states
     const btnSubmit = document.getElementById('btnSubmitQuiz');
@@ -2537,7 +3258,22 @@ class SimonEduApp {
     const text = verse.text || '';
     let quizHtml = '';
 
-    if (useWordMode) {
+    if (Array.isArray(verse.choices) && verse.choices.length > 0) {
+      this.currentQuizBlanks = [{ id: 'choice', answer: verse.answer || verse.correctAnswer || verse.text }];
+      quizHtml = `
+        <div class="choice-question-wrap">
+          <div class="choice-question-text">${this.escapeHtml(verse.question || `요한계시록 ${verse.chapter}장 ${verse.verse}절에 맞는 말씀을 선택하세요.`)}</div>
+          <div class="choice-options">
+            ${verse.choices.map((choice, index) => `
+              <label class="choice-option">
+                <input type="radio" name="choiceAnswer" value="${this.escapeHtml(choice)}">
+                <span>${index + 1}. ${this.escapeHtml(choice)}</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    } else if (useWordMode) {
       // 어절 단위 빈칸
       const result = this._buildWordBlanks(text, blankRatio);
       quizHtml = result.html;
@@ -2587,9 +3323,28 @@ class SimonEduApp {
       }
     }, 1000);
 
+    this.renderQuizProgressMeta();
+
     // 첫 번째 빈칸 포커스
     const firstInput = document.getElementById('blank_0');
     if (firstInput) firstInput.focus();
+  }
+
+  renderQuizProgressMeta() {
+    const titleEl = document.getElementById('gameVerseTitle');
+    if (!titleEl || !this.currentQuizVerse) return;
+    if (this.isExamMode && this.examQuestions.length) {
+      titleEl.textContent = `${this.currentExamQuestionIndex + 1} / ${this.examQuestions.length} 문제`;
+      return;
+    }
+    if (this.challengeActive) {
+      const total = this._getChallengeVersesFromSettings().length || 1;
+      titleEl.textContent = `1 / ${total} 문제 · 스페셜 암송 챌린지`;
+      return;
+    }
+    const bibleData = window.BIBLE_DATA || [];
+    const current = Math.min((this.currentUser?.currentVerseIndex || 0) + 1, bibleData.length || 1);
+    titleEl.textContent = `${current} / ${bibleData.length || 1} 문제 · 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절`;
   }
 
   renderHearts() {
@@ -2629,7 +3384,7 @@ class SimonEduApp {
   }
 
   // Answer Checker
-  submitQuiz() {
+  submitQuiz(skipConfirm = false) {
     if (!this.gameActive) return;
 
     if (this.isCustomQuestionStage) {
@@ -2637,10 +3392,23 @@ class SimonEduApp {
       return;
     }
 
+    if (!skipConfirm && !this._submitConfirmed) {
+      this.openModal('modalSubmitConfirm');
+      return;
+    }
+    this._submitConfirmed = false;
+
     let allCorrect = true;
     let firstWrongInput = null;
 
     this.currentQuizBlanks.forEach(item => {
+      if (item.id === 'choice') {
+        const selected = document.querySelector('input[name="choiceAnswer"]:checked');
+        const userVal = selected ? selected.value.trim().replace(/\s+/g, '') : '';
+        const correctVal = item.answer.replace(/\s+/g, '');
+        allCorrect = userVal === correctVal;
+        return;
+      }
       const input = document.getElementById(`blank_${item.id}`);
       if (!input) return;
 
@@ -2682,6 +3450,12 @@ class SimonEduApp {
         alert(`오답이 있습니다! 기회가 ${this.gameHearts}번 남았습니다.`);
       }
     }
+  }
+
+  confirmSubmitQuiz() {
+    this.closeModal('modalSubmitConfirm');
+    this._submitConfirmed = true;
+    this.submitQuiz(true);
   }
 
   startCustomQuestionStage() {
@@ -2779,7 +3553,7 @@ class SimonEduApp {
       this.gameActive = false;
       this.playConfetti('quiz');
       this.battleCorrectAnswersCount++;
-      const timeSpentOnVerse = 60 - this.gameTimeRemaining;
+      const timeSpentOnVerse = (this._quizDurationSeconds || 60) - this.gameTimeRemaining;
       this.battleTotalTimeSpent += timeSpentOnVerse;
       this.showToast(`📖 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 성공!`);
       setTimeout(() => {
@@ -2838,12 +3612,11 @@ class SimonEduApp {
     const nextVerseIndex = this.challengeActive ? this.currentUser.currentVerseIndex : (this.currentUser.currentVerseIndex + 1);
 
     const totalEarned = totalAward + (checkInResult ? checkInResult.pointsAwarded : 0);
-    const newNotification = {
-      id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-      message: `📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 성공! +${totalEarned}P 적립`,
-      timestamp: Date.now(),
-      read: false
-    };
+    const newNotification = this.createNotification({
+      title: '포인트 지급',
+      type: 'points',
+      message: `📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 성공! +${totalEarned}P 적립`
+    });
 
     const quizHistory = {
       id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
@@ -2855,6 +3628,7 @@ class SimonEduApp {
 
     let updateData = {
       points: firebase.firestore.FieldValue.increment(totalAward),
+      faithXP: firebase.firestore.FieldValue.increment(totalAward),
       lastMissionDate: todayStr,
       currentVerseIndex: nextVerseIndex,
       notifications: firebase.firestore.FieldValue.arrayUnion(newNotification),
@@ -2885,6 +3659,7 @@ class SimonEduApp {
         challengeBonusPointsValue = this.globalSettings.challengeBonusPoints || 50;
         
         updateData.points = firebase.firestore.FieldValue.increment(totalAward + challengeBonusPointsValue);
+        updateData.faithXP = firebase.firestore.FieldValue.increment(totalAward + challengeBonusPointsValue);
         
         const challengeBonusHistory = {
           id: 'hist_' + (Date.now() + 2) + '_' + Math.random().toString(36).substr(2, 5),
@@ -2893,12 +3668,11 @@ class SimonEduApp {
           amount: challengeBonusPointsValue,
           date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
         };
-        const challengeBonusNotification = {
-          id: 'notif_' + (Date.now() + 2) + '_' + Math.random().toString(36).substr(2, 9),
-          message: `🔥 ${challengeRangeLabel} 챌린지 올클리어! 보너스 +${challengeBonusPointsValue}P 적립`,
-          timestamp: Date.now(),
-          read: false
-        };
+        const challengeBonusNotification = this.createNotification({
+          title: '성경여정 완료',
+          type: 'journey_complete',
+          message: `🔥 ${challengeRangeLabel} 챌린지 올클리어! 보너스 +${challengeBonusPointsValue}P 적립`
+        });
         updateData.pointsHistory = firebase.firestore.FieldValue.arrayUnion(quizHistory, challengeBonusHistory);
         updateData.notifications = firebase.firestore.FieldValue.arrayUnion(newNotification, challengeBonusNotification);
       }
@@ -2911,8 +3685,10 @@ class SimonEduApp {
       // Adjust points to prevent double increments if challenge complete also adjusted it
       if (isChallengeCompletedThisTurn) {
         updateData.points = firebase.firestore.FieldValue.increment(totalEarned + challengeBonusPointsValue);
+        updateData.faithXP = firebase.firestore.FieldValue.increment(totalEarned + challengeBonusPointsValue);
       } else {
         updateData.points = firebase.firestore.FieldValue.increment(totalEarned);
+        updateData.faithXP = firebase.firestore.FieldValue.increment(totalEarned);
       }
       
       const checkInHistoryObj = {
@@ -5224,7 +6000,19 @@ window.handleDeepLink = function(urlOrPath) {
     }
   } else if (path === 'attendance') {
     if (window.app.currentUser) {
-      window.app.switchView('attendance');
+      window.app.switchView('dashboard');
+    } else {
+      window.app.switchView('auth');
+    }
+  } else if (path === 'events' || path === 'event' || path === 'notices') {
+    if (window.app.currentUser) {
+      window.app.switchView('events');
+    } else {
+      window.app.switchView('auth');
+    }
+  } else if (path === 'journey') {
+    if (window.app.currentUser) {
+      window.app.switchView('journey');
     } else {
       window.app.switchView('auth');
     }

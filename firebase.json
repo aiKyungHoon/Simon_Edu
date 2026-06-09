@@ -23,9 +23,29 @@
       "ignore": [
         "firebase.json",
         "**/.*",
+        ".git/**",
+        ".firebase/**",
+        ".npm-cache/**",
         "**/node_modules/**",
+        "node_modules/**",
         "simon_edu_admin/**",
-        "simon_edu_app/**"
+        "simon_edu_app/**",
+        "functions/**",
+        "serviceAccountKey.json",
+        "Simon_Edu.jks",
+        "package.json",
+        "package-lock.json",
+        "firebase-debug.log",
+        "firestore-debug.log",
+        "storage.rules",
+        "firestore.rules",
+        "*.js.map",
+        "test_*.js",
+        "scratch_*.js",
+        "check_*.js",
+        "list_*.js",
+        "local_push_listener.js",
+        "README.md"
       ],
       "headers": [
         {

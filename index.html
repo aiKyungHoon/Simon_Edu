@@ -8,7 +8,7 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.5.2">
+  <link rel="stylesheet" href="style.css?v=1.5.8">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
@@ -16,8 +16,8 @@
     (function() {
       const params = new URLSearchParams(window.location.search);
       const IS_APP_WEBVIEW = params.get('platform') === 'app';
-      const WEB_VER = '1.5.5';
-      const APP_WEB_VER = '1.5.1';
+      const WEB_VER = '1.5.8';
+      const APP_WEB_VER = '1.5.3';
       const VERSION_KEY = IS_APP_WEBVIEW ? 'simon_app_web_version' : 'simon_web_version';
       const ACTIVE_VER = IS_APP_WEBVIEW ? APP_WEB_VER : WEB_VER;
       window.SIMON_CLIENT_TYPE = IS_APP_WEBVIEW ? 'app' : 'web';
@@ -214,6 +214,29 @@
       <div class="dashboard-grid-left">
         <div id="dashboardView" class="view-container">
       <div class="dashboard-single-container">
+        <section class="home-section-header">
+          <div>
+            <p class="home-section-eyebrow">TODAY</p>
+            <h1>오늘의 말씀</h1>
+          </div>
+          <button class="btn-home-icon" onclick="app.toggleNotifications(event)" title="알림">
+            <span class="material-icons-round">notifications</span>
+          </button>
+        </section>
+
+        <div id="homeAttendanceCard" class="attendance-mini-card">
+          <div class="attendance-mini-left">
+            <div class="attendance-mini-status" id="homeAttendanceStatus">
+              <span class="material-icons-round">event_available</span>
+              오늘 출석 전
+            </div>
+            <div class="attendance-mini-streak" id="homeAttendanceStreak">연속 출석 0일 · 다음 보상까지 5일</div>
+          </div>
+          <button class="btn-attendance-mini" id="btnHomeAttendance" onclick="app.checkIn()">
+            출석 보상 받기
+          </button>
+        </div>
+
         <!-- 사명자 시험 바로가기 카드 -->
         <div id="examShortcutCard" class="dashboard-card glass-panel" style="display: none; background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(16, 185, 129, 0.12)); border: 1px solid rgba(59, 130, 246, 0.25); margin-bottom: 1.5rem; position: relative; overflow: hidden; padding: 1.5rem;">
           <div style="position: absolute; right: -15px; top: -15px; font-size: 5rem; opacity: 0.08; transform: rotate(15deg); pointer-events: none; color: var(--accent-blue);" class="material-icons-round">assignment</div>
@@ -293,7 +316,7 @@
               <h3 id="currentVerseTitle">요한계시록 1장 1절</h3>
               <p id="currentVersePreview">"이 일 후에 내가 네 천사가 땅 네 모퉁이에 선 것을 보니..."</p>
               <div class="mission-action-group" style="display: flex; flex-direction: column; gap: 1rem; align-items: flex-start; width: 100%;">
-                <button class="btn-start-mission" onclick="app.startMission()">
+                <button class="btn-start-mission" id="btnDailyMissionStart" onclick="app.startMission()">
                   암송 챌린지 시작
                   <span class="material-icons-round">play_arrow</span>
                 </button>
@@ -315,6 +338,26 @@
             </div>
           </div>
         </div>
+
+        <section class="event-banners-section">
+          <div class="home-widget-title">
+            <span>이벤트</span>
+            <button onclick="app.switchView('events')">전체보기</button>
+          </div>
+          <div id="homeEventBanners" class="event-banner-list">
+            <div class="home-empty-state">진행 중인 이벤트가 없습니다.</div>
+          </div>
+        </section>
+
+        <section class="notice-section">
+          <div class="home-widget-title">
+            <span>공지사항</span>
+            <button onclick="app.switchView('events')">전체보기</button>
+          </div>
+          <div id="homeNoticeList" class="notice-list-compact">
+            <div class="home-empty-state">등록된 공지사항이 없습니다.</div>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -401,6 +444,82 @@
     </div>
       </div>
       <div class="dashboard-grid-right">
+        <!-- 3.25. Events & Notices View -->
+        <div id="eventsView" class="view-container">
+          <div class="dashboard-single-container">
+            <div class="dashboard-card glass-panel app-list-page-card">
+              <div class="card-title">
+                <span class="material-icons-round" style="color: var(--accent-purple);">campaign</span>
+                이벤트
+              </div>
+              <div id="eventsPageList" class="app-card-list"></div>
+            </div>
+            <div class="dashboard-card glass-panel app-list-page-card">
+              <div class="card-title">
+                <span class="material-icons-round" style="color: var(--accent-amber);">notifications_active</span>
+                공지사항
+              </div>
+              <div id="noticesPageList" class="app-card-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3.255. Event Detail View -->
+        <div id="eventDetailView" class="view-container">
+          <div class="event-detail-wrapper" id="eventDetailContent">
+            <!-- Rendered by app.renderEventDetailView() -->
+          </div>
+        </div>
+
+        <!-- 3.26. Bible Journey View -->
+        <div id="journeyView" class="view-container">
+          <div class="dashboard-single-container">
+            <div class="journey-header-card">
+              <p class="home-section-eyebrow">BIBLE JOURNEY</p>
+              <h2>성경여정</h2>
+              <p id="journeyProgressText">요한계시록 전체 여정을 준비 중입니다.</p>
+              <div class="journey-progress-stats">
+                <strong id="journeyChapterCount">0 / 21장</strong>
+                <span id="journeyProgressPercent">진행률 0%</span>
+              </div>
+              <div class="journey-progress-track">
+                <div class="journey-progress-bar" id="journeyProgressBar"></div>
+              </div>
+            </div>
+            <div id="journeyChapterGrid" class="chapter-cards-grid"></div>
+            <div class="journey-rewards-section">
+              <div class="home-widget-title">
+                <span>장 완독 보상</span>
+              </div>
+              <div id="journeyRewardList" class="journey-reward-list"></div>
+            </div>
+            <div class="journey-hall-section">
+              <div class="home-widget-title">
+                <span>명예의 전당</span>
+                <button onclick="app.openAllRankings()">전체보기</button>
+              </div>
+              <div class="ranking-tabs">
+                <button class="ranking-tab active" id="rankTabAll" onclick="app.setRankingTab('all')">전체 랭킹</button>
+                <button class="ranking-tab" id="rankTabFriends" onclick="app.setRankingTab('friends')">친구 랭킹</button>
+                <button class="ranking-tab" id="rankTabWeekly" onclick="app.setRankingTab('weekly')">주간 랭킹</button>
+              </div>
+              <div id="journeyRankingList" class="app-card-list"></div>
+            </div>
+            <div class="friends-card">
+              <div class="home-widget-title">
+                <span>친구 목록</span>
+              </div>
+              <div id="friendsList" class="friends-list-container"></div>
+            </div>
+            <div class="activity-feed-card">
+              <div class="home-widget-title">
+                <span>친구 활동</span>
+              </div>
+              <div id="friendActivityFeed" class="activity-list"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- 3.3. Ranking View -->
         <div id="rankingView" class="view-container">
       <div class="dashboard-single-container">
@@ -849,6 +968,25 @@
 
   </main>
 
+  <nav class="bottom-nav" id="bottomNav" aria-label="앱 하단 메뉴">
+    <button class="bottom-nav-item active" id="bottomNavDashboard" onclick="app.switchView('dashboard')">
+      <span class="material-icons-round">auto_stories</span>
+      <span>오늘의 말씀</span>
+    </button>
+    <button class="bottom-nav-item" id="bottomNavEvents" onclick="app.switchView('events')">
+      <span class="material-icons-round">campaign</span>
+      <span>이벤트</span>
+    </button>
+    <button class="bottom-nav-item" id="bottomNavJourney" onclick="app.switchView('journey')">
+      <span class="material-icons-round">map</span>
+      <span>성경여정</span>
+    </button>
+    <button class="bottom-nav-item" id="bottomNavSettings" onclick="app.switchView('settings')">
+      <span class="material-icons-round">settings</span>
+      <span>설정</span>
+    </button>
+  </nav>
+
   <!-- 6. Overlays & Modals -->
   <!-- Modal: Create Crew -->
   <div class="modal-overlay" id="modalCreateCrew">
@@ -883,6 +1021,21 @@
       </div>
       <div class="modal-btn-container">
         <button class="btn-primary" style="background: var(--accent-emerald);" onclick="app.closeModal('modalComplete'); app.exitGame();">대시보드로 이동</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Submit Confirm -->
+  <div class="modal-overlay" id="modalSubmitConfirm">
+    <div class="modal-content glass-panel" style="border-color: var(--accent-amber);">
+      <div class="modal-icon"><span class="material-icons-round" style="font-size: 3rem; color: var(--accent-amber);">fact_check</span></div>
+      <div class="modal-title" style="color: var(--accent-amber);">답안을 제출할까요?</div>
+      <div class="modal-body">
+        제출 후 수정할 수 없습니다.
+      </div>
+      <div class="modal-btn-container">
+        <button class="btn-primary" style="background: var(--accent-amber);" onclick="app.confirmSubmitQuiz()">제출하기</button>
+        <button class="btn-game secondary" onclick="app.closeModal('modalSubmitConfirm')">다시 확인</button>
       </div>
     </div>
   </div>
@@ -2011,9 +2164,10 @@
       </div>
 
       <div class="modal-btn-container" style="display: flex; gap: 0.75rem; justify-content: center; width: 100%; margin-top: 1.5rem;">
-        <button class="btn-primary" style="margin: 0; background: var(--accent-purple); flex: 1; height: 44px;" onclick="app.clickEventAnnounceJoin()">참여하기</button>
-        <button class="btn-game secondary" style="margin: 0; color: var(--text-muted); border-color: var(--glass-border); flex: 1; height: 44px;" onclick="app.closeModal('modalEventAnnouncement')">닫기</button>
+        <button class="btn-primary" style="margin: 0; background: var(--accent-purple); flex: 1; height: 44px;" onclick="app.clickEventAnnounceJoin()">시작하기</button>
+        <button class="btn-game secondary" style="margin: 0; color: var(--text-muted); border-color: var(--glass-border); flex: 1; height: 44px;" onclick="app.closeModal('modalEventAnnouncement')">나중에</button>
       </div>
+      <button class="btn-text-muted" onclick="app.hideCurrentEventForToday()" style="margin-top:0.75rem;">오늘 하루 보지 않기</button>
     </div>
   </div>
 
@@ -2127,6 +2281,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <script src="bible_data.js?v=1.5.2"></script>
-  <script src="app.js?v=1.5.5"></script>
+  <script src="app.js?v=1.5.8"></script>
 </body>
 </html>

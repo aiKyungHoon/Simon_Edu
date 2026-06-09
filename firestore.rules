@@ -62,5 +62,19 @@ service cloud.firestore {
       allow read: if true;
       allow write: if canPublish();
     }
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && (
+        resource.data.userId == request.auth.uid ||
+        (resource.data.keys().hasAny(['targetUsers']) && resource.data.targetUsers.hasAny([request.auth.uid])) ||
+        (resource.data.keys().hasAny(['targetGroups']) && resource.data.targetGroups.hasAny([myRole()])) ||
+        canOpenAdmin()
+      );
+      allow create: if signedIn();
+      allow update: if signedIn() && (
+        resource.data.userId == request.auth.uid ||
+        canPublish()
+      );
+      allow delete: if canPublish();
+    }
   }
 }

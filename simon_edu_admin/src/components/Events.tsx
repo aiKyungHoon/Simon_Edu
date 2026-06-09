@@ -12,10 +12,14 @@ interface EventItem {
   description: string;
   rewardPoints: number;
   imageUrl?: string;
+  homeBanner?: string;
+  popup?: boolean;
   active: boolean;
   startDate: string;
   endDate: string;
   participantsCount?: number;
+  targetGroups?: string[];
+  targetUsers?: string[];
   targetRoles?: string[];
   pushOnCreate?: boolean;
 }
@@ -329,9 +333,13 @@ export default function Events({ adminEmail }: EventsProps) {
         description,
         rewardPoints: effectiveRewardPoints,
         imageUrl: uploadedImageUrl || fallbackImageUrl,
+        homeBanner: uploadedImageUrl || fallbackImageUrl,
+        popup: active && pushOnCreate,
         active,
         startDate,
         endDate,
+        targetGroups: eventType === 'mission_exam' ? targetRoles : [],
+        targetUsers: [],
         targetRoles: eventType === 'mission_exam' ? targetRoles : [],
         pushOnCreate,
       };
@@ -369,6 +377,8 @@ export default function Events({ adminEmail }: EventsProps) {
             title: `이벤트 안내: ${title}`,
             body: description,
             target: eventType === 'mission_exam' ? 'roles' : 'all',
+            targetGroups: eventType === 'mission_exam' ? targetRoles : [],
+            targetUsers: [],
             targetRoles: eventType === 'mission_exam' ? targetRoles : [],
             targetName: eventType === 'mission_exam' ? '특정 사명자' : '전체 인원',
             eventId: docRef.id,
