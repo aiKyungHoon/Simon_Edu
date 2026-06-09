@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, addDoc, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { PUBLISH_ROLES, ROLE_OPTIONS } from '../roles';
 
 interface User {
   id: string;
@@ -29,11 +30,12 @@ interface PushHistoryItem {
   id: string;
   title: string;
   body: string;
-  target: 'all' | 'user';
+  target: 'all' | 'user' | 'roles';
   targetUid?: string | null;
   targetName?: string | null;
   targetEmail?: string | null;
   fcmToken?: string | null;
+  targetRoles?: string[];
   status: 'pending' | 'success' | 'failed';
   createdAt: any;
   sentAt?: any;
@@ -43,8 +45,9 @@ interface PushHistoryItem {
 export default function PushManagement({ users, adminEmail }: PushManagementProps) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [targetType, setTargetType] = useState<'all' | 'user'>('all');
+  const [targetType, setTargetType] = useState<'all' | 'user' | 'roles'>('all');
   const [targetUser, setTargetUser] = useState<User | null>(null);
+  const [targetRoles, setTargetRoles] = useState<string[]>([...PUBLISH_ROLES]);
   
   const [sending, setSending] = useState(false);
   const [history, setHistory] = useState<PushHistoryItem[]>([]);
@@ -143,6 +146,10 @@ export default function PushManagement({ users, adminEmail }: PushManagementProp
       alert("개별 발송 대상을 선택해 주세요.");
       return;
     }
+    if (targetType === 'roles' && targetRoles.length === 0) {
+      alert("권한 발송 대상을 한 개 이상 선택해 주세요.");
+      return;
+    }
 
     setSending(true);
 
@@ -162,6 +169,12 @@ export default function PushManagement({ users, adminEmail }: PushManagementProp
         payload.targetName = targetUser.name || targetUser.username;
         payload.targetEmail = targetUser.email;
         payload.fcmToken = targetUser.pushToken || targetUser.fcmToken || null;
+      } else if (targetType === 'roles') {
+        payload.targetUid = null;
+        payload.targetName = "권한 대상 사용자";
+        payload.targetEmail = null;
+        payload.fcmToken = null;
+        payload.targetRoles = targetRoles;
       } else {
         payload.targetUid = null;
         payload.targetName = "전체 사용자";
@@ -173,16 +186,18 @@ export default function PushManagement({ users, adminEmail }: PushManagementProp
       await addDoc(collection(db, 'push_queue'), payload);
 
       // Audit logs
-      const details = targetType === 'all' 
+      const details = targetType === 'all'
         ? `전체 대상 푸시 발송 요청 등록: "${title.trim()}"`
-        : `개별 대상 [${targetUser?.name || targetUser?.username}] 푸시 발송 요청 등록: "${title.trim()}"`;
+        : targetType === 'roles'
+          ? `권한 대상 푸시 발송 요청 등록: "${title.trim()}" (${targetRoles.join(', ')})`
+          : `개별 대상 [${targetUser?.name || targetUser?.username}] 푸시 발송 요청 등록: "${title.trim()}"`;
 
       await addDoc(collection(db, 'logs'), {
         adminEmail,
         type: 'push_notification_dispatch',
         details,
-        targetUserId: targetType === 'user' ? targetUser?.id : 'all',
-        targetUserName: targetType === 'user' ? (targetUser?.name || targetUser?.username) : '전체 사용자',
+        targetUserId: targetType === 'user' ? targetUser?.id : targetType,
+        targetUserName: targetType === 'user' ? (targetUser?.name || targetUser?.username) : (targetType === 'roles' ? '권한 대상 사용자' : '전체 사용자'),
         timestamp: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
         rawTimestamp: Date.now()
       });
@@ -214,6 +229,7 @@ export default function PushManagement({ users, adminEmail }: PushManagementProp
     } else {
       setTargetUser(null);
       setSelectSearchQuery('');
+      if (item.target === 'roles') setTargetRoles(item.targetRoles || [...PUBLISH_ROLES]);
     }
     alert("알림 양식이 복사되었습니다.");
   };
@@ -274,6 +290,24 @@ export default function PushManagement({ users, adminEmail }: PushManagementProp
                   >
                     <span className="material-icons-round" style={{ fontSize: '1.1rem' }}>groups</span>
                     전체 발송 (Broadcast)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => {
+                      setTargetType('roles');
+                      setTargetUser(null);
+                    }}
+                    style={{
+                      flex: 1,
+                      justifyContent: 'center',
+                      background: targetType === 'roles' ? 'var(--sidebar-active)' : 'var(--glass-bg)',
+                      borderColor: targetType === 'roles' ? 'var(--accent-purple)' : 'var(--glass-border)',
+                      fontWeight: targetType === 'roles' ? '700' : '500'
+                    }}
+                  >
+                    <span className="material-icons-round" style={{ fontSize: '1.1rem' }}>admin_panel_settings</span>
+                    권한 대상 발송
                   </button>
                   <button
                     type="button"
@@ -443,6 +477,28 @@ export default function PushManagement({ users, adminEmail }: PushManagementProp
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {targetType === 'roles' && (
+                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                  <label>수신 권한 선택</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.5rem', marginTop: '0.25rem' }}>
+                    {ROLE_OPTIONS.filter((role) => role.value !== 'user').map((role) => (
+                      <label key={role.value} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={targetRoles.includes(role.value)}
+                          onChange={(e) => {
+                            setTargetRoles((prev) => (
+                              e.target.checked ? [...new Set([...prev, role.value])] : prev.filter((r) => r !== role.value)
+                            ));
+                          }}
+                        />
+                        {role.label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -642,6 +698,10 @@ export default function PushManagement({ users, adminEmail }: PushManagementProp
                         {item.target === 'all' ? (
                           <span className="badge admin" style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', marginRight: '0.4rem' }}>
                             👥 전체 발송
+                          </span>
+                        ) : item.target === 'roles' ? (
+                          <span className="badge admin" style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', marginRight: '0.4rem' }}>
+                            권한 대상
                           </span>
                         ) : (
                           <span className="badge user" style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', marginRight: '0.4rem', background: 'rgba(146, 111, 21, 0.1)', color: 'var(--accent-blue)' }}>

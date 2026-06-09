@@ -12,7 +12,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../core/push/push_notification_service.dart';
 
-
 class WebViewScreen extends StatefulWidget {
   const WebViewScreen({super.key});
 
@@ -20,7 +19,8 @@ class WebViewScreen extends StatefulWidget {
   State<WebViewScreen> createState() => _WebViewScreenState();
 }
 
-class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserver {
+class _WebViewScreenState extends State<WebViewScreen>
+    with WidgetsBindingObserver {
   WebViewController? _controller;
   late final AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
@@ -48,7 +48,9 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
   bool _isProfileLoading = true;
   List<dynamic> _pointsHistory = [];
 
-  final String _targetUrl = 'https://simon-edu-bible-game.firebaseapp.com?v=1.5.1';
+  static const String _appWebVersion = '1.5.1';
+  final String _targetUrl =
+      'https://simon-edu-bible-game.firebaseapp.com?platform=app&app_v=$_appWebVersion';
 
   @override
   void initState() {
@@ -57,8 +59,6 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
     _loadAppVersion();
     _initFcmToken();
 
-
-    
     // Only initialize WebView controller on native mobile platforms (Android/iOS)
     if (!kIsWeb) {
       _appLinks = AppLinks();
@@ -91,7 +91,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
                 _syncTokenToWebView(_fcmToken);
               }
               _syncPlatformToWebView();
-              
+
               // Synchronize auth state and active view state after page finish
               _controller?.runJavaScript('''
                 (function() {
@@ -116,7 +116,8 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
                 Future.delayed(const Duration(milliseconds: 500), () {
                   if (mounted && _controller != null) {
                     debugPrint('Executing pending deep link JS: $link');
-                    _controller!.runJavaScript('if (window.handleDeepLink) { window.handleDeepLink("$link"); }');
+                    _controller!.runJavaScript(
+                        'if (window.handleDeepLink) { window.handleDeepLink("$link"); }');
                   }
                 });
               }
@@ -198,7 +199,8 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
     final String linkStr = uri.toString();
     if (_isPageFinished && _controller != null) {
       debugPrint('Executing handleDeepLink JS directly: $linkStr');
-      _controller!.runJavaScript('if (window.handleDeepLink) { window.handleDeepLink("$linkStr"); }');
+      _controller!.runJavaScript(
+          'if (window.handleDeepLink) { window.handleDeepLink("$linkStr"); }');
     } else {
       debugPrint('Page not loaded. Saving pending deep link: $linkStr');
       _pendingDeepLink = linkStr;
@@ -361,7 +363,8 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
             SnackBar(
               content: Row(
                 children: [
-                  const Icon(Icons.check_circle_outline_rounded, color: Colors.white),
+                  const Icon(Icons.check_circle_outline_rounded,
+                      color: Colors.white),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -393,10 +396,10 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
 
   void _switchWebViewTab(int index) {
     if (_controller == null || !_isLoggedIn) return;
-    
+
     // Light haptic feedback
     HapticFeedback.lightImpact();
-    
+
     setState(() {
       _currentIndex = index;
       if (index == 3) {
@@ -413,7 +416,8 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
       viewName = 'settings';
     }
 
-    _controller!.runJavaScript('if (window.app && window.app.switchView) { window.app.switchView("$viewName"); }');
+    _controller!.runJavaScript(
+        'if (window.app && window.app.switchView) { window.app.switchView("$viewName"); }');
 
     if (index == 3) {
       _syncUserProfile();
@@ -536,9 +540,11 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
                     children: [
                       Offstage(
                         offstage: _isLoggedIn && _currentIndex == 3,
-                        child: _controller != null ? WebViewWidget(controller: _controller!) : const SizedBox(),
+                        child: _controller != null
+                            ? WebViewWidget(controller: _controller!)
+                            : const SizedBox(),
                       ),
-                      
+
                       if (_isLoggedIn && _currentIndex == 3)
                         NativeSettingsView(
                           userName: _userName,
@@ -552,18 +558,21 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
                           fcmToken: _fcmToken,
                           pointsHistory: _pointsHistory,
                           onLogout: () {
-                            _controller?.runJavaScript('if (window.app && window.app.logout) { window.app.logout(); }');
+                            _controller?.runJavaScript(
+                                'if (window.app && window.app.logout) { window.app.logout(); }');
                           },
                           onWithdraw: () {
-                            _controller?.runJavaScript('if (window.app && window.app.withdrawAccount) { window.app.withdrawAccount(); }');
+                            _controller?.runJavaScript(
+                                'if (window.app && window.app.withdrawAccount) { window.app.withdrawAccount(); }');
                           },
                           onPushChanged: _togglePushSetting,
                           onMarketingChanged: _toggleMarketingSetting,
                           onRequestPermission: () {
-                            _requestNotificationPermission().then((_) => _syncUserProfile());
+                            _requestNotificationPermission()
+                                .then((_) => _syncUserProfile());
                           },
                         ),
-                      
+
                       // Linear progress bar for loading
                       if (_isLoading && _currentIndex != 3)
                         Positioned(
@@ -571,7 +580,9 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
                           left: 0,
                           right: 0,
                           child: LinearProgressIndicator(
-                            value: _loadingProgress > 0.0 ? _loadingProgress : null,
+                            value: _loadingProgress > 0.0
+                                ? _loadingProgress
+                                : null,
                             color: theme.colorScheme.primary,
                             backgroundColor: const Color(0xFFFDF8E6),
                             minHeight: 3,
@@ -590,8 +601,10 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
                   backgroundColor: const Color(0xFFFDF8E6),
                   selectedItemColor: const Color(0xFFB8860B),
                   unselectedItemColor: const Color(0xFF96855B),
-                  selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                  unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
+                  selectedLabelStyle: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 12),
+                  unselectedLabelStyle: const TextStyle(
+                      fontWeight: FontWeight.w500, fontSize: 11),
                   elevation: 8,
                   type: BottomNavigationBarType.fixed,
                   items: const [
@@ -708,14 +721,14 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
           return '{}';
         })()
       ''');
-      
+
       String jsonStr = result.toString();
       if (jsonStr.startsWith('"') && jsonStr.endsWith('"')) {
         try {
           jsonStr = json.decode(jsonStr);
         } catch (_) {}
       }
-      
+
       final Map<String, dynamic> data = json.decode(jsonStr);
       if (data.isNotEmpty && mounted) {
         final status = await Permission.notification.status;
@@ -726,7 +739,8 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
           _pushEnabled = data['pushEnabled'] ?? false;
           _marketingPushEnabled = data['marketingPushEnabled'] ?? false;
           _pointsHistory = data['pointsHistory'] ?? [];
-          _isNotificationPermissionGranted = status.isGranted || status.isProvisional;
+          _isNotificationPermissionGranted =
+              status.isGranted || status.isProvisional;
           _isProfileLoading = false;
         });
       }
@@ -737,7 +751,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
 
   Future<void> _togglePushSetting(bool value) async {
     if (_controller == null) return;
-    
+
     if (value) {
       final status = await Permission.notification.status;
       if (!status.isGranted && !status.isProvisional) {
@@ -749,7 +763,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
         }
       }
     }
-    
+
     setState(() {
       _pushEnabled = value;
       if (!value) {
@@ -768,7 +782,7 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
         }
       })()
     ''');
-    
+
     Future.delayed(const Duration(milliseconds: 300), _syncUserProfile);
   }
 
@@ -807,7 +821,8 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
               TextButton(
                 onPressed: () async {
                   Navigator.of(context).pop();
-                  await _controller!.runJavaScript('if (window.app) { window.app.acceptMarketingConsent(true); }');
+                  await _controller!.runJavaScript(
+                      'if (window.app) { window.app.acceptMarketingConsent(true); }');
                   _syncUserProfile();
                 },
                 child: const Text(
@@ -821,7 +836,8 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
               TextButton(
                 onPressed: () async {
                   Navigator.of(context).pop();
-                  await _controller!.runJavaScript('if (window.app) { window.app.acceptMarketingConsent(false); }');
+                  await _controller!.runJavaScript(
+                      'if (window.app) { window.app.acceptMarketingConsent(false); }');
                   _syncUserProfile();
                 },
                 child: const Text(
@@ -918,14 +934,16 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
         },
       );
     } else {
-      final granted = await PushNotificationService.instance.requestPermission();
+      final granted =
+          await PushNotificationService.instance.requestPermission();
       _sendDevicePermissionStatus(granted);
     }
   }
 
   void _sendDevicePermissionStatus(bool granted) {
     if (mounted && _controller != null) {
-      _controller!.runJavaScript('if (window.app && window.app.updateDevicePermissionStatus) { window.app.updateDevicePermissionStatus($granted); }');
+      _controller!.runJavaScript(
+          'if (window.app && window.app.updateDevicePermissionStatus) { window.app.updateDevicePermissionStatus($granted); }');
     }
   }
 
@@ -934,7 +952,8 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
       final pushService = PushNotificationService.instance;
 
       // Set foreground notification options
-      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+      await FirebaseMessaging.instance
+          .setForegroundNotificationPresentationOptions(
         alert: true,
         badge: true,
         sound: true,
@@ -966,7 +985,8 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
         debugPrint('Message data: ${message.data}');
 
         if (message.notification != null && mounted) {
-          debugPrint('Message also contained a notification: ${message.notification}');
+          debugPrint(
+              'Message also contained a notification: ${message.notification}');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -986,14 +1006,17 @@ class _WebViewScreenState extends State<WebViewScreen> with WidgetsBindingObserv
   void _syncTokenToWebView(String? token) {
     if (token == null || _controller == null) return;
     debugPrint("Syncing push token to webview: $token");
-    _controller!.runJavaScript('if (window.app && window.app.updatePushToken) { window.app.updatePushToken("$token"); }');
+    _controller!.runJavaScript(
+        'if (window.app && window.app.updatePushToken) { window.app.updatePushToken("$token"); }');
   }
 
   void _syncPlatformToWebView() {
     if (_controller == null) return;
-    String osName = defaultTargetPlatform == TargetPlatform.iOS ? 'iOS' : 'Android';
+    String osName =
+        defaultTargetPlatform == TargetPlatform.iOS ? 'iOS' : 'Android';
     debugPrint("Syncing platform to webview: $osName");
-    _controller!.runJavaScript('if (window.app && window.app.updateDevicePlatform) { window.app.updateDevicePlatform("$osName"); }');
+    _controller!.runJavaScript(
+        'if (window.app && window.app.updateDevicePlatform) { window.app.updateDevicePlatform("$osName"); }');
   }
 }
 
@@ -1112,14 +1135,15 @@ class NativeSettingsView extends StatelessWidget {
                     ),
                   ],
                 ),
-                
+
                 // Notification Warning Banner inside My Info
                 if (!isPermissionGranted) ...[
                   const SizedBox(height: 16),
                   GestureDetector(
                     onTap: onRequestPermission,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFFF0F0),
                         borderRadius: BorderRadius.circular(12),
@@ -1127,7 +1151,8 @@ class NativeSettingsView extends StatelessWidget {
                       ),
                       child: const Row(
                         children: [
-                          Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 20),
+                          Icon(Icons.warning_amber_rounded,
+                              color: Color(0xFFEF4444), size: 20),
                           SizedBox(width: 10),
                           Expanded(
                             child: Text(
@@ -1147,7 +1172,7 @@ class NativeSettingsView extends StatelessWidget {
 
                 const SizedBox(height: 16),
                 const Divider(color: Color(0x1FB8860B)),
-                
+
                 // Switch 1: Push enabled
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
@@ -1213,7 +1238,8 @@ class NativeSettingsView extends StatelessWidget {
               ],
             ),
             child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
               leading: const Icon(
                 Icons.monetization_on_rounded,
                 color: Color(0xFFB8860B),
@@ -1239,7 +1265,8 @@ class NativeSettingsView extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Icon(Icons.chevron_right_rounded, color: Color(0xFF96855B)),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF96855B)),
                 ],
               ),
               onTap: () => _showPointHistoryDialog(context),
@@ -1268,7 +1295,8 @@ class NativeSettingsView extends StatelessWidget {
                   padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
                   child: Row(
                     children: [
-                      Icon(Icons.description_rounded, color: Color(0xFFB8860B), size: 20),
+                      Icon(Icons.description_rounded,
+                          color: Color(0xFFB8860B), size: 20),
                       SizedBox(width: 8),
                       Text(
                         '약관 및 정책',
@@ -1292,12 +1320,14 @@ class NativeSettingsView extends StatelessWidget {
                       color: Color(0xFF3D341C),
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF96855B)),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF96855B)),
                   onTap: () {
                     _openWebPopup(
                       context: context,
                       title: '이용약관',
-                      url: 'https://simon-edu-bible-game.firebaseapp.com/Terms_of_Use',
+                      url:
+                          'https://simon-edu-bible-game.firebaseapp.com/Terms_of_Use',
                     );
                   },
                 ),
@@ -1312,12 +1342,14 @@ class NativeSettingsView extends StatelessWidget {
                       color: Color(0xFF3D341C),
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF96855B)),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF96855B)),
                   onTap: () {
                     _openWebPopup(
                       context: context,
                       title: '개인정보처리방침',
-                      url: 'https://simon-edu-bible-game.firebaseapp.com/privacy',
+                      url:
+                          'https://simon-edu-bible-game.firebaseapp.com/privacy',
                     );
                   },
                 ),
@@ -1332,12 +1364,14 @@ class NativeSettingsView extends StatelessWidget {
                       color: Color(0xFF3D341C),
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF96855B)),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF96855B)),
                   onTap: () {
                     _openWebPopup(
                       context: context,
                       title: '포인트 정책',
-                      url: 'https://simon-edu-bible-game.firebaseapp.com/points_policy',
+                      url:
+                          'https://simon-edu-bible-game.firebaseapp.com/points_policy',
                     );
                   },
                 ),
@@ -1346,7 +1380,6 @@ class NativeSettingsView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-
 
           const SizedBox(height: 16),
 
@@ -1368,7 +1401,8 @@ class NativeSettingsView extends StatelessWidget {
               children: [
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                  leading: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 20),
+                  leading: const Icon(Icons.logout_rounded,
+                      color: Color(0xFFEF4444), size: 20),
                   title: const Text(
                     '로그아웃',
                     style: TextStyle(
@@ -1377,13 +1411,15 @@ class NativeSettingsView extends StatelessWidget {
                       color: Color(0xFFEF4444),
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF96855B)),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF96855B)),
                   onTap: onLogout,
                 ),
                 const Divider(color: Color(0x1FB8860B), height: 1),
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                  leading: const Icon(Icons.person_remove_rounded, color: Color(0xFF96855B), size: 20),
+                  leading: const Icon(Icons.person_remove_rounded,
+                      color: Color(0xFF96855B), size: 20),
                   title: const Text(
                     '회원 탈퇴',
                     style: TextStyle(
@@ -1392,12 +1428,14 @@ class NativeSettingsView extends StatelessWidget {
                       color: Color(0xFF96855B),
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF96855B)),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF96855B)),
                   onTap: () {
                     _openWebPopup(
                       context: context,
                       title: '회원 탈퇴',
-                      url: 'https://simon-edu-bible-game.firebaseapp.com/Delete_account',
+                      url:
+                          'https://simon-edu-bible-game.firebaseapp.com/Delete_account',
                       onLogout: onLogout,
                     );
                   },
@@ -1406,7 +1444,7 @@ class NativeSettingsView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Version info center aligned
           Center(
             child: Text(
@@ -1440,7 +1478,7 @@ class NativeSettingsView extends StatelessWidget {
             'date': '기존 적립 이력',
           });
         }
-        
+
         return Container(
           height: MediaQuery.of(context).size.height * 0.7,
           decoration: const BoxDecoration(
@@ -1463,10 +1501,11 @@ class NativeSettingsView extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              
+
               // Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1479,18 +1518,20 @@ class NativeSettingsView extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Color(0xFF96855B)),
+                      icon: const Icon(Icons.close_rounded,
+                          color: Color(0xFF96855B)),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),
               ),
-              
+
               // Points Summary Card
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -1508,7 +1549,8 @@ class NativeSettingsView extends StatelessWidget {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.monetization_on_rounded, color: Color(0xFFB8860B), size: 24),
+                          Icon(Icons.monetization_on_rounded,
+                              color: Color(0xFFB8860B), size: 24),
                           SizedBox(width: 8),
                           Text(
                             '현재 보유 포인트',
@@ -1533,7 +1575,7 @@ class NativeSettingsView extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              
+
               // History List
               Expanded(
                 child: reversedHistory.isEmpty
@@ -1575,17 +1617,18 @@ class NativeSettingsView extends StatelessWidget {
                           height: 1,
                         ),
                         itemBuilder: (context, index) {
-                          final item = reversedHistory[index] as Map<String, dynamic>;
+                          final item =
+                              reversedHistory[index] as Map<String, dynamic>;
                           final type = item['type'] ?? '';
                           final title = item['title'] ?? '포인트 적립';
                           final amount = item['amount'] ?? 0;
                           final date = item['date'] ?? '';
-                          
+
                           // Styling configurations based on type
                           Color bgColor;
                           Color iconColor;
                           IconData iconData;
-                          
+
                           switch (type) {
                             case 'signup':
                               bgColor = const Color(0xFFFFF4EB);
@@ -1617,7 +1660,7 @@ class NativeSettingsView extends StatelessWidget {
                               iconColor = const Color(0xFFF59E0B);
                               iconData = Icons.monetization_on_rounded;
                           }
-                          
+
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             child: Row(
@@ -1637,11 +1680,12 @@ class NativeSettingsView extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 14),
-                                
+
                                 // Text details
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         title,
@@ -1662,7 +1706,7 @@ class NativeSettingsView extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                
+
                                 // Amount text
                                 Text(
                                   '+${amount}P',
@@ -1729,7 +1773,8 @@ void _openWebPopup({
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Color(0xFF96855B)),
+                    icon: const Icon(Icons.close_rounded,
+                        color: Color(0xFF96855B)),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -1832,8 +1877,3 @@ class _PopupWebViewState extends State<_PopupWebView> {
     );
   }
 }
-
-
-
-
-

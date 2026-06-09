@@ -97,13 +97,19 @@ exports.processPushQueue = onDocumentCreated("push_queue/{pushId}", async (event
         });
       }
 
-    } else if (data.target === "all") {
-      console.log("Broadcasting push notification to all users...");
+    } else if (data.target === "all" || data.target === "roles") {
+      const targetRoles = Array.isArray(data.targetRoles) ? data.targetRoles : [];
+      console.log(data.target === "roles" ? `Broadcasting to roles: ${targetRoles.join(",")}` : "Broadcasting push notification to all users...");
       
       const usersSnap = await db.collection("users").get();
       const tokens = [];
+      const targetUserRefs = [];
       usersSnap.forEach((userDoc) => {
         const uData = userDoc.data();
+        if (data.target === "roles" && !targetRoles.includes(uData.role)) {
+          return;
+        }
+        targetUserRefs.push(userDoc.ref);
         const t = uData.pushToken || uData.fcmToken;
         if (t) {
           tokens.push(t);
@@ -191,12 +197,11 @@ exports.processPushQueue = onDocumentCreated("push_queue/{pushId}", async (event
       });
 
       const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      const allUsersSnap = await db.collection("users").get();
       let batchDbNotice = db.batch();
       let batchCountNotice = 0;
 
-      for (const uDoc of allUsersSnap.docs) {
-        batchDbNotice.update(uDoc.ref, {
+      for (const userRef of targetUserRefs) {
+        batchDbNotice.update(userRef, {
           notifications: admin.firestore.FieldValue.arrayUnion({
             id: notifId,
             message: `📢 ${data.title}\n${data.body}`,

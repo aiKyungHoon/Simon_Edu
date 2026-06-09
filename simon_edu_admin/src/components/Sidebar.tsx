@@ -22,6 +22,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "members", label: "회원 관리", icon: "people" },
     { id: "points", label: "포인트 관리", icon: "monetization_on" },
     { id: "quizzes", label: "말씀 / 퀴즈 관리", icon: "menu_book" },
+    { id: "missionExam", label: "사명자 시험", icon: "assignment" },
     { id: "events", label: "이벤트 관리", icon: "emoji_events" },
     { id: "stats", label: "학습 통계", icon: "analytics" },
     { id: "notices", label: "공지사항 관리", icon: "campaign" },

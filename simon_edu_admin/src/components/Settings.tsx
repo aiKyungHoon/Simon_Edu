@@ -93,7 +93,7 @@ export default function Settings({ adminEmail }: SettingsProps) {
 
     try {
       const docRef = doc(db, 'settings', 'global');
-      await setDoc(docRef, updatedData);
+      await setDoc(docRef, updatedData, { merge: true });
 
       // Audit Log
       await addDoc(collection(db, 'logs'), {

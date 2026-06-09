@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { canOpenAdmin } from '../roles';
 
 interface LoginProps {
   onLoginSuccess: (email: string) => void;
@@ -76,12 +77,12 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        if (userData.role === 'admin') {
+        if (canOpenAdmin(userData.role)) {
           // Success
           onLoginSuccess(user.email || 'Admin');
         } else {
           // Not an admin
-          setError('관리자 권한이 없습니다. 관리자 계정으로 로그인해주세요.');
+          setError('관리자 페이지 로그인 권한이 없습니다. 임과장 또는 관리자 계정으로 로그인해주세요.');
           await signOut(auth);
         }
       } else {

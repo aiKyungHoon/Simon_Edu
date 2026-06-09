@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { doc, updateDoc, deleteDoc, arrayUnion, addDoc, collection } from 'firebase/firestore';
 import { db } from '../firebase';
 import BIBLE_DATA_RAW from '../assets/bible_data.json';
+import { ROLE_OPTIONS, getRoleLabel } from '../roles';
 
 interface User {
   id: string;
@@ -136,10 +137,10 @@ export default function Members({ users, adminEmail }: MembersProps) {
     }
   };
 
-  // Action: Toggle Role
-  const handleToggleRole = async (user: User) => {
-    const newRole = user.role === 'admin' ? 'user' : 'admin';
-    if (!window.confirm(`${user.name || user.username} 님의 권한을 ${newRole === 'admin' ? '관리자' : '일반 사용자'}로 변경하시겠습니까?`)) {
+  // Action: Change Role
+  const handleChangeRole = async (user: User, newRole: string) => {
+    if (user.role === newRole) return;
+    if (!window.confirm(`${user.name || user.username} 님의 권한을 ${getRoleLabel(newRole)}(으)로 변경하시겠습니까?`)) {
       return;
     }
 
@@ -251,8 +252,9 @@ export default function Members({ users, adminEmail }: MembersProps) {
               }}
             >
               <option value="all">전체</option>
-              <option value="user">일반 사용자</option>
-              <option value="admin">관리자</option>
+              {ROLE_OPTIONS.map((role) => (
+                <option key={role.value} value={role.value}>{role.label}</option>
+              ))}
             </select>
           </div>
 
@@ -325,7 +327,7 @@ export default function Members({ users, adminEmail }: MembersProps) {
                             </span>
                           )}
                           <span className={`badge ${user.role}`}>
-                            {user.role === 'admin' ? '관리자' : '일반'}
+                            {getRoleLabel(user.role)}
                           </span>
                           <span className={`badge ${status}`}>
                             {status === 'suspended' ? '정지됨' : '정상'}
@@ -340,12 +342,16 @@ export default function Members({ users, adminEmail }: MembersProps) {
                           >
                             상세 정보
                           </button>
-                          <button
-                            onClick={() => handleToggleRole(user)}
+                          <select
+                            value={user.role || 'user'}
+                            onChange={(e) => handleChangeRole(user, e.target.value)}
                             className="btn-action reset"
+                            style={{ cursor: 'pointer' }}
                           >
-                            권한 전환
-                          </button>
+                            {ROLE_OPTIONS.map((role) => (
+                              <option key={role.value} value={role.value}>{role.label}</option>
+                            ))}
+                          </select>
                           <button
                             onClick={() => handleToggleSuspend(user)}
                             className="btn-action danger"
@@ -410,7 +416,7 @@ export default function Members({ users, adminEmail }: MembersProps) {
                       </span>
                     )}
                     <span className={`badge ${user.role}`}>
-                      {user.role === 'admin' ? '관리자' : '일반'}
+                      {getRoleLabel(user.role)}
                     </span>
                     <span className={`badge ${status}`}>
                       {status === 'suspended' ? '정지됨' : '정상'}
@@ -448,12 +454,16 @@ export default function Members({ users, adminEmail }: MembersProps) {
                   >
                     상세 정보
                   </button>
-                  <button
-                    onClick={() => handleToggleRole(user)}
+                  <select
+                    value={user.role || 'user'}
+                    onChange={(e) => handleChangeRole(user, e.target.value)}
                     className="btn-action reset"
+                    style={{ cursor: 'pointer' }}
                   >
-                    권한 전환
-                  </button>
+                    {ROLE_OPTIONS.map((role) => (
+                      <option key={role.value} value={role.value}>{role.label}</option>
+                    ))}
+                  </select>
                   <button
                     onClick={() => handleToggleSuspend(user)}
                     className="btn-action danger"
@@ -503,7 +513,7 @@ export default function Members({ users, adminEmail }: MembersProps) {
 
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>가입 상태 / 권한 / OS</p>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem', alignItems: 'center' }}>
-                  <span className={`badge ${selectedUser.role}`}>{selectedUser.role === 'admin' ? '관리자' : '일반'}</span>
+                  <span className={`badge ${selectedUser.role}`}>{getRoleLabel(selectedUser.role)}</span>
                   <span className={`badge ${selectedUser.status || 'active'}`}>{selectedUser.status === 'suspended' ? '정지됨' : '정상'}</span>
                   {selectedUser.os && (
                     <span className="badge" style={{ 

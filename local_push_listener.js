@@ -103,15 +103,21 @@ db.collection("push_queue")
             console.log(`✅ 유저 수신함 저장 성공!`);
           }
 
-        } else if (data.target === "all") {
-          console.log(`-> 전체 발송을 위해 토큰 수집 중...`);
+        } else if (data.target === "all" || data.target === "roles") {
+          const targetRoles = Array.isArray(data.targetRoles) ? data.targetRoles : [];
+          console.log(data.target === "roles" ? `-> 권한 대상(${targetRoles.join(", ")}) 발송을 위해 토큰 수집 중...` : `-> 전체 발송을 위해 토큰 수집 중...`);
           
           // Query users with pushToken or fcmToken
           let usersSnap = await db.collection("users").get();
           const tokens = [];
+          const targetUserRefs = [];
           
           usersSnap.forEach((userDoc) => {
             const uData = userDoc.data();
+            if (data.target === "roles" && !targetRoles.includes(uData.role)) {
+              return;
+            }
+            targetUserRefs.push(userDoc.ref);
             const token = uData.pushToken || uData.fcmToken;
             if (token) {
               tokens.push(token);
@@ -182,14 +188,13 @@ db.collection("push_queue")
           });
           console.log(`✅ 전체 발송 완료 (성공: ${totalSuccess}, 실패: ${totalFailure})`);
 
-          console.log(`-> 모든 유저 수신함에 공지 알림 추가 중...`);
+          console.log(`-> 대상 유저 수신함에 공지 알림 추가 중...`);
           const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-          const allUsersSnap = await db.collection("users").get();
           let batchDbNotice = db.batch();
           let batchCountNotice = 0;
 
-          for (const uDoc of allUsersSnap.docs) {
-            batchDbNotice.update(uDoc.ref, {
+          for (const userRef of targetUserRefs) {
+            batchDbNotice.update(userRef, {
               notifications: admin.firestore.FieldValue.arrayUnion({
                 id: notifId,
                 message: `📢 ${data.title}\n${data.body}`,
@@ -207,7 +212,7 @@ db.collection("push_queue")
           if (batchCountNotice > 0) {
             await batchDbNotice.commit();
           }
-          console.log(`✅ 모든 유저 수신함 저장 성공! (${allUsersSnap.size}명)`);
+          console.log(`✅ 대상 유저 수신함 저장 성공! (${targetUserRefs.length}명)`);
         }
 
       } catch (error) {

@@ -77,6 +77,32 @@ class SimonEduApp {
     this.currentQuizBlanks = [];
     this.isTestMode = false;
 
+    // Crew & Battle Arena states (Battle mode hidden)
+    this.hideBattleMode = true;
+    this.isExamMode = false;
+    this.examQuestions = [];
+    this.currentExamQuestionIndex = 0;
+    this.examCorrectCount = 0;
+    this.examIncorrectCount = 0;
+    this.isEventQuizMode = false;
+    this.currentEvent = null;
+    this.eventQuestions = [];
+    this.currentEventQuestionIndex = 0;
+    this.eventCorrectCount = 0;
+    this.eventIncorrectCount = 0;
+    this.examSubmissions = null;
+    this.activeEvents = [];
+
+    this.crews = [];
+    this.battles = [];
+    this.notifiedInviteIds = [];
+    this.currentBattleId = null;
+    this.currentBattleVerses = [];
+    this.currentBattleVerseIndex = 0;
+    this.battleCorrectAnswersCount = 0;
+    this.battleTotalTimeSpent = 0;
+    this.battleStartTime = null;
+
     const today = new Date();
     this.currentCalendarYear = today.getFullYear();
     this.currentCalendarMonth = today.getMonth();
@@ -156,6 +182,8 @@ class SimonEduApp {
         if (btnNavAdmin) btnNavAdmin.style.display = 'none';
         const desktopNav = document.getElementById('desktopNav');
         if (desktopNav) desktopNav.style.display = 'none';
+        const fab = document.getElementById('fabCreateCrew');
+        if (fab) fab.style.display = 'none';
         
         if (this.isMobileApp && window.MobileAppChannel) {
           window.MobileAppChannel.postMessage(JSON.stringify({
@@ -172,7 +200,11 @@ class SimonEduApp {
   }
 
   get isMobileApp() {
-    return typeof window.MobileAppChannel !== 'undefined' || typeof window.Vibration !== 'undefined';
+    return (
+      typeof window.MobileAppChannel !== 'undefined' ||
+      window.SIMON_CLIENT_TYPE === 'app' ||
+      new URLSearchParams(window.location.search).get('platform') === 'app'
+    );
   }
 
   // 1. Database Initialization & Cloud Firestore real-time listener
@@ -191,6 +223,18 @@ class SimonEduApp {
           const navPoints = document.getElementById('navPoints');
           if (navPoints) navPoints.textContent = this.currentUser.points;
           this.renderNotifications();
+          this.updateFabVisibility();
+
+          // Toast alert for new notifications
+          const unreadInvites = (this.currentUser.notifications || []).filter(n => 
+            (n.type === 'battle_invite' || n.type === 'battle_accepted') && !n.read
+          );
+          unreadInvites.forEach(n => {
+            if (!this.notifiedInviteIds.includes(n.id)) {
+              this.notifiedInviteIds.push(n.id);
+              this.showToast(n.message);
+            }
+          });
         }
       }
 
@@ -265,6 +309,65 @@ class SimonEduApp {
       }
     }, error => {
       console.error("Firestore settings sync error:", error);
+    });
+
+    // Sync active events for in-app event popup
+    db.collection('events').onSnapshot(snapshot => {
+      this.activeEvents = [];
+      const today = new Date().toISOString().split('T')[0];
+      snapshot.forEach(doc => {
+        const eventData = { id: doc.id, ...doc.data() };
+        const startsOk = !eventData.startDate || eventData.startDate <= today;
+        const endsOk = !eventData.endDate || eventData.endDate >= today;
+        if (eventData.active && startsOk && endsOk) {
+          this.activeEvents.push(eventData);
+        }
+      });
+      this.updateExamEntryVisibility();
+      this.renderChallengeCard();
+      const examView = document.getElementById('examView');
+      if (examView && examView.classList.contains('active') && !this.hasActiveExamEvent()) {
+        this.switchView('dashboard');
+      }
+      this.maybeShowEventAnnouncement();
+    }, error => {
+      console.error("Firestore events snapshot sync error:", error);
+    });
+
+    // Sync crews in real-time
+    db.collection('crews').onSnapshot(snapshot => {
+      this.crews = [];
+      snapshot.forEach(doc => {
+        const crewData = doc.data();
+        crewData.id = doc.id;
+        this.crews.push(crewData);
+      });
+      // Re-render crew views if active (mobile) or always update FAB
+      const crewView = document.getElementById('crewView');
+      if (crewView && crewView.classList.contains('active')) {
+        this.renderCrewHub();
+      }
+      this.updateFabVisibility();
+    }, error => {
+      console.error("Firestore crews snapshot sync error:", error);
+    });
+
+    // Sync battles in real-time
+    db.collection('battles').onSnapshot(snapshot => {
+      this.battles = [];
+      snapshot.forEach(doc => {
+        const battleData = doc.data();
+        battleData.id = doc.id;
+        this.battles.push(battleData);
+      });
+      // Re-render crew views if active (mobile) or always update FAB
+      const crewView = document.getElementById('crewView');
+      if (crewView && crewView.classList.contains('active')) {
+        this.renderCrewHub();
+      }
+      this.updateFabVisibility();
+    }, error => {
+      console.error("Firestore battles snapshot sync error:", error);
     });
   }
 
@@ -743,8 +846,19 @@ class SimonEduApp {
 
   // 4. View Router & Screen Renders
   switchView(viewName) {
+    if (this.hideBattleMode && viewName === 'crew') {
+      viewName = 'dashboard';
+    }
+    if (viewName === 'exam' && !this.hasActiveExamEvent()) {
+      alert('현재 진행 중인 사명자 시험 이벤트가 없습니다.');
+      viewName = 'dashboard';
+    }
+
+    const singleDashboardViews = ['game', 'exam', 'settings'];
+    document.body.classList.toggle('single-dashboard-view', singleDashboardViews.includes(viewName));
+
     if (this.currentUser && this.currentUser.isTrial) {
-      if (viewName === 'ranking') {
+      if (viewName === 'ranking' || viewName === 'crew') {
         this.openModal('modalTrialRestrictRanking');
         return;
       }
@@ -770,14 +884,24 @@ class SimonEduApp {
 
     const gridContainer = document.querySelector('.dashboard-grid-container');
     if (gridContainer) {
-      if (['dashboard', 'attendance', 'ranking'].includes(viewName)) {
+      if (['dashboard', 'attendance', 'ranking', 'crew', 'game', 'exam', 'settings'].includes(viewName)) {
         gridContainer.style.display = '';
       } else {
         gridContainer.style.display = 'none';
       }
     }
 
-    if (!this.isMobileApp && ['dashboard', 'attendance', 'ranking'].includes(viewName)) {
+    // FAB: hide on game/auth/settings, otherwise show based on crew status
+    const fab = document.getElementById('fabCreateCrew');
+    if (fab) {
+      if (['game', 'auth', 'settings', 'admin'].includes(viewName)) {
+        fab.style.display = 'none';
+      } else {
+        this.updateFabVisibility();
+      }
+    }
+
+    if (!this.isMobileApp && ['dashboard', 'attendance', 'ranking', 'crew'].includes(viewName)) {
       // Hide auth, game, and admin views on desktop web
       ['auth', 'game', 'admin'].forEach(v => {
         const el = document.getElementById(v + 'View');
@@ -791,6 +915,8 @@ class SimonEduApp {
         this.renderAttendanceWidget();
       } else if (viewName === 'ranking') {
         this.renderLeaderboardWidget();
+      } else if (viewName === 'crew') {
+        this.renderCrewHub();
       }
 
       // Smooth scroll to target view
@@ -827,10 +953,14 @@ class SimonEduApp {
       this.renderAttendanceWidget();
     } else if (viewName === 'ranking') {
       this.renderLeaderboardWidget();
+    } else if (viewName === 'crew') {
+      this.renderCrewHub();
     } else if (viewName === 'admin') {
       this.switchView('dashboard');
     } else if (viewName === 'settings') {
       this.renderSettings();
+    } else if (viewName === 'exam') {
+      this.renderExamView();
     }
 
     // Notify Flutter of view change
@@ -932,9 +1062,30 @@ class SimonEduApp {
       desktopNav.style.display = 'none';
     }
 
+    // Initialize FAB visibility
+    this.updateFabVisibility();
+
     this.renderNotifications();
+    this.updateExamEntryVisibility();
+    this.maybeShowEventAnnouncement();
     if (!document.body.classList.contains('single-path-route')) {
       this.switchView('dashboard');
+    }
+  }
+
+  // Update FAB visibility based on crew membership
+  updateFabVisibility() {
+    const fab = document.getElementById('fabCreateCrew');
+    if (!fab || !this.currentUser || this.currentUser.isTrial) return;
+    if (this.hideBattleMode) {
+      fab.style.display = 'none';
+      return;
+    }
+    // Show FAB when user has no crew
+    if (!this.currentUser.crewId) {
+      fab.style.display = 'flex';
+    } else {
+      fab.style.display = 'none';
     }
   }
 
@@ -943,6 +1094,7 @@ class SimonEduApp {
     if (!this.currentUser) return;
 
     this.populateTestVerseSelect();
+    this.updateExamEntryVisibility();
 
     // 5.1 Points and Info
     // Always refresh currentUser details from memory array to stay synced
@@ -1032,34 +1184,48 @@ class SimonEduApp {
     const card = document.getElementById('challengeCard');
     if (!card) return;
 
-    if (!this.globalSettings || !this.globalSettings.activeChallengeChapter) {
+    if (!this.hasActiveSpecialChallengeEvent()) {
       card.style.display = 'none';
       return;
     }
 
-    const chapter = this.globalSettings.activeChallengeChapter;
+    if (!this.globalSettings || (!this.globalSettings.activeChallengeChapter && !this.globalSettings.challengeStartChapter)) {
+      card.style.display = 'none';
+      return;
+    }
+
+    const challengeVerses = this._getChallengeVersesFromSettings();
+    if (challengeVerses.length === 0) {
+      card.style.display = 'none';
+      return;
+    }
+    const firstVerse = challengeVerses[0];
+    const lastVerse = challengeVerses[challengeVerses.length - 1];
+    const rangeLabel = firstVerse.chapter === lastVerse.chapter && firstVerse.verse === lastVerse.verse
+      ? `요한계시록 ${firstVerse.chapter}장 ${firstVerse.verse}절`
+      : `요한계시록 ${firstVerse.chapter}장 ${firstVerse.verse}절 ~ ${lastVerse.chapter}장 ${lastVerse.verse}절`;
+    const chapter = firstVerse.chapter;
     const bonus = this.globalSettings.challengeBonusPoints || 50;
 
     // Set texts safely
     const titleEl = document.getElementById('challengeChapterTitle');
-    if (titleEl) titleEl.textContent = `요한계시록 ${chapter}장 전체 암송 챌린지`;
+    if (titleEl) titleEl.textContent = `${rangeLabel} 암송 챌린지`;
 
     const bonusEl = document.getElementById('challengeBonusPointsDisplay');
     if (bonusEl) bonusEl.textContent = `+${bonus}P`;
 
     const textEl = document.getElementById('challengeProgressText');
     if (textEl) {
-      textEl.innerHTML = `관리자가 지정한 특별 챌린지입니다. 요한계시록 ${chapter}장 전체 구절을 암송 완료하면 <strong style="color: var(--accent-amber);">+${bonus}P</strong> 보너스를 드립니다!`;
+      textEl.innerHTML = `관리자가 지정한 특별 챌린지입니다. ${rangeLabel} 구간을 모두 암송 완료하면 <strong style="color: var(--accent-amber);">+${bonus}P</strong> 보너스를 드립니다!`;
     }
 
     // Calculate progress if user logged in
     if (this.currentUser) {
       const progress = this.currentUser.challengeProgress || {};
-      const challengeVerses = window.BIBLE_DATA.filter(v => v.chapter === chapter);
       const totalCount = challengeVerses.length;
       
       let completedCount = 0;
-      if (progress.chapter === chapter) {
+      if (progress.rangeKey === this._getChallengeRangeKey() || progress.chapter === chapter) {
         completedCount = progress.completedCount || 0;
       }
 
@@ -1076,7 +1242,7 @@ class SimonEduApp {
 
       const btn = document.getElementById('btnStartChallenge');
       const badge = document.getElementById('challengeBadge');
-      if (progress.claimed && progress.chapter === chapter) {
+      if (progress.claimed && (progress.rangeKey === this._getChallengeRangeKey() || progress.chapter === chapter)) {
         if (btn) {
           btn.innerHTML = '챌린지 완수 완료 <span class="material-icons-round">emoji_events</span>';
           btn.style.background = 'var(--sidebar-active)';
@@ -1109,19 +1275,19 @@ class SimonEduApp {
 
   startChallenge() {
     if (!this.currentUser) return;
-    if (!this.globalSettings || !this.globalSettings.activeChallengeChapter) return;
+    if (!this.globalSettings || (!this.globalSettings.activeChallengeChapter && !this.globalSettings.challengeStartChapter)) return;
 
-    const challengeChapter = this.globalSettings.activeChallengeChapter;
-    const challengeVerses = window.BIBLE_DATA.filter(v => v.chapter === challengeChapter);
+    const challengeVerses = this._getChallengeVersesFromSettings();
     if (challengeVerses.length === 0) {
-      alert("챌린지 장의 말씀 데이터를 찾을 수 없습니다.");
+      alert("챌린지 구간의 말씀 데이터를 찾을 수 없습니다.");
       return;
     }
+    const rangeKey = this._getChallengeRangeKey();
 
     const progress = this.currentUser.challengeProgress || {};
-    // If user's challenge chapter is different, initialize it
-    if (progress.chapter !== challengeChapter) {
-      progress.chapter = challengeChapter;
+    if (progress.rangeKey !== rangeKey) {
+      progress.chapter = challengeVerses[0].chapter;
+      progress.rangeKey = rangeKey;
       progress.completedCount = 0;
       progress.claimed = false;
       
@@ -1154,19 +1320,45 @@ class SimonEduApp {
     this.challengeActive = true;
     this.currentQuizVerse = window.BIBLE_DATA[absoluteIdx];
 
-    // Automatically sync game difficulty with the verse's custom difficulty if set
-    if (this.currentQuizVerse && this.currentQuizVerse.difficulty) {
-      const diffMap = {
-        'easy': 'easy',
-        'normal': 'medium',
-        'hard': 'hard'
-      };
-      const targetDiff = diffMap[this.currentQuizVerse.difficulty] || 'medium';
-      this.setDifficulty(targetDiff);
-    }
+    // 스페셜 챌린지는 항상 마스터 난이도 고정
+    this.setDifficulty('master');
 
     this.switchView('game');
     this.initializeQuiz();
+  }
+
+  _getVerseRange(startChapter, startVerse, endChapter, endVerse) {
+    const sChapter = Number(startChapter) || 1;
+    const sVerse = Number(startVerse) || 1;
+    const eChapter = Number(endChapter) || 22;
+    const eVerse = Number(endVerse) || 21;
+    return (window.BIBLE_DATA || []).filter(v => {
+      const afterStart = v.chapter > sChapter || (v.chapter === sChapter && v.verse >= sVerse);
+      const beforeEnd = v.chapter < eChapter || (v.chapter === eChapter && v.verse <= eVerse);
+      return afterStart && beforeEnd;
+    });
+  }
+
+  _getChallengeVersesFromSettings() {
+    if (!this.globalSettings) return [];
+    if (this.globalSettings.challengeStartChapter && this.globalSettings.challengeEndChapter) {
+      return this._getVerseRange(
+        this.globalSettings.challengeStartChapter,
+        this.globalSettings.challengeStartVerse || 1,
+        this.globalSettings.challengeEndChapter,
+        this.globalSettings.challengeEndVerse || 999
+      );
+    }
+    const chapter = this.globalSettings.activeChallengeChapter;
+    return (window.BIBLE_DATA || []).filter(v => v.chapter === chapter);
+  }
+
+  _getChallengeRangeKey() {
+    const verses = this._getChallengeVersesFromSettings();
+    if (verses.length === 0) return 'none';
+    const first = verses[0];
+    const last = verses[verses.length - 1];
+    return `${first.chapter}:${first.verse}-${last.chapter}:${last.verse}`;
   }
 
   // 5.3.1 Attendance Calendar Widget logic
@@ -1485,6 +1677,11 @@ class SimonEduApp {
           <div class="leaderboard-avatar">${user.name.charAt(0)}</div>
           <div class="leaderboard-name">${user.name} ${isMe ? '<span style="color:#d8b4fe; font-size:0.75rem;">(나)</span>' : ''}</div>
           <div class="leaderboard-points">${user.points.toLocaleString()} P</div>
+          ${!isMe && !this.hideBattleMode ? `
+          <button class="btn-mini" onclick="app.requestOneOnOneBattle('${user.id}', '${user.name}')" style="margin-left: 0.75rem;" title="1대1 대결 신청">
+            ⚔️
+          </button>
+          ` : ''}
         `;
         
         list.appendChild(item);
@@ -1580,6 +1777,11 @@ class SimonEduApp {
         <div class="all-ranking-avatar">${user.name.charAt(0)}</div>
         <div class="all-ranking-name">${user.name} ${isMe ? '<span style="color:var(--text-muted); font-size:0.75rem; font-weight:normal;">(나)</span>' : ''}</div>
         <div class="all-ranking-points">${user.points.toLocaleString()} P</div>
+        ${!isMe && !this.hideBattleMode ? `
+        <button class="btn-mini" onclick="app.requestOneOnOneBattle('${user.id}', '${user.name}')" style="margin-left: 0.75rem;" title="1대1 대결 신청">
+          ⚔️
+        </button>
+        ` : ''}
       `;
       
       list.appendChild(item);
@@ -1641,6 +1843,227 @@ class SimonEduApp {
     db.collection('users').doc(this.currentUser.id).update({
       notifications: firebase.firestore.FieldValue.arrayUnion(newNotification)
     }).catch(err => console.error("Error adding notification:", err));
+  }
+
+  hasActiveExamEvent() {
+    if (!this.currentUser || this.currentUser.isTrial || !Array.isArray(this.activeEvents)) return false;
+    return this.activeEvents.some(evt => evt.eventType === 'mission_exam' && this._eventTargetsCurrentUser(evt));
+  }
+
+  hasActiveSpecialChallengeEvent() {
+    if (!this.currentUser || this.currentUser.isTrial || !Array.isArray(this.activeEvents)) return false;
+    return this.activeEvents.some(evt => evt.eventType === 'special_challenge' && this._eventTargetsCurrentUser(evt));
+  }
+
+  updateExamEntryVisibility() {
+    const visible = this.hasActiveExamEvent();
+    const card = document.getElementById('examShortcutCard');
+    if (card) card.style.display = visible ? 'block' : 'none';
+    const navTab = document.getElementById('navTabExam');
+    if (navTab) navTab.style.display = visible ? '' : 'none';
+  }
+
+  _eventTargetsCurrentUser(eventItem) {
+    if (!eventItem || !this.currentUser || this.currentUser.isTrial) return false;
+    const targetRoles = Array.isArray(eventItem.targetRoles) ? eventItem.targetRoles : [];
+    if (targetRoles.length === 0) return true;
+    return targetRoles.includes(this.currentUser.role || 'user');
+  }
+
+  maybeShowEventAnnouncement() {
+    if (!this.currentUser || this.currentUser.isTrial || !Array.isArray(this.activeEvents)) return;
+    const eventItem = this.activeEvents.find(evt => {
+      if (!this._eventTargetsCurrentUser(evt)) return false;
+      return localStorage.getItem(`simon_event_seen_${evt.id}`) !== '1';
+    });
+    if (!eventItem) return;
+
+    this.currentEvent = eventItem;
+    localStorage.setItem(`simon_event_seen_${eventItem.id}`, '1');
+
+    const titleEl = document.getElementById('eventAnnounceTitle');
+    const descEl = document.getElementById('eventAnnounceDesc');
+    const pointsEl = document.getElementById('eventAnnouncePoints');
+    const endEl = document.getElementById('eventAnnounceEndDate');
+    const imageContainer = document.getElementById('eventAnnounceImageContainer');
+    const imageEl = document.getElementById('eventAnnounceImage');
+
+    if (titleEl) titleEl.textContent = eventItem.title || '이벤트 안내';
+    if (descEl) descEl.textContent = eventItem.description || '';
+    if (pointsEl) pointsEl.textContent = eventItem.rewardPoints || 0;
+    if (endEl) endEl.textContent = eventItem.endDate || '-';
+    if (imageContainer && imageEl) {
+      if (eventItem.imageUrl) {
+        imageEl.src = eventItem.imageUrl;
+        imageContainer.style.display = 'block';
+      } else {
+        imageContainer.style.display = 'none';
+      }
+    }
+
+    this.openModal('modalEventAnnouncement');
+  }
+
+  clickEventAnnounceJoin() {
+    if (!this.currentEvent) return;
+    this.closeModal('modalEventAnnouncement');
+    const nameInput = document.getElementById('eventJoinName');
+    const regionInput = document.getElementById('eventJoinRegion');
+    if (nameInput && this.currentUser?.name) nameInput.value = this.currentUser.name;
+    if (regionInput) regionInput.value = '';
+    this.openModal('modalEventJoin');
+  }
+
+  async submitEventJoinForm() {
+    if (!this.currentUser || !this.currentEvent) return;
+    const regionInput = document.getElementById('eventJoinRegion');
+    const nameInput = document.getElementById('eventJoinName');
+    const region = regionInput ? regionInput.value.trim() : '';
+    const name = nameInput ? nameInput.value.trim() : '';
+    if (!region || !name) {
+      alert('지역과 이름을 모두 입력해 주세요.');
+      return;
+    }
+
+    try {
+      await db.collection('event_participants').doc(`${this.currentEvent.id}_${this.currentUser.id}`).set({
+        eventId: this.currentEvent.id,
+        eventTitle: this.currentEvent.title || '',
+        userId: this.currentUser.id,
+        username: this.currentUser.username || '',
+        name,
+        region,
+        startedAt: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+        status: 'started'
+      }, { merge: true });
+    } catch (err) {
+      console.error('Event participant save error:', err);
+    }
+
+    this.closeModal('modalEventJoin');
+    this.startEventQuiz();
+  }
+
+  _getEventQuestionBank() {
+    return [
+      { question: '요한계시록을 기록한 사도는 누구입니까?', answer: '요한' },
+      { question: '요한계시록은 성경의 몇 번째 책입니까?', answer: '66' },
+      { question: '요한이 계시를 받은 장소는 어디입니까?', answer: '밧모섬' },
+      { question: '새 예루살렘에 대한 묘사는 몇 장에 나옵니까?', answer: '21' },
+      { question: '요한계시록에서 짐승의 수는 무엇입니까?', answer: '666' },
+      { question: '요한계시록 마지막 장은 몇 장입니까?', answer: '22' },
+      { question: '일곱 교회 편지는 몇 장부터 몇 장에 나옵니까?', answer: '2-3' }
+    ];
+  }
+
+  startEventQuiz() {
+    if (!this.currentEvent) return;
+    this.isEventQuizMode = true;
+    this.eventQuestions = [...this._getEventQuestionBank()].sort(() => Math.random() - 0.5).slice(0, 5);
+    this.currentEventQuestionIndex = 0;
+    this.eventCorrectCount = 0;
+    this.eventAnswers = [];
+    this.switchView('game');
+    this._renderEventQuizQuestion();
+  }
+
+  _renderEventQuizQuestion() {
+    const idx = this.currentEventQuestionIndex;
+    if (idx >= this.eventQuestions.length) {
+      this._finishEventQuiz();
+      return;
+    }
+    const q = this.eventQuestions[idx];
+    const titleEl = document.getElementById('gameVerseTitle');
+    const timerEl = document.getElementById('gameTimer');
+    const card = document.getElementById('verseTestCard');
+    const submitBtn = document.getElementById('btnSubmitQuiz');
+    const hintBtn = document.getElementById('btnHint');
+    const pointsEl = document.getElementById('gameEarnedPoints');
+    if (titleEl) titleEl.textContent = `${this.currentEvent.title || '이벤트'} 문제 ${idx + 1}/${this.eventQuestions.length}`;
+    if (timerEl) timerEl.textContent = '-';
+    if (pointsEl) pointsEl.textContent = String(this.currentEvent.rewardPoints || 0);
+    if (submitBtn) {
+      submitBtn.textContent = '이벤트 정답 제출';
+      submitBtn.setAttribute('onclick', 'app.submitEventQuizAnswer()');
+    }
+    if (hintBtn) {
+      hintBtn.textContent = '모름';
+      hintBtn.setAttribute('onclick', 'app.skipEventQuizAnswer()');
+    }
+    if (card) {
+      card.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:1rem;text-align:left;">
+          <div style="font-size:1rem;font-weight:800;color:var(--accent-purple);">Q${idx + 1}. ${q.question}</div>
+          <input type="text" id="eventQuizAnswerInput" class="blank-input" style="width:100%;padding:0.75rem 1rem;border-radius:10px;" placeholder="정답을 입력하세요" autocomplete="off">
+        </div>
+      `;
+    }
+    const input = document.getElementById('eventQuizAnswerInput');
+    if (input) {
+      input.focus();
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          this.submitEventQuizAnswer();
+        }
+      });
+    }
+  }
+
+  submitEventQuizAnswer() {
+    const input = document.getElementById('eventQuizAnswerInput');
+    if (!input) return;
+    const q = this.eventQuestions[this.currentEventQuestionIndex];
+    const userAnswer = input.value.trim();
+    const isCorrect = userAnswer.replace(/\s+/g, '').toLowerCase() === q.answer.replace(/\s+/g, '').toLowerCase();
+    if (isCorrect) this.eventCorrectCount++;
+    this.eventAnswers.push({ question: q.question, correct: q.answer, userAnswer, isCorrect });
+    this.currentEventQuestionIndex++;
+    this._renderEventQuizQuestion();
+  }
+
+  skipEventQuizAnswer() {
+    const q = this.eventQuestions[this.currentEventQuestionIndex];
+    this.eventAnswers.push({ question: q.question, correct: q.answer, userAnswer: '(미입력)', isCorrect: false });
+    this.currentEventQuestionIndex++;
+    this._renderEventQuizQuestion();
+  }
+
+  async _finishEventQuiz() {
+    const reward = this.currentEvent?.rewardPoints || 0;
+    const score = Math.round((this.eventCorrectCount / this.eventQuestions.length) * 100);
+    try {
+      const participantRef = db.collection('event_participants').doc(`${this.currentEvent.id}_${this.currentUser.id}`);
+      await participantRef.set({
+        score,
+        correctCount: this.eventCorrectCount,
+        totalCount: this.eventQuestions.length,
+        answers: this.eventAnswers,
+        completedAt: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+        status: 'completed'
+      }, { merge: true });
+
+      const history = {
+        id: 'hist_event_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        type: 'event',
+        title: `이벤트 참여 완료 (${this.currentEvent.title || '이벤트'})`,
+        amount: reward,
+        date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+      };
+      await db.collection('users').doc(this.currentUser.id).update({
+        points: firebase.firestore.FieldValue.increment(reward),
+        pointsHistory: firebase.firestore.FieldValue.arrayUnion(history)
+      });
+      this.currentUser.points = (this.currentUser.points || 0) + reward;
+      this.showPointsFloater(reward, `이벤트 +${reward}P`);
+    } catch (err) {
+      console.error('Event quiz finish error:', err);
+    }
+
+    this.isEventQuizMode = false;
+    this.showToast(`이벤트 완료! 점수 ${score}점, +${reward}P`);
+    this.switchView('dashboard');
   }
 
   toggleNotifications(event) {
@@ -1719,10 +2142,34 @@ class SimonEduApp {
       
       const timeStr = this.formatRelativeTime(n.timestamp);
       
-      item.innerHTML = `
-        <div class="notification-content">${n.message}</div>
-        <div class="notification-time">${timeStr}</div>
-      `;
+      if (n.type === 'battle_invite' && !n.read) {
+        item.innerHTML = `
+          <div class="notification-content" style="display: flex; flex-direction: column; gap: 0.5rem; text-align: left;">
+            <span>${n.message}</span>
+            <div style="display: flex; gap: 0.4rem; margin-top: 0.25rem;">
+              <button class="btn-mini" onclick="app.acceptBattleInvite('${n.battleId}', '${n.id}')">수락</button>
+              <button class="btn-mini secondary" onclick="app.declineBattleInvite('${n.battleId}', '${n.id}')">거절</button>
+            </div>
+          </div>
+          <div class="notification-time">${timeStr}</div>
+        `;
+      } else if (n.type === 'battle_accepted' && !n.read) {
+        // 신청자에게 수락 알림 + 즉시 시작 버튼
+        item.innerHTML = `
+          <div class="notification-content" style="display: flex; flex-direction: column; gap: 0.5rem; text-align: left;">
+            <span>${n.message}</span>
+            <div style="display: flex; gap: 0.4rem; margin-top: 0.25rem;">
+              <button class="btn-mini" style="background: linear-gradient(135deg,#10b981,#047857); border-color: #10b981;" onclick="app.startBattleFromNotif('${n.battleId}', '${n.id}')">⚔️ 지금 시작!</button>
+            </div>
+          </div>
+          <div class="notification-time">${timeStr}</div>
+        `;
+      } else {
+        item.innerHTML = `
+          <div class="notification-content">${n.message}</div>
+          <div class="notification-time">${timeStr}</div>
+        `;
+      }
       list.appendChild(item);
     });
   }
@@ -1902,32 +2349,16 @@ class SimonEduApp {
 
   startTestMode() {
     if (!this.currentUser) return;
-
     const select = document.getElementById('testVerseSelect');
     if (!select) return;
-
     const selectedIdx = parseInt(select.value, 10);
     const bibleData = window.BIBLE_DATA;
-
     if (isNaN(selectedIdx) || selectedIdx < 0 || selectedIdx >= bibleData.length) {
       alert('올바른 성경 구절을 선택해주세요.');
       return;
     }
-
     this.isTestMode = true;
     this.currentQuizVerse = bibleData[selectedIdx];
-
-    // Automatically sync game difficulty with the verse's custom difficulty if set
-    if (this.currentQuizVerse && this.currentQuizVerse.difficulty) {
-      const diffMap = {
-        'easy': 'easy',
-        'normal': 'medium',
-        'hard': 'hard'
-      };
-      const targetDiff = diffMap[this.currentQuizVerse.difficulty] || 'medium';
-      this.setDifficulty(targetDiff);
-    }
-
     this.switchView('game');
     this.initializeQuiz();
   }
@@ -1969,16 +2400,61 @@ class SimonEduApp {
     document.getElementById('btnDiffEasy').classList.toggle('active', diff === 'easy');
     document.getElementById('btnDiffMedium').classList.toggle('active', diff === 'medium');
     document.getElementById('btnDiffHard').classList.toggle('active', diff === 'hard');
+    const masterBtn = document.getElementById('btnDiffMaster');
+    if (masterBtn) masterBtn.classList.toggle('active', diff === 'master');
     
-    // Change game points label depending on difficulty
+    // 난이도별 기본 포인트 표기 (시간 차감 전 최대치)
     const pointsLabel = document.getElementById('gameEarnedPoints');
-    if (diff === 'easy') pointsLabel.textContent = '80';
-    else if (diff === 'medium') pointsLabel.textContent = '100';
-    else if (diff === 'hard') pointsLabel.textContent = '130';
+    if (pointsLabel) {
+      if (diff === 'easy') pointsLabel.textContent = '100';
+      else if (diff === 'medium' || diff === 'normal') pointsLabel.textContent = '200';
+      else if (diff === 'hard') pointsLabel.textContent = '200';
+      else if (diff === 'master') pointsLabel.textContent = '500';
+    }
 
     if (this.gameActive) {
       this.initializeQuiz();
     }
+  }
+
+  /**
+   * 구두점(.,?! 등)을 어절 끝에서 분리하는 헬퍼
+   * "말씀이여," → { word: "말씀이여", punct: "," }
+   */
+  _splitWordPunct(token) {
+    const m = token.match(/^(.*?)([.,!?;:。、]+)$/);
+    if (m) return { word: m[1], punct: m[2] };
+    return { word: token, punct: '' };
+  }
+
+  /**
+   * 어절(띄어쓰기) 단위 랜덤 빈칸 생성
+   * @param {string} text - 원문 텍스트
+   * @param {number} ratio - 빈칸 비율 (0~1)
+   * @returns {{ html: string, blanks: Array<{id,answer}> }}
+   */
+  _buildWordBlanks(text, ratio) {
+    const tokens = text.split(' ');
+    const blanks = [];
+    let blankIdx = 0;
+
+    // 빈칸으로 뽑을 어절 인덱스 무작위 선택
+    const targetCount = Math.max(1, Math.round(tokens.length * ratio));
+    const allIndices = tokens.map((_, i) => i).sort(() => Math.random() - 0.5);
+    const blankIndices = new Set(allIndices.slice(0, targetCount));
+
+    const parts = tokens.map((token, ti) => {
+      const { word, punct } = this._splitWordPunct(token);
+      if (blankIndices.has(ti) && word.length > 0) {
+        const id = blankIdx++;
+        const widthPx = Math.max(60, word.length * 22 + 16);
+        blanks.push({ id, answer: word });
+        return `<input type="text" class="blank-input" id="blank_${id}" data-idx="${id}" style="width:${widthPx}px" placeholder="?" autocomplete="off">${punct}`;
+      }
+      return `<span>${token}</span>`;
+    });
+
+    return { html: parts.join(' '), blanks };
   }
 
   initializeQuiz() {
@@ -1989,6 +2465,7 @@ class SimonEduApp {
     this.gameTimeRemaining = 60;
     this.currentQuizBlanks = [];
     this.isCustomQuestionStage = false;
+    this._quizElapsedSeconds = 0; // 시간 차감용
 
     // Reset button states
     const btnSubmit = document.getElementById('btnSubmitQuiz');
@@ -2012,87 +2489,80 @@ class SimonEduApp {
       pointsStatElem.style.display = this.isTestMode ? 'none' : 'flex';
     }
     
-    // Build Blank Interface
-    const text = this.currentQuizVerse.text;
-    
-    // Determine active keywords based on difficulty and custom configs
-    let activeKeywords = [];
-    let blanksCount = 1;
-    let isCustomList = false;
+    // 난이도별 기본 포인트 & 빈칸 비율
+    // 쉬움:30%(100P), 보통:50%(200P), 어려움:70%(200P), 마스터:100%(500P)
+    let blankRatio = 0.3;
+    let basePoints = 100;
+    const diff = this.currentDifficulty;
+    if (diff === 'easy') { blankRatio = 0.3; basePoints = 100; }
+    else if (diff === 'medium' || diff === 'normal') { blankRatio = 0.5; basePoints = 200; }
+    else if (diff === 'hard') { blankRatio = 0.7; basePoints = 200; }
+    else if (diff === 'master') { blankRatio = 1.0; basePoints = 500; }
+    this._quizBasePoints = basePoints;
 
-    if (this.currentDifficulty === 'easy') {
-      if (this.currentQuizVerse.easyKeywords && this.currentQuizVerse.easyKeywords.length > 0) {
-        activeKeywords = this.currentQuizVerse.easyKeywords;
-        blanksCount = activeKeywords.length;
-        isCustomList = true;
-      } else {
-        activeKeywords = this.currentQuizVerse.keywords || [];
-        blanksCount = Math.max(1, Math.min(2, Math.round(activeKeywords.length * 0.3)));
-      }
-    } else if (this.currentDifficulty === 'medium' || this.currentDifficulty === 'normal') {
-      if (this.currentQuizVerse.normalKeywords && this.currentQuizVerse.normalKeywords.length > 0) {
-        activeKeywords = this.currentQuizVerse.normalKeywords;
-        blanksCount = activeKeywords.length;
-        isCustomList = true;
-      } else {
-        activeKeywords = this.currentQuizVerse.keywords || [];
-        blanksCount = Math.max(2, Math.min(3, Math.round(activeKeywords.length * 0.6)));
-      }
-    } else { // Hard
-      if (this.currentQuizVerse.hardKeywords && this.currentQuizVerse.hardKeywords.length > 0) {
-        activeKeywords = this.currentQuizVerse.hardKeywords;
-        blanksCount = activeKeywords.length;
-        isCustomList = true;
-      } else {
-        activeKeywords = this.currentQuizVerse.keywords || [];
-        blanksCount = activeKeywords.length; // Hide all available key phrases
-      }
+    // 포인트 레이블 업데이트
+    const pointsLabel = document.getElementById('gameEarnedPoints');
+    if (pointsLabel) pointsLabel.textContent = String(basePoints);
+
+    // 커스텀 키워드가 있으면 기존 keyword 방식 유지 (하위 호환)
+    const verse = this.currentQuizVerse;
+    let useWordMode = true;
+    let customKeywords = [];
+
+    if (diff === 'easy' && verse.easyKeywords && verse.easyKeywords.length > 0) {
+      customKeywords = verse.easyKeywords; useWordMode = false;
+    } else if ((diff === 'medium' || diff === 'normal') && verse.normalKeywords && verse.normalKeywords.length > 0) {
+      customKeywords = verse.normalKeywords; useWordMode = false;
+    } else if (diff === 'hard' && verse.hardKeywords && verse.hardKeywords.length > 0) {
+      customKeywords = verse.hardKeywords; useWordMode = false;
     }
 
-    // Select keywords to hide
-    const shuffledKeywords = isCustomList ? [...activeKeywords] : [...activeKeywords].sort(() => 0.5 - Math.random());
-    const selectedBlanks = shuffledKeywords.slice(0, blanksCount);
-    
-    // Replace text elements with blank input fields
-    let quizHtml = text;
-    
-    // Sort selectedBlanks by length descending so longer phrases match first
-    selectedBlanks.sort((a, b) => b.length - a.length);
-    
-    this.currentQuizBlanks = selectedBlanks.map((phrase, idx) => {
-      // Find matching phrase and replace with input tag
-      const placeholder = `__BLANK_${idx}__`;
-      quizHtml = quizHtml.replace(phrase, placeholder);
-      return {
-        id: idx,
-        answer: phrase
-      };
-    });
+    const text = verse.text || '';
+    let quizHtml = '';
 
-    // Hydrate HTML with inputs
-    this.currentQuizBlanks.forEach(item => {
-      // Width calculation: approx 15px per Korean character
-      const widthPx = Math.max(50, item.answer.length * 20 + 20);
-      const inputTag = `<input type="text" class="blank-input" id="blank_${item.id}" data-idx="${item.id}" style="width: ${widthPx}px" placeholder="?" autocomplete="off">`;
-      quizHtml = quizHtml.replace(`__BLANK_${item.id}__`, inputTag);
-    });
+    if (useWordMode) {
+      // 어절 단위 빈칸
+      const result = this._buildWordBlanks(text, blankRatio);
+      quizHtml = result.html;
+      this.currentQuizBlanks = result.blanks;
+    } else {
+      // 기존 키워드 방식 (커스텀 설정 존재 시)
+      let rawHtml = text;
+      customKeywords.sort((a, b) => b.length - a.length);
+      this.currentQuizBlanks = customKeywords.map((phrase, idx) => {
+        rawHtml = rawHtml.replace(phrase, `__BLANK_${idx}__`);
+        return { id: idx, answer: phrase };
+      });
+      this.currentQuizBlanks.forEach(item => {
+        const widthPx = Math.max(60, item.answer.length * 22 + 16);
+        rawHtml = rawHtml.replace(`__BLANK_${item.id}__`, `<input type="text" class="blank-input" id="blank_${item.id}" data-idx="${item.id}" style="width:${widthPx}px" placeholder="?" autocomplete="off">`);
+      });
+      quizHtml = rawHtml;
+    }
 
     const card = document.getElementById('verseTestCard');
-    card.innerHTML = quizHtml;
+    if (card) card.innerHTML = quizHtml;
 
-    // Start countdown timer
+    // 타이머 시작 (5초당 10P 차감 로직)
     const timerElem = document.getElementById('gameTimer');
     this.gameTimerInterval = setInterval(() => {
       this.gameTimeRemaining--;
+      this._quizElapsedSeconds = (this._quizElapsedSeconds || 0) + 1;
       timerElem.textContent = this.gameTimeRemaining;
+
+      // 5초마다 포인트 차감 프리뷰 업데이트
+      if (this._quizElapsedSeconds % 5 === 0) {
+        const deducted = Math.floor(this._quizElapsedSeconds / 5) * 10;
+        const current = Math.max(10, this._quizBasePoints - deducted);
+        if (pointsLabel) pointsLabel.textContent = String(current);
+      }
       
-      // Flash red when timer goes low
       if (this.gameTimeRemaining <= 10) {
         timerElem.style.color = 'var(--accent-rose)';
-        timerElem.parentElement.style.animation = 'pulse-glow 1s infinite';
+        if (timerElem.parentElement) timerElem.parentElement.style.animation = 'pulse-glow 1s infinite';
       } else {
-        timerElem.style.color = 'var(--accent-rose)';
-        timerElem.parentElement.style.animation = 'none';
+        timerElem.style.color = '';
+        if (timerElem.parentElement) timerElem.parentElement.style.animation = 'none';
       }
 
       if (this.gameTimeRemaining <= 0) {
@@ -2100,7 +2570,7 @@ class SimonEduApp {
       }
     }, 1000);
 
-    // Focus first input automatically
+    // 첫 번째 빈칸 포커스
     const firstInput = document.getElementById('blank_0');
     if (firstInput) firstInput.focus();
   }
@@ -2287,18 +2757,28 @@ class SimonEduApp {
   }
 
   triggerQuizSuccess(hasCustomBonus = false) {
+    if (this.currentBattleId) {
+      this.clearIntervals();
+      this.gameActive = false;
+      this.playConfetti('quiz');
+      this.battleCorrectAnswersCount++;
+      const timeSpentOnVerse = 60 - this.gameTimeRemaining;
+      this.battleTotalTimeSpent += timeSpentOnVerse;
+      this.showToast(`📖 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 성공!`);
+      setTimeout(() => {
+        this.nextBattleVerse();
+      }, 1000);
+      return;
+    }
+
     this.clearIntervals();
     this.gameActive = false;
 
-    // Calculate score
-    let basePoints = 100;
-    if (this.currentDifficulty === 'easy') basePoints = 80;
-    else if (this.currentDifficulty === 'medium' || this.currentDifficulty === 'normal') basePoints = 100;
-    else if (this.currentDifficulty === 'hard') basePoints = 130;
-
-    // Time bonus: 2P per second remaining
-    const timeBonus = this.gameTimeRemaining * 2;
-    let totalAward = basePoints + timeBonus;
+    // 시간 차감 포인트 계산: 5초당 10P 차감, 최저 10P 보장
+    const basePoints = this._quizBasePoints || 100;
+    const elapsed = this._quizElapsedSeconds || 0;
+    const deducted = Math.floor(elapsed / 5) * 10;
+    let totalAward = Math.max(10, basePoints - deducted);
     if (hasCustomBonus) {
       totalAward += 20;
     }
@@ -2319,11 +2799,12 @@ class SimonEduApp {
     }
 
     if (this.isTestMode) {
+      const elapsed3 = this._quizElapsedSeconds || 0;
       const modalBody = document.getElementById('modalCompleteBody');
       modalBody.innerHTML = `
         요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 [테스트 모드] 시험을 완료했습니다!<br><br>
-        기본 포인트: <strong>+${basePoints} P (테스트 모드 - 미지급)</strong><br>
-        남은 시간 보너스 (${this.gameTimeRemaining}s): <strong>+${timeBonus} P (테스트 모드 - 미지급)</strong><br>
+        기본 포인트: <strong>${basePoints} P</strong> (소요 ${elapsed3}초 → -${Math.floor(elapsed3/5)*10}P 차감)<br>
+        획득 예상 포인트: <strong>+${totalAward} P (테스트 모드 - 미지급)</strong><br>
         ${hasCustomBonus ? `서술형 보너스: <strong>+20 P (테스트 모드 - 미지급)</strong><br>` : ''}
         <hr style="margin: 0.75rem 0; border:0; border-top:1px solid var(--glass-border);">
         <strong style="color:var(--accent-amber); font-size:1.1rem;">테스트 모드 완료 (포인트가 지급되지 않습니다)</strong>
@@ -2369,12 +2850,19 @@ class SimonEduApp {
     if (this.challengeActive) {
       const progress = { ...(this.currentUser.challengeProgress || {}) };
       progress.completedCount = (progress.completedCount || 0) + 1;
-      progress.chapter = this.globalSettings.activeChallengeChapter;
+      const challengeVersesForProgress = this._getChallengeVersesFromSettings();
+      const challengeRangeKey = this._getChallengeRangeKey();
+      const firstChallengeVerse = challengeVersesForProgress[0] || { chapter: this.globalSettings.activeChallengeChapter || 1, verse: 1 };
+      const lastChallengeVerse = challengeVersesForProgress[challengeVersesForProgress.length - 1] || firstChallengeVerse;
+      const challengeRangeLabel = firstChallengeVerse.chapter === lastChallengeVerse.chapter && firstChallengeVerse.verse === lastChallengeVerse.verse
+        ? `요한계시록 ${firstChallengeVerse.chapter}장 ${firstChallengeVerse.verse}절`
+        : `요한계시록 ${firstChallengeVerse.chapter}장 ${firstChallengeVerse.verse}절 ~ ${lastChallengeVerse.chapter}장 ${lastChallengeVerse.verse}절`;
+      progress.chapter = firstChallengeVerse.chapter;
+      progress.rangeKey = challengeRangeKey;
       
       updateData.challengeProgress = progress;
 
-      const challengeVerses = window.BIBLE_DATA.filter(v => v.chapter === progress.chapter);
-      if (progress.completedCount >= challengeVerses.length && !progress.claimed) {
+      if (progress.completedCount >= challengeVersesForProgress.length && !progress.claimed) {
         progress.claimed = true;
         isChallengeCompletedThisTurn = true;
         challengeBonusPointsValue = this.globalSettings.challengeBonusPoints || 50;
@@ -2384,13 +2872,13 @@ class SimonEduApp {
         const challengeBonusHistory = {
           id: 'hist_' + (Date.now() + 2) + '_' + Math.random().toString(36).substr(2, 5),
           type: 'challenge_bonus',
-          title: `스페셜 챌린지 완수 보너스 (계시록 ${progress.chapter}장)`,
+          title: `스페셜 챌린지 완수 보너스 (${challengeRangeLabel})`,
           amount: challengeBonusPointsValue,
           date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
         };
         const challengeBonusNotification = {
           id: 'notif_' + (Date.now() + 2) + '_' + Math.random().toString(36).substr(2, 9),
-          message: `🔥 요한계시록 ${progress.chapter}장 챌린지 올클리어! 보너스 +${challengeBonusPointsValue}P 적립`,
+          message: `🔥 ${challengeRangeLabel} 챌린지 올클리어! 보너스 +${challengeBonusPointsValue}P 적립`,
           timestamp: Date.now(),
           read: false
         };
@@ -2423,7 +2911,7 @@ class SimonEduApp {
         const challengeBonusHistory = {
           id: 'hist_' + (Date.now() + 2) + '_' + Math.random().toString(36).substr(2, 5),
           type: 'challenge_bonus',
-          title: `스페셜 챌린지 완수 보너스 (계시록 ${progress.chapter}장)`,
+          title: `스페셜 챌린지 완수 보너스 (${progress.rangeKey || progress.chapter})`,
           amount: challengeBonusPointsValue,
           date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
         };
@@ -2436,10 +2924,12 @@ class SimonEduApp {
     db.collection('users').doc(this.currentUser.id).update(updateData).then(() => {
       // Populate Success Modal
       const modalBody = document.getElementById('modalCompleteBody');
+      const elapsed2 = this._quizElapsedSeconds || 0;
       let htmlContent = `
         요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 시험을 완료했습니다!<br><br>
-        기본 포인트: <strong>+${basePoints} P</strong><br>
-        남은 시간 보너스 (${this.gameTimeRemaining}s): <strong>+${timeBonus} P</strong><br>
+        기본 포인트: <strong>${basePoints} P</strong><br>
+        소요 시간: <strong>${elapsed2}초</strong> (5초당 10P 차감)<br>
+        획득 포인트: <strong style="color:var(--accent-amber);">+${totalAward} P</strong><br>
         ${hasCustomBonus ? `서술형 보너스: <strong>+20 P</strong><br>` : ''}
       `;
 
@@ -2453,7 +2943,7 @@ class SimonEduApp {
       if (isChallengeCompletedThisTurn) {
         htmlContent += `
           🔥 챌린지 완료 보너스: <strong style="color: var(--accent-purple);">+${challengeBonusPointsValue} P</strong><br>
-          <span style="font-size:0.8rem; color:var(--accent-purple); font-weight: bold;">🎉 축하합니다! 요한계시록 ${this.globalSettings.activeChallengeChapter}장 챌린지를 완수했습니다!</span><br>
+          <span style="font-size:0.8rem; color:var(--accent-purple); font-weight: bold;">🎉 축하합니다! 스페셜 암송 챌린지를 완수했습니다!</span><br>
         `;
       }
 
@@ -2497,6 +2987,17 @@ class SimonEduApp {
   }
 
   triggerQuizFail(reason) {
+    if (this.currentBattleId) {
+      this.clearIntervals();
+      this.gameActive = false;
+      this.battleTotalTimeSpent += 60;
+      this.showToast(`❌ 암송 실패: ${reason}`);
+      setTimeout(() => {
+        this.nextBattleVerse();
+      }, 1500);
+      return;
+    }
+
     this.clearIntervals();
     this.gameActive = false;
 
@@ -2515,6 +3016,426 @@ class SimonEduApp {
     this.challengeActive = false;
     this.switchView('dashboard');
   }
+
+  // ============================================================
+  // 사명자 시험 시스템
+  // ============================================================
+
+  // 사명자 시험용 문제 데이터 (관리자 설정 범위에서 랜덤 출제)
+  _getExamQuestionBank() {
+    const settings = this.globalSettings || {};
+    const verses = this._getVerseRange(
+      settings.examStartChapter || 1,
+      settings.examStartVerse || 1,
+      settings.examEndChapter || 22,
+      settings.examEndVerse || 21
+    );
+    return verses.map((verse, idx) => {
+      const words = (verse.text || '').split(' ').filter(Boolean);
+      const blanked = words.map(() => '____').join(' ');
+      const reference = `요한계시록 ${verse.chapter}장 ${verse.verse}절`;
+      return {
+        id: `verse_${verse.chapter}_${verse.verse}_${idx}`,
+        reference,
+        question: `${reference} 전체 말씀을 암송해 입력하세요.`,
+        blanked,
+        answer: verse.text || ''
+      };
+    });
+  }
+
+  openExamJoinForm() {
+    if (!this.currentUser) {
+      alert('로그인 후 사명자 시험에 응시할 수 있습니다.');
+      this.switchView('auth');
+      return;
+    }
+    const nameInput = document.getElementById('examJoinName');
+    const regionInput = document.getElementById('examJoinRegion');
+    const inlineNameInput = document.getElementById('examInlineName');
+    const inlineRegionInput = document.getElementById('examInlineRegion');
+    if (nameInput) nameInput.value = this.currentUser.name || '';
+    if (regionInput) regionInput.value = this.currentUser.examRegion || '';
+    if (inlineNameInput) inlineNameInput.value = this.currentUser.examApplicantName || this.currentUser.name || '';
+    if (inlineRegionInput) inlineRegionInput.value = this.currentUser.examRegion || '';
+    this.openModal('modalExamJoin');
+  }
+
+  submitExamJoinForm() {
+    const regionInput = document.getElementById('examInlineRegion') || document.getElementById('examJoinRegion');
+    const nameInput = document.getElementById('examInlineName') || document.getElementById('examJoinName');
+    const region = regionInput ? regionInput.value.trim() : '';
+    const name = nameInput ? nameInput.value.trim() : '';
+    if (!region || !name) {
+      alert('지역과 이름을 모두 입력해 주세요.');
+      if (!region && regionInput) regionInput.focus();
+      else if (!name && nameInput) nameInput.focus();
+      return;
+    }
+    this.currentExamApplicant = { region, name };
+    this.closeModal('modalExamJoin');
+    this.startExam();
+  }
+
+  renderExamView() {
+    const container = document.getElementById('examView');
+    if (!container) return;
+
+    if (!this.currentUser) return;
+
+    // \uc81c\ucd9c \uc774\ub825 \uac00\uc838\uc640\uc11c \uc2dc\ud5d8 \ubdf0 \uc5c5\ub370\uc774\ud2b8
+    const submission = this.currentUser.examSubmission || null;
+    const bestScore = submission ? (submission.score || 0) : 0;
+    const attemptCount = submission ? (submission.attemptCount || 0) : 0;
+
+    const scoreEl = document.getElementById('examHighestScore');
+    const attemptsEl = document.getElementById('examAttemptsCount');
+    if (scoreEl) scoreEl.textContent = bestScore;
+    if (attemptsEl) attemptsEl.textContent = attemptCount;
+    const inlineNameInput = document.getElementById('examInlineName');
+    const inlineRegionInput = document.getElementById('examInlineRegion');
+    if (inlineNameInput && !inlineNameInput.value) inlineNameInput.value = this.currentUser.examApplicantName || this.currentUser.name || '';
+    if (inlineRegionInput && !inlineRegionInput.value) inlineRegionInput.value = this.currentUser.examRegion || '';
+    this.bindExamJoinButton();
+  }
+
+  bindExamJoinButton() {
+    const btn = document.getElementById('btnOpenExamJoin');
+    if (!btn || btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    btn.removeAttribute('onclick');
+    btn.addEventListener('click', (event) => {
+      event.preventDefault();
+      this.submitExamJoinForm();
+    });
+  }
+
+  startExam() {
+    if (!this.currentUser) return;
+    const container = document.getElementById('examView');
+    // \uc6d0\ubcf8 \ub9c8\ud06c\uc5c5 \uc800\uc7a5 (\uc2dc\ud5d8 \ud6c4 \ubcf5\uc6d0\uc6a9)
+    if (container && !this._examIntroHtml) {
+      this._examIntroHtml = container.innerHTML;
+    }
+    const bank = this._getExamQuestionBank();
+    if (bank.length === 0) {
+      alert('관리자가 설정한 사명자 시험 성구 범위에 문제가 있습니다.');
+      return;
+    }
+    this.currentDifficulty = 'master';
+    this.isExamMode = true;
+    // \ub79c\ub364 10\ubb38\ud56d \uc120\ud0dd
+    const shuffled = [...bank].sort(() => Math.random() - 0.5);
+    this.examQuestions = shuffled.slice(0, Math.min(10, shuffled.length));
+    this.currentExamQuestionIndex = 0;
+    this.examCorrectCount = 0;
+    this.examAnswers = [];
+
+    this._renderExamQuestion();
+  }
+
+  _restoreExamIntro() {
+    const container = document.getElementById('examView');
+    if (!container) return;
+    if (this._examIntroHtml) {
+      container.innerHTML = this._examIntroHtml;
+      this._examIntroHtml = null; // \ub2e4\uc74c\uc5d0 \ub2e4\uc2dc \uc800\uc7a5\ud558\ub3c4\ub85d \ub9ac\uc14b
+    }
+    this.renderExamView(); // \uc810\uc218\ub4f1 \ub370\uc774\ud130 \uc5c5\ub370\uc774\ud2b8
+    this.bindExamJoinButton();
+  }
+
+  _renderExamQuestion() {
+    const container = document.getElementById('examView');
+    if (!container) return;
+
+    const idx = this.currentExamQuestionIndex;
+    const total = this.examQuestions.length;
+
+    if (idx >= total) {
+      this._finishExam();
+      return;
+    }
+
+    const q = this.examQuestions[idx];
+    const pct = Math.round(((idx + 1) / total) * 100);
+
+    container.innerHTML = `
+      <div class="exam-question-card glass-panel" style="max-width:860px;margin:2rem auto;padding:2rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;">
+          <span style="font-size:1.15rem;font-weight:800;color:var(--accent-amber);">${idx+1} / ${total} 문제</span>
+          <span style="font-size:0.85rem;font-weight:700;color:var(--text-secondary);">사명자 시험 · 마스터</span>
+        </div>
+        <div style="height:7px;background:var(--glass-border);border-radius:999px;margin-bottom:1.75rem;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--accent-amber),var(--accent-emerald));transition:width 0.3s;"></div>
+        </div>
+
+        <div style="margin-bottom:1.25rem;">
+          <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary);margin-bottom:0.45rem;">
+            Q. ${q.reference}
+          </div>
+          <div style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">
+            마스터 전문 암송: 아래 빈칸 전체에 해당하는 말씀을 입력하세요.
+          </div>
+        </div>
+
+        <div style="font-size:1.25rem;font-weight:800;line-height:1.75;margin-bottom:1.25rem;color:var(--text-primary);word-break:keep-all;">
+          ${q.blanked}
+        </div>
+
+        <textarea id="examAnswerInput" class="blank-input"
+          style="width:100%;min-height:120px;padding:1rem 1.1rem;font-size:1rem;line-height:1.65;border-radius:12px;margin-bottom:1rem;resize:vertical;font-family:var(--font-kr);"
+          placeholder="전체 말씀을 입력하세요..." autocomplete="off"></textarea>
+
+        <div style="display:flex;gap:0.75rem;">
+          <button onclick="app.submitExamAnswer()" class="btn-primary"
+            style="flex:1;padding:0.9rem;font-size:0.95rem;font-weight:800;border-radius:12px;background:linear-gradient(135deg,var(--accent-amber),var(--accent-emerald));color:#fff;border:none;cursor:pointer;">
+            제출
+          </button>
+          <button onclick="app.skipExamAnswer()" class="btn-secondary"
+            style="padding:0.9rem 1.25rem;font-size:0.9rem;font-weight:700;border-radius:12px;background:var(--glass-bg);border:1px solid var(--glass-border);cursor:pointer;color:var(--text-secondary);">
+            모름
+          </button>
+        </div>
+      </div>
+    `;
+
+    const input = document.getElementById('examAnswerInput');
+    if (input) {
+      input.focus();
+      input.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+          e.preventDefault();
+          this.submitExamAnswer();
+        }
+      });
+    }
+  }
+
+  _normalizeExamAnswer(value) {
+    return String(value || '')
+      .replace(/\s+/g, '')
+      .replace(/[.,!?;:'"“”‘’(){}\[\]<>·…~\-_/\\]/g, '')
+      .toLowerCase();
+  }
+
+  submitExamAnswer() {
+    const input = document.getElementById('examAnswerInput');
+    if (!input) return;
+    const q = this.examQuestions[this.currentExamQuestionIndex];
+    const userVal = input.value.trim();
+    const correctVal = q.answer.trim();
+    const isCorrect = this._normalizeExamAnswer(userVal) === this._normalizeExamAnswer(correctVal);
+
+    this.examAnswers.push({ question: q.question, correct: correctVal, userAnswer: userVal, isCorrect });
+    if (isCorrect) this.examCorrectCount++;
+
+    this.currentExamQuestionIndex++;
+    this._renderExamQuestion();
+  }
+
+  skipExamAnswer() {
+    const q = this.examQuestions[this.currentExamQuestionIndex];
+    this.examAnswers.push({ question: q.question, correct: q.answer, userAnswer: '(미입력)', isCorrect: false });
+    this.currentExamQuestionIndex++;
+    this._renderExamQuestion();
+  }
+
+  async _finishExam() {
+    const total = this.examQuestions.length;
+    const correct = this.examCorrectCount;
+    const score = Math.round((correct / total) * 100);
+    const applicantRegion = (this.currentExamApplicant?.region || '').trim();
+    const applicantName = (this.currentExamApplicant?.name || this.currentUser.name || '').trim();
+    const submittedAt = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+    const examDocKey = this._getMissionExamSubmissionKey(applicantRegion, applicantName);
+
+    const maxExamPoints = Number(this.globalSettings?.examMaxPoints || 500);
+    const pointMap = {
+      100: maxExamPoints,
+      90: Math.round(maxExamPoints * 0.9),
+      80: Math.round(maxExamPoints * 0.8),
+      70: Math.round(maxExamPoints * 0.7),
+      60: Math.round(maxExamPoints * 0.6)
+    };
+    const getPoints = (s) => {
+      for (const g of [100,90,80,70,60]) { if (s >= g) return pointMap[g]; }
+      return 0;
+    };
+    const earnedPoints = getPoints(score);
+
+    const container = document.getElementById('examView');
+    if (!container) return;
+
+    let existingExamDoc = null;
+    if (!this.currentUser.isTrial && examDocKey) {
+      try {
+        const examDoc = await db.collection('mission_exam_submissions').doc(examDocKey).get();
+        existingExamDoc = examDoc.exists ? examDoc.data() : null;
+      } catch (err) {
+        console.error('사명자 시험 이름 기준 내역 조회 오류:', err);
+      }
+    }
+
+    // 이전 최고 점수 확인: 지역+이름 기준 내역을 우선 사용하고, 없으면 현재 계정 내역을 사용합니다.
+    const prevSubmission = existingExamDoc || this.currentUser.examSubmission || null;
+    const prevBestScore = prevSubmission ? (prevSubmission.score || 0) : 0;
+    const prevBestPoints = prevSubmission ? (prevSubmission.pointsEarned || 0) : 0;
+    const prevAttemptCount = prevSubmission ? (prevSubmission.attemptCount || 0) : 0;
+
+    const isNewBest = score > prevBestScore;
+    const pointDiff = Math.max(0, earnedPoints - prevBestPoints);
+
+    // 정답 요약 HTML
+    const answerHtml = this.examAnswers.map((a, i) => `
+      <div style="display:flex;gap:0.5rem;align-items:flex-start;padding:0.5rem 0;border-bottom:1px solid var(--glass-border);">
+        <span style="font-size:1rem;">${a.isCorrect ? '✅' : '❌'}</span>
+        <div style="flex:1;font-size:0.85rem;">
+          <div style="font-weight:600;">${i+1}. ${a.question}</div>
+          <div style="color:var(--text-secondary);">내 답: ${a.userAnswer || '(미입력)'}</div>
+          ${!a.isCorrect ? `<div style="color:var(--accent-emerald);">정답: ${a.correct}</div>` : ''}
+        </div>
+      </div>
+    `).join('');
+
+    container.innerHTML = `
+      <div class="exam-result-card glass-panel" style="max-width:600px;margin:2rem auto;padding:2rem;">
+        <div style="text-align:center;margin-bottom:1.5rem;">
+          <span class="material-icons-round" style="font-size:3rem;color:${score>=60?'var(--accent-amber)':'var(--accent-rose)'};">
+            ${score>=60?'emoji_events':'sentiment_dissatisfied'}
+          </span>
+          <h2 style="font-size:1.5rem;font-weight:700;margin:0.5rem 0;">시험 완료!</h2>
+          <div style="font-size:2.5rem;font-weight:800;color:var(--accent-amber);">${score}점</div>
+          <div style="color:var(--text-secondary);">${correct} / ${total} 정답</div>
+        </div>
+
+        <div class="exam-point-summary glass-panel" style="padding:1rem;border-radius:12px;margin-bottom:1.5rem;text-align:center;">
+          ${earnedPoints > 0 ? `
+            <div style="font-size:1rem;color:var(--text-secondary);">획득 포인트</div>
+            <div style="font-size:2rem;font-weight:800;color:var(--accent-amber);">+${earnedPoints}P</div>
+            ${isNewBest ? `
+              <div style="font-size:0.9rem;color:var(--accent-emerald);margin-top:0.25rem;">
+                🎉 최고점 갱신! 차액 +${pointDiff}P 추가 지급
+              </div>
+            ` : `
+              <div style="font-size:0.85rem;color:var(--text-secondary);margin-top:0.25rem;">
+                최고점 미갱신 - 포인트 추가 지급 없음
+              </div>
+            `}
+          ` : `
+            <div style="color:var(--text-secondary);">60점 미만 - 포인트 지급 없음</div>
+          `}
+        </div>
+
+        <details style="margin-bottom:1.5rem;">
+          <summary style="cursor:pointer;font-weight:700;color:var(--accent-purple);margin-bottom:0.5rem;">📋 답안 확인</summary>
+          <div style="max-height:300px;overflow-y:auto;padding:0.5rem 0;">${answerHtml}</div>
+        </details>
+
+        <button onclick="app.completeExamAndGoHome()" class="btn-primary"
+          style="width:100%;padding:0.8rem;font-size:0.95rem;font-weight:700;border-radius:10px;background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue));color:#fff;border:none;cursor:pointer;">
+          처음으로 돌아가기
+        </button>
+      </div>
+    `;
+
+    // Firestore 업데이트
+    if (!this.currentUser.isTrial) {
+      try {
+        const newAttemptCount = prevAttemptCount + 1;
+        const attemptRecord = {
+          id: 'attempt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+          score,
+          correctCount: correct,
+          totalCount: total,
+          submittedAt,
+          region: applicantRegion,
+          applicantName,
+          userId: this.currentUser.id,
+          userEmail: this.currentUser.email || '',
+          answers: this.examAnswers
+        };
+        const previousAttempts = Array.isArray(prevSubmission?.attempts) ? prevSubmission.attempts : [];
+        const newSubmission = {
+          region: applicantRegion,
+          applicantName,
+          regionNameKey: examDocKey,
+          score: Math.max(score, prevBestScore),
+          pointsEarned: Math.max(earnedPoints, prevBestPoints),
+          attemptCount: newAttemptCount,
+          lastAttemptDate: submittedAt,
+          lastScore: score,
+          lastUserId: this.currentUser.id,
+          lastUserEmail: this.currentUser.email || '',
+          updatedAt: Date.now(),
+          attempts: [...previousAttempts, attemptRecord].slice(-30)
+        };
+
+        const updateData = { examSubmission: newSubmission };
+        updateData.examRegion = applicantRegion;
+        updateData.examApplicantName = applicantName;
+
+        if (isNewBest && pointDiff > 0) {
+          const examHistory = {
+            id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2,5),
+            type: 'exam',
+            title: `사명자 시험 최고점 갱신 (${score}점)`,
+            amount: pointDiff,
+            date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+          };
+          updateData.points = firebase.firestore.FieldValue.increment(pointDiff);
+          updateData.pointsHistory = firebase.firestore.FieldValue.arrayUnion(examHistory);
+          this.showPointsFloater(pointDiff, `사명자 시험 +${pointDiff}P`);
+          this.playConfetti('quiz');
+        }
+
+        await db.collection('users').doc(this.currentUser.id).update(updateData);
+
+        if (examDocKey) {
+          try {
+            await db.collection('mission_exam_submissions').doc(examDocKey).set({
+              ...newSubmission,
+              createdAt: existingExamDoc?.createdAt || Date.now()
+            }, { merge: true });
+          } catch (aggregateErr) {
+            console.error('사명자 시험 이름 기준 내역 저장 오류:', aggregateErr);
+          }
+        }
+
+        this.currentUser.examSubmission = newSubmission;
+        if (isNewBest && pointDiff > 0) {
+          this.currentUser.points = (this.currentUser.points || 0) + pointDiff;
+        }
+        this.showToast(`✅ 사명자 시험 완료! 점수: ${score}점 ${isNewBest && pointDiff>0 ? `(+${pointDiff}P 지급)` : ''}`);
+      } catch(err) {
+        console.error('시험 저장 오류:', err);
+      }
+    }
+  }
+
+  _getMissionExamSubmissionKey(region, name) {
+    const cleanRegion = String(region || '').trim().replace(/\s+/g, ' ');
+    const cleanName = String(name || '').trim().replace(/\s+/g, ' ');
+    if (!cleanRegion || !cleanName) return '';
+    return `${cleanRegion}__${cleanName}`.toLowerCase().replace(/[\/#?\[\]]/g, '_');
+  }
+
+  completeExamAndGoHome() {
+    const container = document.getElementById('examView');
+    if (container && this._examIntroHtml) {
+      container.innerHTML = this._examIntroHtml;
+      this._examIntroHtml = null;
+    }
+    this.isExamMode = false;
+    this.examQuestions = [];
+    this.examAnswers = [];
+    this.currentExamQuestionIndex = 0;
+    this.examCorrectCount = 0;
+    this.currentExamApplicant = null;
+    this.switchView('dashboard');
+  }
+
+  // ============================================================
 
   clearIntervals() {
     if (this.gameTimerInterval) {
@@ -3220,6 +4141,1028 @@ class SimonEduApp {
       console.error("Error updating device platform in Firestore:", err);
     });
   }
+
+  // --- Crew & Battle Arena Arena Logic ---
+
+  createCrew(fromModal = false) {
+    if (!this.currentUser) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+    if (this.currentUser.isTrial) {
+      alert("체험 모드에서는 크루를 창설할 수 없습니다.");
+      return;
+    }
+    
+    const inputId = fromModal ? 'inputCrewNameModal' : 'inputCrewNameInline';
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    
+    const crewName = input.value.trim();
+    if (crewName.length < 2) {
+      alert("크루 이름은 최소 2글자 이상이어야 합니다.");
+      return;
+    }
+    
+    // Check if crew name already exists
+    const nameExists = this.crews && this.crews.some(c => c.name.toLowerCase() === crewName.toLowerCase());
+    if (nameExists) {
+      alert("이미 존재하는 크루 이름입니다. 다른 이름을 입력해주세요.");
+      return;
+    }
+    
+    // Create crew document
+    db.collection('crews').add({
+      name: crewName,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      leaderId: this.currentUser.id,
+      leaderName: this.currentUser.name,
+      points: 0,
+      memberCount: 1
+    }).then(docRef => {
+      // Update user with crew information
+      db.collection('users').doc(this.currentUser.id).update({
+        crewId: docRef.id,
+        crewName: crewName
+      }).then(() => {
+        this.currentUser.crewId = docRef.id;
+        this.currentUser.crewName = crewName;
+        input.value = '';
+        if (fromModal) {
+          this.closeModal('modalCreateCrew');
+        }
+        this.showToast(`👥 [${crewName}] 크루가 성공적으로 창설되었습니다!`);
+        this.renderCrewHub();
+      });
+    }).catch(err => {
+      console.error("Error creating crew:", err);
+      alert("크루 창설에 실패했습니다.");
+    });
+  }
+
+  joinCrew(crewId, crewName) {
+    if (!this.currentUser) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+    if (this.currentUser.isTrial) {
+      alert("체험 모드에서는 크루에 가입할 수 없습니다.");
+      return;
+    }
+    if (this.currentUser.crewId) {
+      alert("이미 가입된 크루가 있습니다. 먼저 탈퇴해야 합니다.");
+      return;
+    }
+    
+    // Update user
+    db.collection('users').doc(this.currentUser.id).update({
+      crewId: crewId,
+      crewName: crewName
+    }).then(() => {
+      // Increment crew count
+      db.collection('crews').doc(crewId).update({
+        memberCount: firebase.firestore.FieldValue.increment(1)
+      });
+      
+      this.currentUser.crewId = crewId;
+      this.currentUser.crewName = crewName;
+      this.showToast(`👥 [${crewName}] 크루에 가입했습니다!`);
+      this.renderCrewHub();
+    }).catch(err => {
+      console.error("Error joining crew:", err);
+      alert("크루 가입에 실패했습니다.");
+    });
+  }
+
+  leaveCrew() {
+    if (!this.currentUser || !this.currentUser.crewId) return;
+    
+    const crewId = this.currentUser.crewId;
+    const crewName = this.currentUser.crewName;
+    
+    if (!confirm(`정말로 [${crewName}] 크루를 탈퇴하시겠습니까?`)) return;
+    
+    // Update user
+    db.collection('users').doc(this.currentUser.id).update({
+      crewId: null,
+      crewName: null
+    }).then(() => {
+      // Decrement crew count
+      db.collection('crews').doc(crewId).get().then(doc => {
+        if (doc.exists) {
+          const crew = doc.data();
+          if (crew.memberCount <= 1) {
+            // Delete crew if no members left
+            db.collection('crews').doc(crewId).delete();
+          } else {
+            db.collection('crews').doc(crewId).update({
+              memberCount: firebase.firestore.FieldValue.increment(-1)
+            });
+          }
+        }
+      });
+      
+      this.currentUser.crewId = null;
+      this.currentUser.crewName = null;
+      this.showToast(`👥 [${crewName}] 크루를 탈퇴했습니다.`);
+      this.renderCrewHub();
+    }).catch(err => {
+      console.error("Error leaving crew:", err);
+      alert("크루 탈퇴에 실패했습니다.");
+    });
+  }
+
+  requestOneOnOneBattle(targetUserId, targetUserName) {
+    if (confirm(`${targetUserName}님에게 1대1 말씀 암송 대결을 신청하시겠습니까? (참가비 10P)`)) {
+      this.createBattleRoom('one_on_one', targetUserId);
+    }
+  }
+
+  createBattleRoom(type, targetUserId = null) {
+    if (!this.currentUser) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+    if (this.currentUser.isTrial) {
+      alert("체험 모드에서는 대결을 이용하실 수 없습니다.");
+      return;
+    }
+    
+    if (type === 'team') {
+      if (!this.currentUser.crewId) {
+        alert("크루 대항전을 시작하려면 먼저 크루에 가입하거나 창설해야 합니다.");
+        return;
+      }
+      
+      const titleInput = document.getElementById('inputBattleTitle');
+      const title = titleInput ? titleInput.value.trim() : '';
+      if (title.length < 2) {
+        alert("대결 방 제목을 2글자 이상 입력하세요.");
+        return;
+      }
+      
+      const chapterSelect = document.getElementById('selectBattleChapter');
+      const chapter = chapterSelect ? parseInt(chapterSelect.value) : 1;
+      
+      const feeInput = document.getElementById('inputBattleEntryFee');
+      const entryFee = feeInput ? parseInt(feeInput.value) : 10;
+      if (isNaN(entryFee) || entryFee < 0) {
+        alert("올바른 참가비를 입력하세요.");
+        return;
+      }
+      
+      if (this.currentUser.points < entryFee) {
+        alert(`포인트가 부족합니다. (필요: ${entryFee}P / 보유: ${this.currentUser.points}P)`);
+        return;
+      }
+      
+      const chapterVerses = window.BIBLE_DATA.filter(v => v.chapter === chapter);
+      if (chapterVerses.length === 0) {
+        alert("해당 장에 등록된 말씀 데이터가 없습니다.");
+        return;
+      }
+      
+      const shuffled = [...chapterVerses].sort(() => 0.5 - Math.random());
+      const selectedVerses = shuffled.slice(0, 5).map(v => ({ chapter: v.chapter, verse: v.verse }));
+      
+      const battleData = {
+        title: title,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        creatorId: this.currentUser.id,
+        creatorName: this.currentUser.name,
+        creatorCrewId: this.currentUser.crewId,
+        creatorCrewName: this.currentUser.crewName,
+        type: 'team',
+        chapter: chapter,
+        entryFee: entryFee,
+        prizePool: entryFee,
+        status: 'waiting',
+        verses: selectedVerses,
+        participants: [
+          {
+            userId: this.currentUser.id,
+            username: this.currentUser.name,
+            crewId: this.currentUser.crewId,
+            crewName: this.currentUser.crewName,
+            score: 0,
+            timeSpent: 999,
+            completed: false,
+            started: false
+          }
+        ]
+      };
+      
+      db.collection('users').doc(this.currentUser.id).update({
+        points: firebase.firestore.FieldValue.increment(-entryFee)
+      }).then(() => {
+        db.collection('battles').add(battleData).then(() => {
+          if (titleInput) titleInput.value = '';
+          this.showToast(`⚔️ 크루 대항전 방 [${title}]이 개설되었습니다!`);
+          this.renderCrewHub();
+        });
+      }).catch(err => {
+        console.error("Error creating team battle room:", err);
+        alert("방 개설에 실패했습니다.");
+      });
+      
+    } else if (type === 'one_on_one') {
+      if (!targetUserId) return;
+      
+      const targetUser = this.users.find(u => u.id === targetUserId);
+      if (!targetUser) {
+        alert("상대방 정보를 찾을 수 없습니다.");
+        return;
+      }
+      
+      const entryFee = 10;
+      
+      if (this.currentUser.points < entryFee) {
+        alert(`포인트가 부족합니다. (필요: ${entryFee}P / 보유: ${this.currentUser.points}P)`);
+        return;
+      }
+      
+      const creatorChapter = Math.max(1, Math.min(22, Math.floor(Math.random() * 22) + 1));
+      
+      const chapterVerses = window.BIBLE_DATA.filter(v => v.chapter === creatorChapter);
+      const shuffled = [...chapterVerses].sort(() => 0.5 - Math.random());
+      const selectedVerses = shuffled.slice(0, 5).map(v => ({ chapter: v.chapter, verse: v.verse }));
+      
+      const battleData = {
+        title: `${this.currentUser.name} vs ${targetUser.name} 대결`,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        creatorId: this.currentUser.id,
+        creatorName: this.currentUser.name,
+        creatorCrewId: this.currentUser.crewId || null,
+        creatorCrewName: this.currentUser.crewName || null,
+        type: 'one_on_one',
+        chapter: creatorChapter,
+        entryFee: entryFee,
+        prizePool: entryFee,
+        status: 'waiting',
+        targetUserId: targetUserId,
+        verses: selectedVerses,
+        participants: [
+          {
+            userId: this.currentUser.id,
+            username: this.currentUser.name,
+            crewId: this.currentUser.crewId || null,
+            crewName: this.currentUser.crewName || null,
+            score: 0,
+            timeSpent: 999,
+            completed: false,
+            started: false
+          }
+        ]
+      };
+      
+      db.collection('users').doc(this.currentUser.id).update({
+        points: firebase.firestore.FieldValue.increment(-entryFee)
+      }).then(() => {
+        db.collection('battles').add(battleData).then(docRef => {
+          const newNotification = {
+            id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            type: 'battle_invite',
+            battleId: docRef.id,
+            message: `⚔️ ${this.currentUser.name}님이 1대1 말씀 대결(참가비 10P)을 신청했습니다!`,
+            timestamp: Date.now(),
+            read: false
+          };
+          
+          db.collection('users').doc(targetUserId).update({
+            notifications: firebase.firestore.FieldValue.arrayUnion(newNotification)
+          }).then(() => {
+            this.showToast(`⚔️ ${targetUser.name}님에게 1대1 대결 신청을 보냈습니다.`);
+            this.closeModal('modalAllRankings');
+          });
+        });
+      }).catch(err => {
+        console.error("Error creating 1-on-1 battle:", err);
+        alert("대결 신청에 실패했습니다.");
+      });
+    }
+  }
+
+  joinBattleRoom(battleId) {
+    if (!this.currentUser) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+    if (this.currentUser.isTrial) {
+      alert("체험 모드에서는 대결을 이용하실 수 없습니다.");
+      return;
+    }
+    
+    db.collection('battles').doc(battleId).get().then(doc => {
+      if (!doc.exists) return;
+      const battle = doc.data();
+      
+      if (battle.status !== 'waiting') {
+        alert("이미 대결이 시작되었거나 종료되었습니다.");
+        return;
+      }
+      
+      if (battle.type === 'team' && !this.currentUser.crewId) {
+        alert("크루 대항전에 참여하려면 먼저 크루에 가입해야 합니다.");
+        return;
+      }
+      
+      const isAlreadyIn = battle.participants.some(p => p.userId === this.currentUser.id);
+      if (isAlreadyIn) {
+        alert("이미 대결 방에 참가되어 있습니다.");
+        return;
+      }
+      
+      const newParticipant = {
+        userId: this.currentUser.id,
+        username: this.currentUser.name,
+        crewId: this.currentUser.crewId || null,
+        crewName: this.currentUser.crewName || null,
+        score: 0,
+        timeSpent: 999,
+        completed: false,
+        started: false
+      };
+      
+      db.collection('battles').doc(battleId).update({
+        participants: firebase.firestore.FieldValue.arrayUnion(newParticipant)
+      }).then(() => {
+        this.showToast(`⚔️ 대결 방에 참가하셨습니다!`);
+        this.renderCrewHub();
+      });
+    });
+  }
+
+  startBattleIndividual(battleId) {
+    if (!this.currentUser) return;
+    
+    db.collection('battles').doc(battleId).get().then(doc => {
+      if (!doc.exists) return;
+      const battle = doc.data();
+      
+      const pIndex = battle.participants.findIndex(p => p.userId === this.currentUser.id);
+      if (pIndex === -1) {
+        alert("참가자가 아닙니다.");
+        return;
+      }
+      
+      const myParticipant = battle.participants[pIndex];
+      if (myParticipant.started) {
+        // 이미 started 상태면 그냥 게임 진입 (재시작 방지)
+        this.startBattleRun(battleId);
+        return;
+      }
+
+      // 1대1 대결이고 이미 active 상태 (상대방이 수락하여 참가비 이미 차감됨)
+      // → 참가비 재차감 없이 바로 started=true 후 게임 진입
+      if (battle.status === 'active' && battle.type === 'one_on_one') {
+        const updatedParticipants = battle.participants.map((p, idx) => {
+          if (idx === pIndex) return { ...p, started: true };
+          return p;
+        });
+        db.collection('battles').doc(battleId).update({
+          participants: updatedParticipants
+        }).then(() => {
+          this.startBattleRun(battleId);
+        });
+        return;
+      }
+      
+      // 대기 중인 방: 참가비 차감 후 시작
+      if (this.currentUser.points < battle.entryFee) {
+        alert(`포인트가 부족합니다. (참가비: ${battle.entryFee}P / 보유: ${this.currentUser.points}P)`);
+        return;
+      }
+      
+      db.collection('users').doc(this.currentUser.id).update({
+        points: firebase.firestore.FieldValue.increment(-battle.entryFee)
+      }).then(() => {
+        const updatedParticipants = battle.participants.map(p => {
+          if (p.userId === this.currentUser.id) {
+            return { ...p, started: true };
+          }
+          return p;
+        });
+        
+        db.collection('battles').doc(battleId).update({
+          participants: updatedParticipants,
+          status: 'active',
+          prizePool: firebase.firestore.FieldValue.increment(battle.entryFee)
+        }).then(() => {
+          this.startBattleRun(battleId);
+        });
+      });
+    });
+  }
+
+  startBattleRun(battleId) {
+    db.collection('battles').doc(battleId).get().then(doc => {
+      if (!doc.exists) return;
+      const battle = doc.data();
+      
+      this.currentBattleId = battleId;
+      this.currentBattleVerses = battle.verses || [];
+      this.currentBattleVerseIndex = 0;
+      this.battleCorrectAnswersCount = 0;
+      this.battleTotalTimeSpent = 0;
+      this.battleStartTime = Date.now();
+      
+      if (this.currentBattleVerses.length === 0) {
+        alert("대결에 등록된 말씀 구절이 없습니다.");
+        this.currentBattleId = null;
+        return;
+      }
+      
+      const firstVerseMeta = this.currentBattleVerses[0];
+      const matched = window.BIBLE_DATA.find(v => v.chapter === firstVerseMeta.chapter && v.verse === firstVerseMeta.verse);
+      if (matched) {
+        this.currentQuizVerse = matched;
+        this.switchView('game');
+        this.initializeQuiz();
+      } else {
+        alert("말씀 구절을 로드하는데 실패했습니다.");
+        this.currentBattleId = null;
+      }
+    });
+  }
+
+  nextBattleVerse() {
+    this.currentBattleVerseIndex++;
+    if (this.currentBattleVerseIndex < this.currentBattleVerses.length) {
+      const targetVerseMeta = this.currentBattleVerses[this.currentBattleVerseIndex];
+      const matched = window.BIBLE_DATA.find(v => v.chapter === targetVerseMeta.chapter && v.verse === targetVerseMeta.verse);
+      if (matched) {
+        this.currentQuizVerse = matched;
+        this.initializeQuiz();
+      } else {
+        console.error("Verse match not found in BIBLE_DATA:", targetVerseMeta);
+        this.finishMyBattleRun();
+      }
+    } else {
+      this.finishMyBattleRun();
+    }
+  }
+
+  finishMyBattleRun() {
+    this.clearIntervals();
+    this.gameActive = false;
+    
+    const battleId = this.currentBattleId;
+    this.currentBattleId = null;
+    
+    this.showToast(`🏆 대결 종료! 결과를 기록 중입니다...`);
+    
+    db.collection('battles').doc(battleId).get().then(doc => {
+      if (!doc.exists) {
+        this.switchView('crew');
+        return;
+      }
+      
+      const battle = doc.data();
+      const updatedParticipants = battle.participants.map(p => {
+        if (p.userId === this.currentUser.id) {
+          return {
+            ...p,
+            completed: true,
+            score: this.battleCorrectAnswersCount,
+            timeSpent: this.battleTotalTimeSpent
+          };
+        }
+        return p;
+      });
+      
+      const allCompleted = updatedParticipants.every(p => p.completed);
+      const newStatus = allCompleted ? 'completed' : battle.status;
+      
+      db.collection('battles').doc(battleId).update({
+        participants: updatedParticipants,
+        status: newStatus
+      }).then(() => {
+        this.switchView('crew');
+        
+        if (allCompleted) {
+          this.resolveBattle(battleId);
+        } else {
+          alert(`대결이 종료되었습니다!\n나의 기록: 맞춘 개수 ${this.battleCorrectAnswersCount}개 / 소요 시간 ${this.battleTotalTimeSpent}초\n\n다른 참가자들이 완료하면 최종 정산됩니다.`);
+        }
+      }).catch(err => {
+        console.error("Error updating battle completion:", err);
+        this.switchView('crew');
+      });
+    });
+  }
+
+  resolveBattle(battleId) {
+    db.collection('battles').doc(battleId).get().then(doc => {
+      if (!doc.exists) return;
+      const battle = doc.data();
+      
+      if (battle.status !== 'completed') return;
+      if (battle.resolved) return;
+      
+      const participants = battle.participants || [];
+      if (participants.length === 0) return;
+      
+      let winnerText = '';
+      let winnerUserIds = [];
+      let winnerCrewId = null;
+      let winnerCrewName = '';
+      
+      if (battle.type === 'one_on_one') {
+        const sorted = [...participants].sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return a.timeSpent - b.timeSpent;
+        });
+        
+        const p1 = sorted[0];
+        const p2 = sorted[1];
+        
+        if (p1.score === p2.score && p1.timeSpent === p2.timeSpent) {
+          winnerText = `🤝 ${p1.username}님과 ${p2.username}님이 동점으로 비겼습니다! 참가비가 환불되었습니다.`;
+          winnerUserIds = [p1.userId, p2.userId];
+          
+          const refundAmount = Math.floor(battle.prizePool / 2);
+          winnerUserIds.forEach(uid => {
+            db.collection('users').doc(uid).update({
+              points: firebase.firestore.FieldValue.increment(refundAmount)
+            });
+            this.addSystemNotification(uid, `🤝 1대1 대결 비김 알림: ${refundAmount}P가 반환되었습니다.`);
+          });
+        } else {
+          winnerText = `🏆 1대1 대결 승리! ${p1.username}님이 ${p2.username}님을 이기고 ${battle.prizePool}P를 획득하셨습니다!`;
+          winnerUserIds = [p1.userId];
+          
+          db.collection('users').doc(p1.userId).update({
+            points: firebase.firestore.FieldValue.increment(battle.prizePool)
+          });
+          this.addSystemNotification(p1.userId, `🎉 1대1 대결 승리! +${battle.prizePool}P가 지급되었습니다.`);
+          this.addSystemNotification(p2.userId, `😢 1대1 대결 아쉬운 패배! 다음 기회에 도전하세요.`);
+        }
+      } else {
+        const crewGroups = {};
+        participants.forEach(p => {
+          if (!p.crewId) return;
+          if (!crewGroups[p.crewId]) {
+            crewGroups[p.crewId] = {
+              crewId: p.crewId,
+              crewName: p.crewName,
+              totalScore: 0,
+              totalTime: 0,
+              count: 0,
+              members: []
+            };
+          }
+          crewGroups[p.crewId].totalScore += p.score;
+          crewGroups[p.crewId].totalTime += p.timeSpent;
+          crewGroups[p.crewId].count += 1;
+          crewGroups[p.crewId].members.push(p);
+        });
+        
+        const groupsArray = Object.values(crewGroups);
+        if (groupsArray.length === 0) {
+          winnerText = "참여한 크루가 없어 대결이 무효 처리되었습니다.";
+        } else if (groupsArray.length === 1) {
+          const winningCrew = groupsArray[0];
+          winnerText = `🎉 단독 크루 참가! [${winningCrew.crewName}] 크루가 상금 ${battle.prizePool}P를 획득했습니다.`;
+          winnerCrewId = winningCrew.crewId;
+          winnerCrewName = winningCrew.crewName;
+          
+          const share = Math.floor(battle.prizePool / winningCrew.members.length);
+          winningCrew.members.forEach(m => {
+            db.collection('users').doc(m.userId).update({
+              points: firebase.firestore.FieldValue.increment(share)
+            });
+            this.addSystemNotification(m.userId, `🎉 크루 대항전 승리! +${share}P가 지급되었습니다.`);
+          });
+          
+          db.collection('crews').doc(winningCrew.crewId).update({
+            points: firebase.firestore.FieldValue.increment(battle.prizePool)
+          });
+        } else {
+          groupsArray.forEach(g => {
+            g.avgScore = g.totalScore / g.count;
+            g.avgTime = g.totalTime / g.count;
+          });
+          
+          groupsArray.sort((a, b) => {
+            if (b.avgScore !== a.avgScore) return b.avgScore - a.avgScore;
+            return a.avgTime - b.avgTime;
+          });
+          
+          const team1 = groupsArray[0];
+          const team2 = groupsArray[1];
+          
+          if (team1.avgScore === team2.avgScore && team1.avgTime === team2.avgTime) {
+            winnerText = `🤝 [${team1.crewName}]와 [${team2.crewName}] 크루가 동점으로 비겼습니다! 상금이 분배되었습니다.`;
+            
+            const splitPrize = Math.floor(battle.prizePool / 2);
+            [team1, team2].forEach(team => {
+              const share = Math.floor(splitPrize / team.members.length);
+              team.members.forEach(m => {
+                db.collection('users').doc(m.userId).update({
+                  points: firebase.firestore.FieldValue.increment(share)
+                });
+                this.addSystemNotification(m.userId, `🤝 크루 대항전 무승부! +${share}P가 지급되었습니다.`);
+              });
+              db.collection('crews').doc(team.crewId).update({
+                points: firebase.firestore.FieldValue.increment(splitPrize)
+              });
+            });
+          } else {
+            winnerText = `🏆 크루 대항전 승리! [${team1.crewName}] 크루가 [${team2.crewName}] 크루를 꺾고 최종 우승했습니다!`;
+            winnerCrewId = team1.crewId;
+            winnerCrewName = team1.crewName;
+            
+            const share = Math.floor(battle.prizePool / team1.members.length);
+            team1.members.forEach(m => {
+              db.collection('users').doc(m.userId).update({
+                points: firebase.firestore.FieldValue.increment(share)
+              });
+              this.addSystemNotification(m.userId, `🎉 크루 대항전 승리! +${share}P가 지급되었습니다.`);
+            });
+            
+            team2.members.forEach(m => {
+              this.addSystemNotification(m.userId, `😢 크루 대항전 패배! 다음 대결에서 복수하세요.`);
+            });
+            
+            db.collection('crews').doc(team1.crewId).update({
+              points: firebase.firestore.FieldValue.increment(battle.prizePool)
+            });
+          }
+        }
+      }
+      
+      db.collection('battles').doc(battleId).update({
+        resolved: true,
+        resolutionText: winnerText,
+        winnerCrewId: winnerCrewId,
+        winnerCrewName: winnerCrewName
+      }).then(() => {
+        const isCurrentParticipant = participants.some(p => p.userId === this.currentUser.id);
+        if (isCurrentParticipant) {
+          alert(`📢 대결 최종 정산 완료!\n\n${winnerText}`);
+        }
+      });
+    });
+  }
+
+  addSystemNotification(userId, message) {
+    const newNotification = {
+      id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+      type: 'system',
+      message: message,
+      timestamp: Date.now(),
+      read: false
+    };
+    db.collection('users').doc(userId).update({
+      notifications: firebase.firestore.FieldValue.arrayUnion(newNotification)
+    }).catch(err => console.error("Error adding system notification:", err));
+  }
+
+  acceptBattleInvite(battleId, notificationId) {
+    if (!this.currentUser) return;
+    
+    const notifications = this.currentUser.notifications || [];
+    const updatedNotifications = notifications.map(n => {
+      if (n.id === notificationId) {
+        return { ...n, read: true };
+      }
+      return n;
+    });
+    
+    db.collection('users').doc(this.currentUser.id).update({
+      notifications: updatedNotifications
+    }).then(() => {
+      this.renderNotifications();
+      
+      db.collection('battles').doc(battleId).get().then(doc => {
+        if (!doc.exists) {
+          alert("존재하지 않거나 만료된 대결입니다.");
+          return;
+        }
+        
+        const battle = doc.data();
+        if (battle.status !== 'waiting') {
+          alert("이미 진행 중이거나 완료된 대결입니다.");
+          return;
+        }
+        
+        if (this.currentUser.points < battle.entryFee) {
+          alert(`포인트가 부족합니다. (참가비: ${battle.entryFee}P / 보유: ${this.currentUser.points}P)`);
+          return;
+        }
+        
+        db.collection('users').doc(this.currentUser.id).update({
+          points: firebase.firestore.FieldValue.increment(-battle.entryFee)
+        }).then(() => {
+          const newParticipant = {
+            userId: this.currentUser.id,
+            username: this.currentUser.name,
+            crewId: this.currentUser.crewId || null,
+            crewName: this.currentUser.crewName || null,
+            score: 0,
+            timeSpent: 999,
+            completed: false,
+            started: true   // 수락자는 즉시 started
+          };
+          
+          const updatedParticipants = [...battle.participants, newParticipant];
+          
+          db.collection('battles').doc(battleId).update({
+            participants: updatedParticipants,
+            status: 'active',
+            prizePool: firebase.firestore.FieldValue.increment(battle.entryFee)
+          }).then(() => {
+            const dropdown = document.getElementById('notificationDropdown');
+            if (dropdown) dropdown.classList.remove('active');
+
+            // ✅ 신청자(creator)에게 대결 수락 알림 push → 신청자도 게임 시작하도록
+            const creatorNotif = {
+              id: 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+              type: 'battle_accepted',
+              battleId: battleId,
+              message: `⚔️ ${this.currentUser.name}님이 1대1 대결을 수락했습니다! 지금 바로 대결을 시작하세요!`,
+              timestamp: Date.now(),
+              read: false
+            };
+            db.collection('users').doc(battle.creatorId).update({
+              notifications: firebase.firestore.FieldValue.arrayUnion(creatorNotif)
+            });
+            
+            // 수락자 → 즉시 게임 시작
+            this.startBattleRun(battleId);
+          });
+        });
+      });
+    });
+  }
+
+  declineBattleInvite(battleId, notificationId) {
+    if (!this.currentUser) return;
+    
+    const notifications = this.currentUser.notifications || [];
+    const updatedNotifications = notifications.map(n => {
+      if (n.id === notificationId) {
+        return { ...n, read: true };
+      }
+      return n;
+    });
+    
+    db.collection('users').doc(this.currentUser.id).update({
+      notifications: updatedNotifications
+    }).then(() => {
+      this.renderNotifications();
+      
+      db.collection('battles').doc(battleId).get().then(doc => {
+        if (!doc.exists) return;
+        const battle = doc.data();
+        
+        if (battle.status === 'waiting') {
+          db.collection('users').doc(battle.creatorId).update({
+            points: firebase.firestore.FieldValue.increment(battle.entryFee)
+          });
+          
+          db.collection('battles').doc(battleId).delete();
+          
+          this.addSystemNotification(battle.creatorId, `😢 1대1 대결 거절 알림: ${this.currentUser.name}님이 대결 신청을 거절하여 참가비가 환불되었습니다.`);
+        }
+      });
+      
+      const dropdown = document.getElementById('notificationDropdown');
+      if (dropdown) dropdown.classList.remove('active');
+      this.showToast("대결 신청을 거절하셨습니다.");
+    });
+  }
+
+  // 신청자가 수락 알림에서 "지금 시작!" 버튼을 눌렀을 때
+  startBattleFromNotif(battleId, notificationId) {
+    if (!this.currentUser) return;
+
+    // 알림을 읽음 처리
+    const notifications = this.currentUser.notifications || [];
+    const updatedNotifications = notifications.map(n => {
+      if (n.id === notificationId) return { ...n, read: true };
+      return n;
+    });
+    db.collection('users').doc(this.currentUser.id).update({
+      notifications: updatedNotifications
+    });
+
+    const dropdown = document.getElementById('notificationDropdown');
+    if (dropdown) dropdown.classList.remove('active');
+
+    // 배틀 문서 가져와서 본인 participant started=true 로 업데이트 후 게임 진입
+    db.collection('battles').doc(battleId).get().then(doc => {
+      if (!doc.exists) {
+        alert('대결 방이 존재하지 않습니다.');
+        return;
+      }
+      const battle = doc.data();
+
+      if (battle.status !== 'active') {
+        alert('아직 상대방이 수락하지 않았습니다.');
+        return;
+      }
+
+      const pIndex = battle.participants.findIndex(p => p.userId === this.currentUser.id);
+      if (pIndex === -1) {
+        alert('참가자가 아닙니다.');
+        return;
+      }
+
+      if (battle.participants[pIndex].started) {
+        // 이미 started 처리된 경우 그냥 게임 진입
+        this.startBattleRun(battleId);
+        return;
+      }
+
+      // started를 true로 업데이트
+      const updatedParticipants = battle.participants.map((p, idx) => {
+        if (idx === pIndex) return { ...p, started: true };
+        return p;
+      });
+
+      db.collection('battles').doc(battleId).update({
+        participants: updatedParticipants
+      }).then(() => {
+        this.startBattleRun(battleId);
+      });
+    });
+  }
+
+  renderCrewHub() {
+    if (!this.currentUser) return;
+
+    const noCrewSection = document.getElementById('crewNoCrewSection');
+    const hubSection = document.getElementById('crewHubSection');
+    const fab = document.getElementById('fabCreateCrew');
+
+    if (!noCrewSection || !hubSection) return;
+
+    if (!this.currentUser.crewId) {
+      noCrewSection.style.display = 'block';
+      hubSection.style.display = 'none';
+      if (fab) fab.style.display = 'flex';
+
+      const list = document.getElementById('joinableCrewsList');
+      if (list) {
+        if (!this.crews || this.crews.length === 0) {
+          list.innerHTML = '<div style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.85rem;">현재 창설된 크루가 없습니다. 첫 크루를 개설해 보세요!</div>';
+        } else {
+          list.innerHTML = '';
+          this.crews.forEach(crew => {
+            const item = document.createElement('div');
+            item.className = 'crew-list-item';
+            item.innerHTML = `
+              <div class="crew-info-col">
+                <span class="crew-name-label">${crew.name}</span>
+                <span class="crew-meta-label">크루장: ${crew.leaderName} | 멤버: ${crew.memberCount}명 | 포인트: ${crew.points.toLocaleString()}P</span>
+              </div>
+              <button class="btn-mini" onclick="app.joinCrew('${crew.id}', '${crew.name}')">가입</button>
+            `;
+            list.appendChild(item);
+          });
+        }
+      }
+    } else {
+      noCrewSection.style.display = 'none';
+      hubSection.style.display = 'block';
+      if (fab) fab.style.display = 'none';
+
+      const myCrew = this.crews ? this.crews.find(c => c.id === this.currentUser.crewId) : null;
+      if (myCrew) {
+        if (this.currentUser.crewName !== myCrew.name) {
+          db.collection('users').doc(this.currentUser.id).update({
+            crewName: myCrew.name
+          });
+          this.currentUser.crewName = myCrew.name;
+        }
+        
+        document.getElementById('myCrewName').textContent = myCrew.name;
+        document.getElementById('myCrewDetails').textContent = 
+          `크루장: ${myCrew.leaderName} | 크루원: ${myCrew.memberCount}명 | 누적 포인트: ${myCrew.points.toLocaleString()}P`;
+      }
+
+      const select = document.getElementById('selectBattleChapter');
+      if (select && select.innerHTML === '') {
+        let options = '';
+        for (let i = 1; i <= 22; i++) {
+          options += `<option value="${i}">요한계시록 ${i}장</option>`;
+        }
+        select.innerHTML = options;
+      }
+
+      const battleList = document.getElementById('battleRoomsList');
+      if (battleList) {
+        const visibleBattles = (this.battles || []).filter(battle => {
+          return battle.type === 'team' || battle.creatorId === this.currentUser.id || battle.targetUserId === this.currentUser.id;
+        });
+
+        if (visibleBattles.length === 0) {
+          battleList.innerHTML = '<div style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:0.85rem;">진행 중인 대결 매치가 없습니다.</div>';
+        } else {
+          const sortedBattles = [...visibleBattles].sort((a, b) => {
+            const statusOrder = { 'waiting': 0, 'active': 1, 'completed': 2 };
+            if (statusOrder[a.status] !== statusOrder[b.status]) {
+              return statusOrder[a.status] - statusOrder[b.status];
+            }
+            const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
+            const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
+            return timeB - timeA;
+          });
+
+          battleList.innerHTML = '';
+          sortedBattles.forEach(battle => {
+            const isParticipant = battle.participants.some(p => p.userId === this.currentUser.id);
+            const myParticipant = battle.participants.find(p => p.userId === this.currentUser.id);
+            
+            let badgeText = '대기 중';
+            if (battle.status === 'active') badgeText = '진행 중';
+            else if (battle.status === 'completed') badgeText = '완료';
+
+            const card = document.createElement('div');
+            card.className = 'battle-card';
+            
+            let html = `
+              <div class="battle-card-header">
+                <h4 class="battle-card-title">${battle.title}</h4>
+                <span class="battle-badge ${battle.status}">${badgeText}</span>
+              </div>
+              <div class="battle-info-row">
+                <span>목표: 요한계시록 ${battle.chapter}장</span>
+                <span>참가비: ${battle.entryFee}P | 상금: ${battle.prizePool}P</span>
+              </div>
+              <div class="battle-participants">
+                <div style="font-weight:bold; font-size:0.75rem; color:var(--accent-purple); margin-bottom:0.2rem;">참가 현황</div>
+            `;
+
+            battle.participants.forEach(p => {
+              let pStatus = '대기 중';
+              let pClass = 'pending';
+              if (p.completed) {
+                pStatus = `완료 (${p.score}/5개, ${p.timeSpent}초)`;
+                pClass = 'completed';
+              } else if (p.started) {
+                pStatus = '암송 중';
+                pClass = 'pending';
+              }
+
+              html += `
+                <div class="participant-row">
+                  <span class="name">${p.username} ${p.crewName ? `[${p.crewName}]` : ''}</span>
+                  <span class="score ${pClass}">${pStatus}</span>
+                </div>
+              `;
+            });
+
+            html += `</div>`;
+
+            if (battle.status === 'completed' && battle.resolutionText) {
+              html += `
+                <div style="margin-top:0.5rem; padding:0.6rem; border-radius:8px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.2); font-size:0.8rem; line-height:1.4; color:var(--accent-amber); font-weight:bold; text-align:center;">
+                  ${battle.resolutionText}
+                </div>
+              `;
+            }
+
+            let actionBtnHtml = '';
+            if (battle.status === 'waiting') {
+              if (!isParticipant) {
+                actionBtnHtml = `<button class="btn-primary" style="margin: 0.5rem 0 0 0; width:100%; height:36px; font-size:0.85rem;" onclick="app.joinBattleRoom('${battle.id}')">대결 참여하기</button>`;
+              } else if (!myParticipant.started) {
+                actionBtnHtml = `<button class="btn-primary" style="margin: 0.5rem 0 0 0; width:100%; height:36px; font-size:0.85rem; background:linear-gradient(135deg, var(--accent-emerald), #047857);" onclick="app.startBattleIndividual('${battle.id}')">내 대결 시작하기</button>`;
+              }
+            } else if (battle.status === 'active' && isParticipant && !myParticipant.started) {
+              actionBtnHtml = `<button class="btn-primary" style="margin: 0.5rem 0 0 0; width:100%; height:36px; font-size:0.85rem; background:linear-gradient(135deg, var(--accent-emerald), #047857);" onclick="app.startBattleIndividual('${battle.id}')">내 대결 시작하기</button>`;
+            }
+
+            if (battle.status === 'completed' && !battle.resolved) {
+              this.resolveBattle(battle.id);
+            }
+
+            html += actionBtnHtml;
+            card.innerHTML = html;
+            battleList.appendChild(card);
+          });
+        }
+      }
+    }
+  }
+
+  updateDevicePlatform(os) {
+    if (!this.currentUser) return;
+    if (this.currentUser.os === os) return; // avoid duplicate updates
+    
+    this.currentUser.os = os;
+    if (this.currentUser.isTrial) return;
+    
+    db.collection('users').doc(this.currentUser.id).update({
+      os: os
+    }).then(() => {
+      console.log("Device platform successfully updated in Firestore:", os);
+    }).catch(err => {
+      console.error("Error updating device platform in Firestore:", err);
+    });
+  }
 }
 
 // Instantiate and bind to window
@@ -3267,6 +5210,12 @@ window.handleDeepLink = function(urlOrPath) {
   } else if (path === 'ranking') {
     if (window.app.currentUser) {
       window.app.switchView('ranking');
+    } else {
+      window.app.switchView('auth');
+    }
+  } else if (path === 'crew') {
+    if (window.app.currentUser) {
+      window.app.switchView('crew');
     } else {
       window.app.switchView('auth');
     }

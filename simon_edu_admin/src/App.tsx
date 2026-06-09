@@ -16,6 +16,8 @@ import Notices from './components/Notices';
 import Settings from './components/Settings';
 import Logs from './components/Logs';
 import PushManagement from './components/PushManagement';
+import MissionExam from './components/MissionExam';
+import { canOpenAdmin } from './roles';
 
 interface User {
   id: string;
@@ -30,6 +32,33 @@ interface User {
   currentVerseIndex: number;
   status?: 'active' | 'suspended';
   checkInHistory?: string[];
+  examRegion?: string;
+  examApplicantName?: string;
+  examSubmission?: {
+    region?: string;
+    applicantName?: string;
+    regionNameKey?: string;
+    score: number;
+    pointsEarned?: number;
+    attemptCount: number;
+    lastAttemptDate?: string;
+    lastScore?: number;
+    attempts?: Array<{
+      id?: string;
+      score: number;
+      correctCount?: number;
+      totalCount?: number;
+      submittedAt?: string;
+      region?: string;
+      applicantName?: string;
+      answers?: Array<{
+        question: string;
+        correct: string;
+        userAnswer: string;
+        isCorrect: boolean;
+      }>;
+    }>;
+  };
   pointsHistory?: Array<{
     id: string;
     type: string;
@@ -149,7 +178,7 @@ export default function App() {
           const userDocRef = doc(db, 'users', user.uid);
           const userDoc = await getDoc(userDocRef);
 
-          if (userDoc.exists() && userDoc.data().role === 'admin') {
+          if (userDoc.exists() && canOpenAdmin(userDoc.data().role)) {
             setAdminEmail(user.email || 'Admin');
             setIsAuthenticated(true);
             setErrorMsg('');
@@ -208,6 +237,7 @@ export default function App() {
       case 'settings': return '시스템 전역 환경설정';
       case 'logs': return '관리자 시스템 감사 로그';
       case 'push': return '푸시 알림 및 발송 관리';
+      case 'missionExam': return '시몬에듀 사명자 시험';
       default: return 'Simon Edu 관리자';
     }
   };
@@ -256,6 +286,8 @@ export default function App() {
         return <Logs />;
       case 'push':
         return <PushManagement users={users} adminEmail={adminEmail} />;
+      case 'missionExam':
+        return <MissionExam users={users} />;
       default:
         return (
           <Dashboard
@@ -349,6 +381,7 @@ export default function App() {
                currentTab === 'notices' ? 'campaign' :
                currentTab === 'settings' ? 'settings' :
                currentTab === 'logs' ? 'terminal' :
+               currentTab === 'missionExam' ? 'assignment' :
                currentTab === 'push' ? 'notifications' : 'security'}
             </span>
             <h1 className="header-title">{getTabTitle(currentTab)}</h1>

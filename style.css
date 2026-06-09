@@ -1355,6 +1355,13 @@ main {
   color: var(--accent-rose);
 }
 
+.btn-diff.active.master {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2));
+  border-color: var(--accent-purple);
+  color: var(--accent-purple);
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+}
+
 .verse-description {
   font-size: 0.9rem;
   line-height: 1.6;
@@ -2112,6 +2119,32 @@ body.logged-in:not(.mobile-app) #rankingView {
   display: block !important;
 }
 
+body.logged-in.single-dashboard-view:not(.mobile-app) .dashboard-grid-container {
+  display: block !important;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+body.logged-in.single-dashboard-view:not(.mobile-app) .dashboard-grid-left {
+  display: none !important;
+}
+
+body.logged-in.single-dashboard-view:not(.mobile-app) .dashboard-grid-right {
+  display: block !important;
+  width: 100%;
+}
+
+body.logged-in.single-dashboard-view:not(.mobile-app) #dashboardView,
+body.logged-in.single-dashboard-view:not(.mobile-app) #attendanceView,
+body.logged-in.single-dashboard-view:not(.mobile-app) #rankingView,
+body.logged-in.single-dashboard-view:not(.mobile-app) #crewView {
+  display: none !important;
+}
+
+body.logged-in.single-dashboard-view:not(.mobile-app) .view-container.active {
+  display: block !important;
+}
+
 /* On mobile app, disable grid layout and show only active view-container when logged in */
 body.mobile-app.logged-in .dashboard-grid-container {
   display: block !important;
@@ -2377,5 +2410,235 @@ body.mobile-app .settings-app-card {
   .single-path-card {
     padding: 1.5rem;
   }
+}
+
+/* Crew & Battle Arena Styles */
+.fab-btn {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ffd700, #b8860b);
+  border: 2px solid rgba(255, 215, 0, 0.6);
+  box-shadow: 0 8px 32px rgba(184, 134, 11, 0.5), 0 0 0 4px rgba(255,215,0,0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  z-index: 9999;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  animation: pulse-gold 2s infinite;
+}
+
+.fab-btn:hover {
+  transform: scale(1.1) rotate(90deg);
+  box-shadow: 0 12px 40px rgba(184, 134, 11, 0.5);
+}
+
+.fab-btn span {
+  font-size: 2rem;
+}
+
+@keyframes pulse-gold {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 15px rgba(255, 215, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+  }
+}
+
+@media (max-width: 600px) {
+  .fab-btn {
+    bottom: 1.5rem;
+    right: 1.5rem;
+    width: 58px;
+    height: 58px;
+  }
+  .fab-btn span {
+    font-size: 1.8rem;
+  }
+}
+
+/* Battle Room List Cards */
+.battle-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.battle-card:hover {
+  border-color: rgba(147, 51, 234, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(147, 51, 234, 0.1);
+}
+
+.battle-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.battle-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.battle-card-meta {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.battle-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  text-transform: uppercase;
+}
+
+.battle-badge.waiting {
+  background: rgba(147, 51, 234, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(147, 51, 234, 0.3);
+}
+
+.battle-badge.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.battle-badge.completed {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+  border: 1px solid rgba(107, 114, 128, 0.3);
+}
+
+.battle-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.battle-participants {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  border-top: 1px dashed var(--glass-border);
+  padding-top: 0.5rem;
+}
+
+.participant-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.participant-row .name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.participant-row .score {
+  font-family: var(--font-en);
+  font-weight: bold;
+}
+
+.participant-row .score.completed {
+  color: var(--accent-emerald);
+}
+
+.participant-row .score.pending {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* 1대1 대결 미니 수락 버튼 */
+.btn-mini {
+  background: var(--accent-purple);
+  color: white;
+  border: none;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-kr);
+}
+
+.btn-mini:hover {
+  background: #7c3aed;
+  box-shadow: 0 4px 10px rgba(124, 58, 237, 0.3);
+}
+
+.btn-mini.secondary {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+}
+
+.btn-mini.secondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+/* Crew list card in No Crew View */
+.crew-list-item {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.crew-list-item:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.crew-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-align: left;
+}
+
+.crew-name-label {
+  font-weight: bold;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.crew-meta-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
