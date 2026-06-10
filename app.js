@@ -889,7 +889,7 @@ class SimonEduApp {
       viewName = 'dashboard';
     }
 
-    const singleDashboardViews = ['game', 'exam', 'settings', 'events', 'eventDetail', 'journey', 'journeyChapterDetail', 'journeyVerseStudy', 'journeyResult', 'noticeDetail', 'notifications'];
+    const singleDashboardViews = ['game', 'exam', 'settings', 'events', 'eventDetail', 'notices', 'journey', 'journeyChapterDetail', 'journeyVerseStudy', 'journeyResult', 'noticeDetail', 'notifications'];
     document.body.classList.toggle('single-dashboard-view', singleDashboardViews.includes(viewName));
     document.body.classList.toggle('hide-bottom-nav', ['game', 'exam', 'auth', 'journeyChapterDetail', 'journeyVerseStudy', 'journeyResult', 'eventDetail', 'noticeDetail'].includes(viewName));
 
@@ -920,7 +920,7 @@ class SimonEduApp {
 
     const gridContainer = document.querySelector('.dashboard-grid-container');
     if (gridContainer) {
-      if (['dashboard', 'attendance', 'ranking', 'crew', 'events', 'eventDetail', 'journey', 'game', 'exam', 'settings', 'journeyChapterDetail', 'journeyVerseStudy', 'journeyResult', 'noticeDetail', 'notifications'].includes(viewName)) {
+      if (['dashboard', 'attendance', 'ranking', 'crew', 'events', 'eventDetail', 'notices', 'journey', 'game', 'exam', 'settings', 'journeyChapterDetail', 'journeyVerseStudy', 'journeyResult', 'noticeDetail', 'notifications'].includes(viewName)) {
         gridContainer.style.display = '';
       } else {
         gridContainer.style.display = 'none';
@@ -985,6 +985,11 @@ class SimonEduApp {
     const activeView = document.getElementById(viewName + 'View');
     if (activeView) {
       activeView.classList.add('active');
+      if (this.isMobileApp && ['game', 'notices', 'noticeDetail'].includes(viewName)) {
+        activeView.classList.remove('app-page-enter');
+        void activeView.offsetWidth;
+        activeView.classList.add('app-page-enter');
+      }
     }
 
     // Load matching view data
@@ -1000,6 +1005,8 @@ class SimonEduApp {
       this.renderEventsView();
     } else if (viewName === 'eventDetail') {
       this.renderEventDetailView();
+    } else if (viewName === 'notices') {
+      this.renderNoticesView();
     } else if (viewName === 'journey') {
       this.renderJourneyView();
     } else if (viewName === 'journeyChapterDetail') {
@@ -1045,6 +1052,7 @@ class SimonEduApp {
       ranking: 'bottomNavRanking',
       events: 'bottomNavDashboard',
       eventDetail: 'bottomNavDashboard',
+      notices: 'bottomNavDashboard',
       journey: 'bottomNavJourney',
       settings: 'bottomNavSettings',
       notifications: 'bottomNavNotifications',
@@ -1052,6 +1060,44 @@ class SimonEduApp {
     };
     const active = document.getElementById(map[viewName] || 'bottomNavDashboard');
     if (active) active.classList.add('active');
+  }
+
+  requestNativeScreen(viewName, payload = {}) {
+    if (!this.isMobileApp || !window.MobileAppChannel || this._nativeRouteBypass) {
+      return false;
+    }
+    window.MobileAppChannel.postMessage(JSON.stringify({
+      event: 'open_native_screen',
+      view: viewName,
+      previousView: this.currentViewName || 'dashboard',
+      ...payload
+    }));
+    return true;
+  }
+
+  __runNativeAction(payload = {}) {
+    this._nativeRouteBypass = true;
+    try {
+      if (payload.action === 'startMission') {
+        this.startMission();
+      } else if (payload.action === 'openNotice') {
+        this.openNotice(payload.noticeId);
+      } else {
+        this.switchView(payload.view || 'dashboard');
+      }
+    } finally {
+      this._nativeRouteBypass = false;
+    }
+  }
+
+  openNotices() {
+    if (this.requestNativeScreen('notices', {
+      title: '공지사항',
+      action: 'switchView'
+    })) {
+      return;
+    }
+    this.switchView('notices');
   }
 
   handlePointBadgeClick() {
@@ -1657,20 +1703,36 @@ class SimonEduApp {
     }
 
     if (noticesList) {
-      const notices = this.getNoticeItems();
-      noticesList.innerHTML = notices.map(notice => `
-        <button class="app-list-item" onclick="app.openNotice('${notice.id}')">
-          <div class="app-list-icon notice">
-            <span class="material-icons-round">notifications</span>
-          </div>
-          <div class="app-list-body">
-            <strong>${this.escapeHtml(notice.title)}</strong>
-            <span>${this.escapeHtml(notice.date)}</span>
-          </div>
-          <span class="material-icons-round app-list-arrow">chevron_right</span>
-        </button>
-      `).join('');
+      this.renderNoticeListInto(noticesList);
     }
+  }
+
+  renderNoticesView() {
+    this.renderHomeEventsAndNotices();
+    const noticesList = document.getElementById('noticesOnlyPageList');
+    if (noticesList) {
+      this.renderNoticeListInto(noticesList);
+    }
+  }
+
+  renderNoticeListInto(listEl) {
+    const notices = this.getNoticeItems();
+    if (notices.length === 0) {
+      listEl.innerHTML = '<div class="home-empty-state">등록된 공지사항이 없습니다.</div>';
+      return;
+    }
+    listEl.innerHTML = notices.map(notice => `
+      <button class="app-list-item" onclick="app.openNotice('${notice.id}')">
+        <div class="app-list-icon notice">
+          <span class="material-icons-round">notifications</span>
+        </div>
+        <div class="app-list-body">
+          <strong>${this.escapeHtml(notice.title)}</strong>
+          <span>${this.escapeHtml(notice.date)}</span>
+        </div>
+        <span class="material-icons-round app-list-arrow">chevron_right</span>
+      </button>
+    `).join('');
   }
 
   renderJourneyView() {
@@ -2628,6 +2690,14 @@ class SimonEduApp {
   }
 
   openNotice(noticeId) {
+    if (this.requestNativeScreen('noticeDetail', {
+      title: '공지사항 상세',
+      action: 'openNotice',
+      noticeId
+    })) {
+      return;
+    }
+
     const notice = this.getNoticeItems().find(item => item.id === noticeId);
     if (!notice) return;
     
@@ -3944,6 +4014,13 @@ class SimonEduApp {
   // 8. Gamified Quiz Engine
   startMission() {
     if (!this.currentUser) return;
+
+    if (this.requestNativeScreen('game', {
+      title: '암송 챌린지',
+      action: 'startMission'
+    })) {
+      return;
+    }
     
     const bibleData = window.BIBLE_DATA;
     let curIdx = this.currentUser.currentVerseIndex;
@@ -7037,6 +7114,9 @@ class SimonEduApp {
     } else if (view === 'eventDetail') {
       this.switchView('events');
       return 'navigated';
+    } else if (view === 'notices') {
+      this.switchView('dashboard');
+      return 'navigated';
     } else if (view === 'exam' && !this.isExamMode) {
       this.switchView('events');
       return 'navigated';
@@ -7098,9 +7178,15 @@ window.handleDeepLink = function(urlOrPath) {
     } else {
       window.app.switchView('auth');
     }
-  } else if (path === 'events' || path === 'event' || path === 'notices') {
+  } else if (path === 'events' || path === 'event') {
     if (window.app.currentUser) {
       window.app.switchView('events');
+    } else {
+      window.app.switchView('auth');
+    }
+  } else if (path === 'notices' || path === 'notice') {
+    if (window.app.currentUser) {
+      window.app.switchView('notices');
     } else {
       window.app.switchView('auth');
     }

@@ -329,7 +329,7 @@
         <section class="notice-section">
           <div class="home-widget-title">
             <span>공지사항</span>
-            <button onclick="app.switchView('events')">전체보기 &gt;</button>
+            <button onclick="app.openNotices()">전체보기 &gt;</button>
           </div>
           <div id="homeNoticeList" class="notice-list-compact">
             <div class="home-empty-state">등록된 공지사항이 없습니다.</div>
@@ -453,6 +453,22 @@
             </div>
             <div class="event-detail-wrapper" id="eventDetailContent" style="margin-top: 1rem;">
               <!-- Rendered by app.renderEventDetailView() -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 3.256. Notices List View -->
+        <div id="noticesView" class="view-container">
+          <div class="dashboard-single-container">
+            <div class="page-header-bar">
+              <button class="btn-header-back" onclick="app.switchView('dashboard')" aria-label="뒤로가기">
+                <span class="material-icons-round">arrow_back</span>
+              </button>
+              <h1>공지사항</h1>
+              <div style="width: 40px;"></div>
+            </div>
+            <div class="dashboard-card glass-panel app-list-page-card">
+              <div id="noticesOnlyPageList" class="app-card-list"></div>
             </div>
           </div>
         </div>
@@ -912,7 +928,7 @@
           
           <!-- Game Controls -->
           <div class="game-controls">
-            <button class="btn-game secondary" onclick="app.exitGame()">
+            <button class="btn-game secondary btn-game-give-up" onclick="app.exitGame()">
               <span class="material-icons-round" style="vertical-align: middle; font-size: 1.1rem; margin-right: 4px;">arrow_back</span>
               포기하기
             </button>

@@ -41,6 +41,9 @@ class _WebViewScreenState extends State<WebViewScreen>
   String? _fcmToken;
   DateTime? _lastPressedAt;
   String _currentWebView = 'dashboard';
+  bool _webViewInNativeRoute = false;
+  final ValueNotifier<int> _nativeRouteDepth = ValueNotifier<int>(0);
+  int _nativeRouteCounter = 0;
 
   // Native Settings Profile State
   String _userName = '';
@@ -125,6 +128,7 @@ class _WebViewScreenState extends State<WebViewScreen>
     if (!kIsWeb) {
       _linkSubscription?.cancel();
     }
+    _nativeRouteDepth.dispose();
     super.dispose();
   }
 
@@ -353,19 +357,23 @@ class _WebViewScreenState extends State<WebViewScreen>
         final view = data['view'] as String?;
         _currentWebView = view ?? 'dashboard';
         int newIndex = _currentIndex;
-        final shouldHideBottomNav = view == 'game' || 
-                                    view == 'exam' || 
-                                    view == 'journeyChapterDetail' || 
-                                    view == 'journeyVerseStudy' || 
-                                    view == 'journeyResult' ||
-                                    view == 'eventDetail' ||
-                                    view == 'noticeDetail';
-        if (view == 'dashboard' || view == 'events' || view == 'eventDetail' || view == 'noticeDetail') {
+        final shouldHideBottomNav = view == 'game' ||
+            view == 'exam' ||
+            view == 'journeyChapterDetail' ||
+            view == 'journeyVerseStudy' ||
+            view == 'journeyResult' ||
+            view == 'eventDetail' ||
+            view == 'noticeDetail';
+        if (view == 'dashboard' ||
+            view == 'events' ||
+            view == 'eventDetail' ||
+            view == 'notices' ||
+            view == 'noticeDetail') {
           newIndex = 0;
-        } else if (view == 'journey' || 
-                   view == 'journeyChapterDetail' || 
-                   view == 'journeyVerseStudy' || 
-                   view == 'journeyResult') {
+        } else if (view == 'journey' ||
+            view == 'journeyChapterDetail' ||
+            view == 'journeyVerseStudy' ||
+            view == 'journeyResult') {
           newIndex = 1;
         } else if (view == 'ranking') {
           newIndex = 2;
@@ -423,9 +431,103 @@ class _WebViewScreenState extends State<WebViewScreen>
             ),
           );
         }
+      } else if (event == 'open_native_screen') {
+        unawaited(_openNativeWebScreen(data));
       }
     } catch (e) {
       debugPrint('Error parsing MobileAppChannel message: $e');
+    }
+  }
+
+  Future<void> _openNativeWebScreen(Map<String, dynamic> data) async {
+    if (_controller == null || !mounted) return;
+
+    final view = (data['view'] as String?) ?? 'dashboard';
+    final previousView = (data['previousView'] as String?) ?? 'dashboard';
+    final title = (data['title'] as String?) ?? _nativeTitleForView(view);
+
+    HapticFeedback.lightImpact();
+    final routeDepth = _nativeRouteCounter + 1;
+    _nativeRouteCounter = routeDepth;
+    _nativeRouteDepth.value = routeDepth;
+    if (!_webViewInNativeRoute || !_hideBottomNav) {
+      setState(() {
+        _webViewInNativeRoute = true;
+        _hideBottomNav = true;
+      });
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+    if (!mounted || _controller == null) return;
+
+    await _controller!.runJavaScript(
+      'document.body.classList.add("native-route-active");',
+    );
+    await _controller!.runJavaScript(
+      'if (window.app && window.app.__runNativeAction) { window.app.__runNativeAction(${jsonEncode(data)}); }',
+    );
+
+    if (!mounted || _controller == null) return;
+
+    await Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        transitionDuration: const Duration(milliseconds: 260),
+        reverseTransitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return _NativeWebRoutePage(
+            title: title,
+            controller: _controller!,
+            depth: routeDepth,
+            activeDepth: _nativeRouteDepth,
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(1, 0),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          );
+        },
+      ),
+    );
+
+    if (!mounted || _controller == null) return;
+    if (_nativeRouteDepth.value == routeDepth) {
+      _nativeRouteDepth.value = routeDepth - 1;
+    }
+    _nativeRouteCounter = routeDepth - 1;
+    final hasNativeRoute = _nativeRouteCounter > 0;
+    setState(() {
+      _webViewInNativeRoute = hasNativeRoute;
+      _hideBottomNav = hasNativeRoute;
+    });
+    await _controller!.runJavaScript(
+      hasNativeRoute
+          ? 'document.body.classList.add("native-route-active");'
+          : 'document.body.classList.remove("native-route-active");',
+    );
+    await _controller!.runJavaScript(
+      'if (window.app && window.app.switchView) { window.app.switchView(${jsonEncode(previousView)}); }',
+    );
+  }
+
+  String _nativeTitleForView(String view) {
+    switch (view) {
+      case 'game':
+        return '암송 챌린지';
+      case 'notices':
+        return '공지사항';
+      case 'noticeDetail':
+        return '공지사항 상세';
+      default:
+        return 'Simon Edu';
     }
   }
 
@@ -593,8 +695,9 @@ class _WebViewScreenState extends State<WebViewScreen>
                     child: Stack(
                       children: [
                         Offstage(
-                          offstage: _isLoggedIn && _currentIndex == 4,
-                          child: _controller != null
+                          offstage: (_isLoggedIn && _currentIndex == 4) ||
+                              _webViewInNativeRoute,
+                          child: _controller != null && !_webViewInNativeRoute
                               ? WebViewWidget(controller: _controller!)
                               : const SizedBox(),
                         ),
@@ -606,9 +709,11 @@ class _WebViewScreenState extends State<WebViewScreen>
                             userPoints: _userPoints,
                             pushEnabled: _pushEnabled,
                             marketingPushEnabled: _marketingPushEnabled,
-                            isPermissionGranted: _isNotificationPermissionGranted,
+                            isPermissionGranted:
+                                _isNotificationPermissionGranted,
                             isLoading: _isProfileLoading,
-                            version: _appVersion.isEmpty ? '1.4.2' : _appVersion,
+                            version:
+                                _appVersion.isEmpty ? '1.4.2' : _appVersion,
                             fcmToken: _fcmToken,
                             pointsHistory: _pointsHistory,
                             onLogout: () {
@@ -769,11 +874,12 @@ class _WebViewScreenState extends State<WebViewScreen>
 
     try {
       final result = await _controller!.runJavaScriptReturningResult(
-        'window.app ? window.app.handleBackNavigation() : "tab_screen"'
-      );
+          'window.app ? window.app.handleBackNavigation() : "tab_screen"');
       final String resultStr = result.toString().replaceAll('"', '').trim();
 
-      if (resultStr == 'modal_closed' || resultStr == 'navigated' || resultStr == 'confirmation_opened') {
+      if (resultStr == 'modal_closed' ||
+          resultStr == 'navigated' ||
+          resultStr == 'confirmation_opened') {
         // WebView back navigation handled successfully
         return;
       }
@@ -783,8 +889,10 @@ class _WebViewScreenState extends State<WebViewScreen>
 
     // Double-back-to-exit logic for Tab views on Android
     final now = DateTime.now();
-    if (_lastPressedAt == null || now.difference(_lastPressedAt!) > const Duration(seconds: 3)) {
+    if (_lastPressedAt == null ||
+        now.difference(_lastPressedAt!) > const Duration(seconds: 3)) {
       _lastPressedAt = now;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text(
@@ -1135,6 +1243,81 @@ class _WebViewScreenState extends State<WebViewScreen>
     debugPrint("Syncing platform to webview: $osName");
     _controller!.runJavaScript(
         'if (window.app && window.app.updateDevicePlatform) { window.app.updateDevicePlatform("$osName"); }');
+  }
+}
+
+class _NativeWebRoutePage extends StatelessWidget {
+  const _NativeWebRoutePage({
+    required this.title,
+    required this.controller,
+    required this.depth,
+    required this.activeDepth,
+  });
+
+  final String title;
+  final WebViewController controller;
+  final int depth;
+  final ValueListenable<int> activeDepth;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFFDF8E6),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            Container(
+              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFFBEB),
+                border: Border(
+                  bottom: BorderSide(color: Color(0x1FB8860B)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: Color(0xFF3D341C),
+                      size: 20,
+                    ),
+                    tooltip: '뒤로가기',
+                  ),
+                  Expanded(
+                    child: Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF3D341C),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 48),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ValueListenableBuilder<int>(
+                valueListenable: activeDepth,
+                builder: (context, currentDepth, _) {
+                  if (currentDepth != depth) {
+                    return const SizedBox.expand();
+                  }
+                  return WebViewWidget(controller: controller);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

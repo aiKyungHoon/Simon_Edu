@@ -154,6 +154,24 @@ header {
   gap: 1rem;
 }
 
+body.mobile-app.native-route-active header {
+  display: none !important;
+}
+
+body.mobile-app.native-route-active main {
+  padding-top: 0 !important;
+}
+
+body.mobile-app.native-route-active .page-header-bar,
+body.mobile-app.native-route-active #gameView .game-header-bar,
+body.mobile-app.native-route-active #gameView .btn-game-give-up {
+  display: none !important;
+}
+
+body.mobile-app.native-route-active #gameView .dashboard-card {
+  margin-top: 0 !important;
+}
+
 .header-left {
   display: flex;
   align-items: center;
@@ -410,6 +428,21 @@ main {
 
 .view-container.active {
   display: block;
+}
+
+body.mobile-app .view-container.app-page-enter {
+  animation: appPageEnter 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes appPageEnter {
+  from {
+    opacity: 0.72;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 /* 5. Authentication View */
