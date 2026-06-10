@@ -1523,7 +1523,7 @@ class SimonEduApp {
         <div class="rank-badge ${index === 0 ? 'rank-1' : index === 1 ? 'rank-2' : index === 2 ? 'rank-3' : ''}">${index + 1}</div>
         <div class="app-list-body">
           <strong>${this.escapeHtml(user.username || user.name || '사용자')}</strong>
-          <span>${xpGetter(user).toLocaleString()} Faith XP · ${this.getUserTitle(user)}</span>
+          <span>${xpGetter(user).toLocaleString()} · ${this.getUserTitle(user)}</span>
         </div>
         <span class="material-icons-round app-list-arrow">chevron_right</span>
       </button>
@@ -2364,7 +2364,7 @@ class SimonEduApp {
           <div class="${rankBadgeClass}">${rank}</div>
           <div class="leaderboard-avatar">${user.name.charAt(0)}</div>
           <div class="leaderboard-name">${user.username || user.name} ${isMe ? '<span style="color:#d8b4fe; font-size:0.75rem;">(나)</span>' : ''}<span class="rank-item-badge">${this.getUserTitle(user)}</span></div>
-          <div class="leaderboard-points">${this.getRankingXp(user).toLocaleString()} Faith XP</div>
+          <div class="leaderboard-points">${this.getRankingXp(user).toLocaleString()}</div>
           ${!isMe && !this.hideBattleMode ? `
           <button class="btn-mini" onclick="app.requestOneOnOneBattle('${user.id}', '${user.name}')" style="margin-left: 0.75rem;" title="1대1 대결 신청">
             ⚔️
@@ -2431,7 +2431,7 @@ class SimonEduApp {
         const popupMyPctText = document.getElementById('popupMyPctText');
 
         if (popupMyRankText) popupMyRankText.textContent = `${myRank} 위`;
-        if (popupMyPointsText) popupMyPointsText.textContent = `${this.getRankingXp(myUser).toLocaleString()} Faith XP`;
+        if (popupMyPointsText) popupMyPointsText.textContent = `${this.getRankingXp(myUser).toLocaleString()}`;
         if (popupMyPctText) popupMyPctText.textContent = `전체 중 상위 ${rankPercentage}%`;
       }
     }
@@ -2464,7 +2464,7 @@ class SimonEduApp {
         <div class="${rankBadgeClass}">${rank}</div>
         <div class="all-ranking-avatar">${user.name.charAt(0)}</div>
         <div class="all-ranking-name">${user.username || user.name} ${isMe ? '<span style="color:var(--text-muted); font-size:0.75rem; font-weight:normal;">(나)</span>' : ''}<span class="rank-item-badge">${this.getUserTitle(user)}</span></div>
-        <div class="all-ranking-points">${this.getRankingXp(user).toLocaleString()} Faith XP</div>
+        <div class="all-ranking-points">${this.getRankingXp(user).toLocaleString()}</div>
         ${!isMe && !this.hideBattleMode ? `
         <button class="btn-mini" onclick="app.requestOneOnOneBattle('${user.id}', '${user.name}')" style="margin-left: 0.75rem;" title="1대1 대결 신청">
           ⚔️
@@ -4060,6 +4060,14 @@ class SimonEduApp {
       return 0;
     };
     const earnedPoints = getPoints(score);
+    const isPassed = score >= 60;
+    const rewardLabel = isPassed
+      ? (score === 100 ? '만점 보상' : `${Math.floor(score / 10) * 10}점 구간 보상`)
+      : '무지급';
+    const eventTitle = this.currentEvent?.title || this.currentEventDetail?.title || '사명자 시험';
+    const eventStartDate = this.currentEvent?.startDate || this.currentEventDetail?.startDate || '-';
+    const eventEndDate = this.currentEvent?.endDate || this.currentEventDetail?.endDate || '-';
+    const resultAnnouncement = this.currentEvent?.resultDate || this.currentEventDetail?.resultDate || '시험 완료 즉시 확인';
 
     const container = document.getElementById('examView');
     if (!container) return;
@@ -4082,6 +4090,8 @@ class SimonEduApp {
 
     const isNewBest = score > prevBestScore;
     const pointDiff = Math.max(0, earnedPoints - prevBestPoints);
+    const relatedNotificationTitle = isPassed ? '시험 결과 발표' : '시험 결과 안내';
+    const relatedNotificationMessage = `${eventTitle} 결과: ${score}점, ${correct}/${total} 정답, ${isPassed ? '합격' : '불합격'}${pointDiff > 0 ? `, +${pointDiff}P 지급` : ''}`;
 
     // 정답 요약 HTML
     const answerHtml = this.examAnswers.map((a, i) => `
@@ -4124,15 +4134,34 @@ class SimonEduApp {
           `}
         </div>
 
+        <div class="exam-result-detail-grid">
+          <div><span>지역</span><strong>${this.escapeHtml(applicantRegion || '-')}</strong></div>
+          <div><span>이름</span><strong>${this.escapeHtml(applicantName || '-')}</strong></div>
+          <div><span>응시 일시</span><strong>${this.escapeHtml(submittedAt)}</strong></div>
+          <div><span>점수</span><strong>${score}점</strong></div>
+          <div><span>정답 수</span><strong>${correct} / ${total}</strong></div>
+          <div><span>획득 포인트</span><strong>+${pointDiff}P</strong></div>
+          <div><span>지급 보상</span><strong>${this.escapeHtml(rewardLabel)} (${earnedPoints}P)</strong></div>
+          <div><span>합격 여부</span><strong class="${isPassed ? 'pass' : 'fail'}">${isPassed ? '합격' : '불합격'}</strong></div>
+        </div>
+
+        <div class="exam-related-alerts">
+          <h3>관련 알림</h3>
+          <div class="exam-alert-row"><span class="material-icons-round">play_circle</span><div><strong>이벤트 시작</strong><p>${this.escapeHtml(eventStartDate)}</p></div></div>
+          <div class="exam-alert-row"><span class="material-icons-round">event</span><div><strong>이벤트 종료 예정</strong><p>${this.escapeHtml(eventEndDate)}</p></div></div>
+          <div class="exam-alert-row"><span class="material-icons-round">campaign</span><div><strong>결과 발표</strong><p>${this.escapeHtml(resultAnnouncement)} · 알림센터에서 확인 가능</p></div></div>
+        </div>
+
         <details style="margin-bottom:1.5rem;">
           <summary style="cursor:pointer;font-weight:700;color:var(--accent-purple);margin-bottom:0.5rem;">📋 답안 확인</summary>
           <div style="max-height:300px;overflow-y:auto;padding:0.5rem 0;">${answerHtml}</div>
         </details>
 
-        <button onclick="app.completeExamAndGoHome()" class="btn-primary"
-          style="width:100%;padding:0.8rem;font-size:0.95rem;font-weight:700;border-radius:10px;background:linear-gradient(135deg,var(--accent-purple),var(--accent-blue));color:#fff;border:none;cursor:pointer;">
-          처음으로 돌아가기
-        </button>
+        <div class="exam-result-actions">
+          <button onclick="app.restartExamFromResult()" class="btn-primary">시험 다시 시작</button>
+          <button onclick="app.backToEventDetailFromResult()" class="btn-game secondary">이벤트 상세</button>
+          <button onclick="app.completeExamAndGoHome()" class="btn-game secondary">홈으로</button>
+        </div>
       </div>
     `;
 
@@ -4162,13 +4191,32 @@ class SimonEduApp {
           attemptCount: newAttemptCount,
           lastAttemptDate: submittedAt,
           lastScore: score,
+          lastCorrectCount: correct,
+          lastTotalCount: total,
+          lastEarnedPoints: pointDiff,
+          lastRewardLabel: rewardLabel,
+          lastPassed: isPassed,
+          lastNotificationTitle: relatedNotificationTitle,
+          lastNotificationMessage: relatedNotificationMessage,
+          eventTitle,
+          eventStartDate,
+          eventEndDate,
+          resultAnnouncement,
           lastUserId: this.currentUser.id,
           lastUserEmail: this.currentUser.email || '',
           updatedAt: Date.now(),
           attempts: [...previousAttempts, attemptRecord].slice(-30)
         };
 
-        const updateData = { examSubmission: newSubmission };
+        const relatedNotification = this.createNotification({
+          title: relatedNotificationTitle,
+          type: 'exam_result',
+          message: relatedNotificationMessage
+        });
+        const updateData = {
+          examSubmission: newSubmission,
+          notifications: firebase.firestore.FieldValue.arrayUnion(relatedNotification)
+        };
         updateData.examRegion = applicantRegion;
         updateData.examApplicantName = applicantName;
 
@@ -4181,12 +4229,22 @@ class SimonEduApp {
             date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
           };
           updateData.points = firebase.firestore.FieldValue.increment(pointDiff);
+          updateData.faithXP = firebase.firestore.FieldValue.increment(pointDiff);
           updateData.pointsHistory = firebase.firestore.FieldValue.arrayUnion(examHistory);
           this.showPointsFloater(pointDiff, `사명자 시험 +${pointDiff}P`);
           this.playConfetti('quiz');
         }
 
         await db.collection('users').doc(this.currentUser.id).update(updateData);
+        await db.collection('notifications').add({
+          userId: this.currentUser.id,
+          title: relatedNotification.title,
+          message: relatedNotification.message,
+          type: relatedNotification.type,
+          isRead: false,
+          eventId: this.currentEvent?.id || this.currentEventDetail?.id || null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).catch(err => console.error('시험 결과 알림 저장 오류:', err));
 
         if (examDocKey) {
           try {
@@ -4230,6 +4288,40 @@ class SimonEduApp {
     this.examCorrectCount = 0;
     this.currentExamApplicant = null;
     this.switchView('dashboard');
+  }
+
+  restartExamFromResult() {
+    const container = document.getElementById('examView');
+    if (container && this._examIntroHtml) {
+      container.innerHTML = this._examIntroHtml;
+      this._examIntroHtml = null;
+    }
+    this.isExamMode = false;
+    this.examQuestions = [];
+    this.examAnswers = [];
+    this.currentExamQuestionIndex = 0;
+    this.examCorrectCount = 0;
+    this.switchView('exam');
+    setTimeout(() => this.submitExamJoinForm(), 80);
+  }
+
+  backToEventDetailFromResult() {
+    const container = document.getElementById('examView');
+    if (container && this._examIntroHtml) {
+      container.innerHTML = this._examIntroHtml;
+      this._examIntroHtml = null;
+    }
+    this.isExamMode = false;
+    this.examQuestions = [];
+    this.examAnswers = [];
+    this.currentExamQuestionIndex = 0;
+    this.examCorrectCount = 0;
+    if (this.currentEvent || this.currentEventDetail) {
+      this.currentEventDetail = this.currentEventDetail || this.currentEvent;
+      this.switchView('eventDetail');
+    } else {
+      this.switchView('events');
+    }
   }
 
   // ============================================================
@@ -4734,6 +4826,13 @@ class SimonEduApp {
       const rowMarketingPush = document.getElementById('rowMarketingPush');
       if (toggleMarketingPush) toggleMarketingPush.disabled = false;
       if (rowMarketingPush) rowMarketingPush.style.opacity = '1';
+    }
+  }
+
+  scrollToNotificationSettings() {
+    const card = document.querySelector('.settings-notifications-card');
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
 

@@ -2670,7 +2670,7 @@ body.mobile-app .settings-app-card {
 }
 
 body.mobile-app.logged-in:not(.hide-bottom-nav) .bottom-nav {
-  display: flex;
+  display: none;
 }
 
 .bottom-nav-item {
@@ -2711,7 +2711,7 @@ body.mobile-app.logged-in:not(.hide-bottom-nav) .bottom-nav {
 
 /* Adjust main element padding-bottom so it doesn't get covered by fixed bottom nav */
 body.mobile-app.logged-in:not(.hide-bottom-nav) main {
-  padding-bottom: 80px;
+  padding-bottom: 0;
 }
 
 /* 1. 오늘의 말씀 (Home View) Renewal Styling */
@@ -3508,8 +3508,111 @@ body.mobile-app.logged-in:not(.hide-bottom-nav) main {
   cursor: pointer;
 }
 
+.exam-result-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.exam-result-detail-grid div {
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 0.8rem;
+  background: var(--glass-bg);
+}
+
+.exam-result-detail-grid span {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.exam-result-detail-grid strong {
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  word-break: keep-all;
+}
+
+.exam-result-detail-grid strong.pass {
+  color: var(--accent-emerald);
+}
+
+.exam-result-detail-grid strong.fail {
+  color: var(--accent-rose);
+}
+
+.exam-related-alerts {
+  text-align: left;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  background: rgba(200, 146, 17, 0.05);
+}
+
+.exam-related-alerts h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: var(--text-primary);
+}
+
+.exam-alert-row {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.exam-alert-row:last-child {
+  border-bottom: 0;
+}
+
+.exam-alert-row .material-icons-round {
+  color: var(--accent-purple);
+  font-size: 1.2rem;
+  margin-top: 0.05rem;
+}
+
+.exam-alert-row strong {
+  display: block;
+  font-size: 0.84rem;
+  color: var(--text-primary);
+}
+
+.exam-alert-row p {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.exam-result-actions {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.exam-result-actions button {
+  margin: 0;
+  min-height: 44px;
+  border-radius: 10px;
+  font-family: var(--font-kr);
+  font-weight: 800;
+}
+
 @media (max-width: 640px) {
   .event-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .exam-result-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .exam-result-actions {
     grid-template-columns: 1fr;
   }
 

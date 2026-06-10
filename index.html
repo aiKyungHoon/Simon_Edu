@@ -920,8 +920,22 @@
         <!-- Terms and Policies Config Card -->
         <div class="dashboard-card glass-panel settings-policies-card" style="margin-top: 1rem; text-align: left;">
           <div class="card-title" style="margin-bottom: 1rem;">
-            <span class="material-icons-round" style="color: var(--accent-purple);">description</span>
-            약관 및 정책
+            <span class="material-icons-round" style="color: var(--accent-purple);">settings</span>
+            설정 메뉴
+          </div>
+
+          <div class="settings-row" onclick="app.switchView('events')" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--glass-border); cursor: pointer;">
+            <div class="settings-label-col">
+              <div class="settings-item-title" style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary);">공지사항</div>
+            </div>
+            <span class="material-icons-round" style="color: var(--text-muted); font-size: 1.2rem;">chevron_right</span>
+          </div>
+
+          <div class="settings-row" onclick="app.switchView('events')" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--glass-border); cursor: pointer;">
+            <div class="settings-label-col">
+              <div class="settings-item-title" style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary);">이벤트</div>
+            </div>
+            <span class="material-icons-round" style="color: var(--text-muted); font-size: 1.2rem;">chevron_right</span>
           </div>
           
           <div class="settings-row" onclick="app.openModal('modalTerms')" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--glass-border); cursor: pointer;">
@@ -938,28 +952,36 @@
             <span class="material-icons-round" style="color: var(--text-muted); font-size: 1.2rem;">chevron_right</span>
           </div>
 
-          <div class="settings-row" onclick="app.openModal('modalPoints')" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; cursor: pointer;">
+          <div class="settings-row" onclick="app.openModal('modalPoints')" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--glass-border); cursor: pointer;">
             <div class="settings-label-col">
               <div class="settings-item-title" style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary);">포인트 정책</div>
             </div>
             <span class="material-icons-round" style="color: var(--text-muted); font-size: 1.2rem;">chevron_right</span>
           </div>
-        </div>
 
-        <!-- App Settings Card (Logout etc.) -->
-        <div class="dashboard-card glass-panel settings-app-card" style="margin-top: 1rem; padding: 1.25rem 1rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">
-          <button class="btn-logout-settings" onclick="app.logout()" style="background: transparent; color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600; font-family: var(--font-kr); font-size: 0.9rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; transition: all 0.2s;">
-            <span class="material-icons-round" style="font-size: 1.1rem;">logout</span>
-            로그아웃
-          </button>
-          
-          <button class="btn-withdraw-settings" onclick="app.openModal('modalWithdraw')" style="background: transparent; color: var(--text-muted); border: 1px solid var(--glass-border); padding: 0.4rem 1rem; border-radius: 8px; font-weight: 500; font-family: var(--font-kr); font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; transition: all 0.2s; margin-top: 0.25rem; width: auto;">
-            <span class="material-icons-round" style="font-size: 1rem;">person_remove</span>
-            회원 탈퇴
-          </button>
+          <div class="settings-row" onclick="app.scrollToNotificationSettings()" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--glass-border); cursor: pointer;">
+            <div class="settings-label-col">
+              <div class="settings-item-title" style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary);">알림 설정</div>
+            </div>
+            <span class="material-icons-round" style="color: var(--text-muted); font-size: 1.2rem;">chevron_right</span>
+          </div>
+
+          <div class="settings-row" onclick="app.logout()" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--glass-border); cursor: pointer;">
+            <div class="settings-label-col">
+              <div class="settings-item-title" style="font-size: 0.95rem; font-weight: 600; color: #ef4444;">로그아웃</div>
+            </div>
+            <span class="material-icons-round" style="color: #ef4444; font-size: 1.2rem;">logout</span>
+          </div>
+
+          <div class="settings-row" onclick="app.openModal('modalWithdraw')" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; cursor: pointer;">
+            <div class="settings-label-col">
+              <div class="settings-item-title" style="font-size: 0.95rem; font-weight: 600; color: var(--text-muted);">회원탈퇴</div>
+            </div>
+            <span class="material-icons-round" style="color: var(--text-muted); font-size: 1.2rem;">person_remove</span>
+          </div>
 
           <div class="app-version" style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-en); font-weight: 500; letter-spacing: 0.5px; opacity: 0.7;">
-            Version 1.4.2
+            Version 1.5.8
           </div>
         </div>
 

@@ -35,6 +35,7 @@ class _WebViewScreenState extends State<WebViewScreen>
   bool _videoCompleted = false;
   int _currentIndex = 0;
   bool _isLoggedIn = false;
+  bool _hideBottomNav = false;
   String _appVersion = '';
   String? _fcmToken;
 
@@ -48,7 +49,7 @@ class _WebViewScreenState extends State<WebViewScreen>
   bool _isProfileLoading = true;
   List<dynamic> _pointsHistory = [];
 
-  static const String _appWebVersion = '1.5.1';
+  static const String _appWebVersion = '1.5.3';
   final String _targetUrl =
       'https://simon-edu-bible-game.firebaseapp.com?platform=app&app_v=$_appWebVersion';
 
@@ -328,22 +329,26 @@ class _WebViewScreenState extends State<WebViewScreen>
         setState(() {
           _isLoggedIn = false;
           _currentIndex = 0;
+          _hideBottomNav = false;
         });
       } else if (event == 'view_changed') {
         final view = data['view'];
         int newIndex = _currentIndex;
+        final shouldHideBottomNav = view == 'game' || view == 'exam';
         if (view == 'dashboard') {
           newIndex = 0;
-        } else if (view == 'attendance') {
+        } else if (view == 'events' || view == 'eventDetail') {
           newIndex = 1;
-        } else if (view == 'ranking') {
+        } else if (view == 'journey' || view == 'ranking') {
           newIndex = 2;
         } else if (view == 'settings') {
           newIndex = 3;
         }
-        if (newIndex != _currentIndex) {
+        if (newIndex != _currentIndex ||
+            shouldHideBottomNav != _hideBottomNav) {
           setState(() {
             _currentIndex = newIndex;
+            _hideBottomNav = shouldHideBottomNav;
             if (newIndex == 3) {
               _isProfileLoading = true;
             }
@@ -409,9 +414,9 @@ class _WebViewScreenState extends State<WebViewScreen>
 
     String viewName = 'dashboard';
     if (index == 1) {
-      viewName = 'attendance';
+      viewName = 'events';
     } else if (index == 2) {
-      viewName = 'ranking';
+      viewName = 'journey';
     } else if (index == 3) {
       viewName = 'settings';
     }
@@ -571,6 +576,7 @@ class _WebViewScreenState extends State<WebViewScreen>
                             _requestNotificationPermission()
                                 .then((_) => _syncUserProfile());
                           },
+                          onOpenEvents: () => _switchWebViewTab(1),
                         ),
 
                       // Linear progress bar for loading
@@ -594,7 +600,7 @@ class _WebViewScreenState extends State<WebViewScreen>
               ],
             ),
           ),
-          bottomNavigationBar: _isLoggedIn
+          bottomNavigationBar: _isLoggedIn && !_hideBottomNav
               ? BottomNavigationBar(
                   currentIndex: _currentIndex,
                   onTap: _switchWebViewTab,
@@ -614,14 +620,14 @@ class _WebViewScreenState extends State<WebViewScreen>
                       label: '오늘의 말씀',
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.event_available_rounded),
-                      activeIcon: Icon(Icons.event_available_rounded),
-                      label: '출석체크',
+                      icon: Icon(Icons.campaign_rounded),
+                      activeIcon: Icon(Icons.campaign_rounded),
+                      label: '이벤트',
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.emoji_events_rounded),
-                      activeIcon: Icon(Icons.emoji_events_rounded),
-                      label: '명예의 전당',
+                      icon: Icon(Icons.map_rounded),
+                      activeIcon: Icon(Icons.map_rounded),
+                      label: '성경여정',
                     ),
                     BottomNavigationBarItem(
                       icon: Icon(Icons.settings_rounded),
@@ -1035,6 +1041,7 @@ class NativeSettingsView extends StatelessWidget {
   final ValueChanged<bool> onPushChanged;
   final ValueChanged<bool> onMarketingChanged;
   final VoidCallback onRequestPermission;
+  final VoidCallback onOpenEvents;
   final List<dynamic> pointsHistory;
 
   const NativeSettingsView({
@@ -1053,6 +1060,7 @@ class NativeSettingsView extends StatelessWidget {
     required this.onPushChanged,
     required this.onMarketingChanged,
     required this.onRequestPermission,
+    required this.onOpenEvents,
     required this.pointsHistory,
   });
 
@@ -1217,6 +1225,161 @@ class NativeSettingsView extends StatelessWidget {
                   ),
                   value: marketingPushEnabled,
                   onChanged: pushEnabled ? onMarketingChanged : null,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 2. 설정 메뉴
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0x1FB8860B)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3D341C).withOpacity(0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.settings_rounded,
+                          color: Color(0xFFB8860B), size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        '설정 메뉴',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF3D341C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(color: Color(0x1FB8860B)),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                  title: const Text('공지사항',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF3D341C))),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF96855B)),
+                  onTap: onOpenEvents,
+                ),
+                const Divider(color: Color(0x1FB8860B), height: 1),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                  title: const Text('이벤트',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF3D341C))),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF96855B)),
+                  onTap: onOpenEvents,
+                ),
+                const Divider(color: Color(0x1FB8860B), height: 1),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                  title: const Text('이용약관',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF3D341C))),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF96855B)),
+                  onTap: () => _openWebPopup(
+                    context: context,
+                    title: '이용약관',
+                    url:
+                        'https://simon-edu-bible-game.firebaseapp.com/Terms_of_Use',
+                  ),
+                ),
+                const Divider(color: Color(0x1FB8860B), height: 1),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                  title: const Text('개인정보처리방침',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF3D341C))),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF96855B)),
+                  onTap: () => _openWebPopup(
+                    context: context,
+                    title: '개인정보처리방침',
+                    url: 'https://simon-edu-bible-game.firebaseapp.com/privacy',
+                  ),
+                ),
+                const Divider(color: Color(0x1FB8860B), height: 1),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                  title: const Text('포인트 정책',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF3D341C))),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF96855B)),
+                  onTap: () => _openWebPopup(
+                    context: context,
+                    title: '포인트 정책',
+                    url:
+                        'https://simon-edu-bible-game.firebaseapp.com/points_policy',
+                  ),
+                ),
+                const Divider(color: Color(0x1FB8860B), height: 1),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                  title: const Text('알림 설정',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF3D341C))),
+                  trailing: const Icon(Icons.notifications_active_rounded,
+                      color: Color(0xFFB8860B)),
+                  onTap: onRequestPermission,
+                ),
+                const Divider(color: Color(0x1FB8860B), height: 1),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                  title: const Text('로그아웃',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFEF4444))),
+                  trailing: const Icon(Icons.logout_rounded,
+                      color: Color(0xFFEF4444)),
+                  onTap: onLogout,
+                ),
+                const Divider(color: Color(0x1FB8860B), height: 1),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                  title: const Text('회원탈퇴',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF96855B))),
+                  trailing: const Icon(Icons.person_remove_rounded,
+                      color: Color(0xFF96855B)),
+                  onTap: () => _openWebPopup(
+                    context: context,
+                    title: '회원 탈퇴',
+                    url:
+                        'https://simon-edu-bible-game.firebaseapp.com/Delete_account',
+                    onLogout: onLogout,
+                  ),
                 ),
               ],
             ),
