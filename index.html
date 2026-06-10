@@ -8,7 +8,7 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.5.8">
+  <link rel="stylesheet" href="style.css?v=1.5.11">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
@@ -16,8 +16,8 @@
     (function() {
       const params = new URLSearchParams(window.location.search);
       const IS_APP_WEBVIEW = params.get('platform') === 'app';
-      const WEB_VER = '1.5.8';
-      const APP_WEB_VER = '1.5.3';
+      const WEB_VER = '1.5.11';
+      const APP_WEB_VER = '1.5.6';
       const VERSION_KEY = IS_APP_WEBVIEW ? 'simon_app_web_version' : 'simon_web_version';
       const ACTIVE_VER = IS_APP_WEBVIEW ? APP_WEB_VER : WEB_VER;
       window.SIMON_CLIENT_TYPE = IS_APP_WEBVIEW ? 'app' : 'web';
@@ -214,136 +214,50 @@
       <div class="dashboard-grid-left">
         <div id="dashboardView" class="view-container">
       <div class="dashboard-single-container">
-        <section class="home-section-header">
-          <div>
-            <p class="home-section-eyebrow">TODAY</p>
-            <h1>오늘의 말씀</h1>
+        <!-- Daily Mission Card -->
+        <section class="home-hero-card">
+          <div class="home-hero-head">
+            <div class="home-hero-title">
+              <span class="material-icons-round">emoji_events</span>
+              오늘의 말씀 암송 미션
+            </div>
+            <button class="home-record-btn" onclick="app.openAllRankings()">
+              도전 기록
+              <span class="material-icons-round">chevron_right</span>
+            </button>
           </div>
-          <button class="btn-home-icon" onclick="app.toggleNotifications(event)" title="알림">
-            <span class="material-icons-round">notifications</span>
-          </button>
+          <div class="home-verse-layout">
+            <div class="home-verse-art" aria-hidden="true">
+              <span class="material-icons-round home-art-cross">church</span>
+              <span class="material-icons-round home-art-book">auto_stories</span>
+            </div>
+            <div class="home-verse-copy">
+              <span class="home-verse-book-chip">요한계시록</span>
+              <h2 id="currentVerseTitle">1장 1절</h2>
+              <p id="currentVersePreview">"이 일 후에 내가 네 천사가 땅 네 모퉁이에 선 것을 보니..."</p>
+            </div>
+          </div>
+          <div class="home-progress-row">
+            <span>오늘의 달성도</span>
+            <div class="home-progress-track">
+              <div class="home-progress-fill" id="homeProgressBar"></div>
+            </div>
+            <strong><span id="progressPct">0%</span> <small id="homeProgressCount">(1/100)</small></strong>
+          </div>
+          <div class="home-action-row">
+            <button class="btn-start-mission" id="btnDailyMissionStart" onclick="app.startMission()">
+              암송 챌린지 시작
+              <span class="material-icons-round">play_arrow</span>
+            </button>
+            <button class="btn-review-mission" onclick="app.startTestMode()">
+              복습하기
+              <span class="material-icons-round">refresh</span>
+            </button>
+          </div>
+          <select id="testVerseSelect" class="home-test-select" aria-label="복습 구절 선택"></select>
         </section>
 
-        <div id="homeAttendanceCard" class="attendance-mini-card">
-          <div class="attendance-mini-left">
-            <div class="attendance-mini-status" id="homeAttendanceStatus">
-              <span class="material-icons-round">event_available</span>
-              오늘 출석 전
-            </div>
-            <div class="attendance-mini-streak" id="homeAttendanceStreak">연속 출석 0일 · 다음 보상까지 5일</div>
-          </div>
-          <button class="btn-attendance-mini" id="btnHomeAttendance" onclick="app.checkIn()">
-            출석 보상 받기
-          </button>
-        </div>
-
-        <!-- 사명자 시험 바로가기 카드 -->
-        <div id="examShortcutCard" class="dashboard-card glass-panel" style="display: none; background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(16, 185, 129, 0.12)); border: 1px solid rgba(59, 130, 246, 0.25); margin-bottom: 1.5rem; position: relative; overflow: hidden; padding: 1.5rem;">
-          <div style="position: absolute; right: -15px; top: -15px; font-size: 5rem; opacity: 0.08; transform: rotate(15deg); pointer-events: none; color: var(--accent-blue);" class="material-icons-round">assignment</div>
-          <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
-            <span class="material-icons-round" style="color: var(--accent-blue);">assignment</span>
-            <span style="font-weight: 800;">시몬에듀 사명자 시험</span>
-            <span class="badge active" style="margin-left: auto; background: var(--accent-blue); color: white; font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 6px;">상시 응시</span>
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;">
-            <p style="font-size: 0.825rem; color: var(--text-secondary); margin: 0; line-height: 1.4; word-break: keep-all;">
-              요한계시록 전체 범위에서 랜덤 10문항이 출제됩니다. 만점(100점) 달성 시 무려 <strong style="color: var(--accent-amber);">500P</strong>를 적립해 드립니다! (최고점 갱신 시 차액 보상 지급)
-            </p>
-            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
-              <span>내 최고 점수: <strong id="shortcutHighestScore" style="color: var(--text-primary);">0</strong>점</span>
-              <span>총 응시 횟수: <strong id="shortcutAttemptsCount" style="color: var(--text-primary);">0</strong>회</span>
-            </div>
-            <button class="btn-start-mission" onclick="app.switchView('exam')" style="background: linear-gradient(135deg, var(--accent-blue), var(--accent-emerald)); border: none; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); margin-top: 0.5rem; width: 100%; height: 44px; display: flex; justify-content: center; align-items: center; gap: 0.5rem; font-weight: bold; color: white; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-family: var(--font-kr);">
-              시험 화면으로 이동
-              <span class="material-icons-round" style="font-size: 1.1rem;">arrow_forward</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Scripture Challenge Card -->
-        <div id="challengeCard" class="dashboard-card glass-panel" style="display: none; background: linear-gradient(135deg, rgba(147, 51, 234, 0.12), rgba(59, 130, 246, 0.12)); border: 1px solid rgba(147, 51, 234, 0.25); margin-bottom: 1.5rem; position: relative; overflow: hidden; padding: 1.5rem;">
-          <div style="position: absolute; right: -15px; top: -15px; font-size: 5rem; opacity: 0.08; transform: rotate(15deg); pointer-events: none; color: var(--accent-purple);" class="material-icons-round">local_fire_department</div>
-          <div class="card-title" style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
-            <span class="material-icons-round" style="color: var(--accent-purple);">local_fire_department</span>
-            <span style="font-weight: 800;">스페셜 암송 챌린지!</span>
-            <span class="badge active" id="challengeBadge" style="margin-left: auto; background: var(--accent-purple); color: white; font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 6px;">진행 중</span>
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;">
-            <h3 id="challengeChapterTitle" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">요한계시록 7장 전체 암송</h3>
-            <p id="challengeProgressText" style="font-size: 0.825rem; color: var(--text-secondary); margin: 0; line-height: 1.4;">
-              관리자가 지정한 특별 챌린지입니다. 요한계시록 7장 전체 구절을 암송 완료하면 <strong style="color: var(--accent-amber);" id="challengeBonusPointsDisplay">+50P</strong> 보너스를 드립니다!
-            </p>
-            <div id="challengeProgressContainer" style="display: none; align-items: center; gap: 0.75rem; width: 100%; margin-top: 0.5rem;">
-              <div style="flex: 1; height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; border: 1px solid var(--glass-border);">
-                <div id="challengeProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--accent-purple), var(--accent-blue)); border-radius: 4px; transition: width 0.3s ease;"></div>
-              </div>
-              <span id="challengeProgressLabel" style="font-size: 0.75rem; font-weight: bold; color: var(--text-secondary); min-width: 40px; text-align: right;">0 / 17</span>
-            </div>
-            <button class="btn-start-mission" id="btnStartChallenge" onclick="app.startChallenge()" style="background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue)); border: none; box-shadow: 0 4px 15px rgba(147, 51, 234, 0.3); margin-top: 0.5rem; width: 100%; height: 44px; display: flex; justify-content: center; align-items: center; gap: 0.5rem; font-weight: bold; color: white; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-family: var(--font-kr);">
-              챌린지 도전하기
-              <span class="material-icons-round" style="font-size: 1.1rem;">local_fire_department</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Daily Mission Card -->
-        <div class="dashboard-card glass-panel">
-          <div class="card-title">
-            <span class="material-icons-round" style="color: var(--accent-purple);">emoji_events</span>
-            오늘의 말씀 암송 미션
-          </div>
-          <div class="mission-progress-container">
-            <!-- Circle Progress Bar -->
-            <div class="circular-progress">
-              <svg>
-                <defs>
-                  <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="var(--accent-purple)" />
-                    <stop offset="100%" stop-color="var(--accent-blue)" />
-                  </linearGradient>
-                </defs>
-                <circle class="circle-bg" cx="60" cy="60" r="45"></circle>
-                <circle class="circle-progress" id="missionCircle" cx="60" cy="60" r="45"></circle>
-              </svg>
-              <div class="progress-text">
-                <div class="progress-number" id="progressPct">0%</div>
-                <div class="progress-label">달성도</div>
-              </div>
-            </div>
-            
-            <!-- Mission Info -->
-            <div class="mission-details">
-              <h3 id="currentVerseTitle">요한계시록 1장 1절</h3>
-              <p id="currentVersePreview">"이 일 후에 내가 네 천사가 땅 네 모퉁이에 선 것을 보니..."</p>
-              <div class="mission-action-group" style="display: flex; flex-direction: column; gap: 1rem; align-items: flex-start; width: 100%;">
-                <button class="btn-start-mission" id="btnDailyMissionStart" onclick="app.startMission()">
-                  암송 챌린지 시작
-                  <span class="material-icons-round">play_arrow</span>
-                </button>
-                <div class="test-mode-section" style="border-top: 1px dashed var(--glass-border); padding-top: 1rem; width: 100%; margin-top: 0.5rem;">
-                  <div style="font-size: 0.85rem; font-weight: bold; color: var(--text-secondary); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.25rem;">
-                    <span class="material-icons-round" style="font-size: 1.1rem; color: var(--accent-amber);">science</span>
-                    말씀 암송 테스트 모드 (점수 미지급)
-                  </div>
-                  <div style="display: flex; gap: 0.5rem; align-items: center; width: 100%; max-width: 320px;">
-                    <select id="testVerseSelect" style="flex: 1; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--glass-border); background: var(--glass-bg); color: var(--text-primary); font-weight: bold; font-family: var(--font-kr); outline: none; cursor: pointer; height: 38px;">
-                      <!-- JS dynamic generation -->
-                    </select>
-                    <button onclick="app.startTestMode()" style="background: linear-gradient(135deg, var(--accent-amber), #d97706); color: white; border: none; padding: 0 1.2rem; border-radius: 8px; font-weight: 700; height: 38px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; font-family: var(--font-kr); font-size: 0.9rem; transition: all var(--transition-fast); box-shadow: var(--accent-amber-glow) 0 4px 10px; flex-shrink: 0;">
-                      테스트 시작 <span class="material-icons-round" style="font-size: 1rem;">quiz</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <section class="event-banners-section">
-          <div class="home-widget-title">
-            <span>이벤트</span>
-            <button onclick="app.switchView('events')">전체보기</button>
-          </div>
           <div id="homeEventBanners" class="event-banner-list">
             <div class="home-empty-state">진행 중인 이벤트가 없습니다.</div>
           </div>
@@ -357,6 +271,37 @@
           <div id="homeNoticeList" class="notice-list-compact">
             <div class="home-empty-state">등록된 공지사항이 없습니다.</div>
           </div>
+        </section>
+
+        <section class="home-mission-section">
+          <div class="home-widget-title">
+            <span>오늘의 미션</span>
+          </div>
+          <div class="home-mission-grid">
+            <button class="home-mission-tile" id="btnHomeAttendance" onclick="app.checkIn()">
+              <span class="home-mission-icon"><span class="material-icons-round">event_available</span></span>
+              <span><strong id="homeAttendanceStatus">출석체크</strong><small id="homeAttendanceStreak">연속 출석 0일</small><b>+50P</b></span>
+              <span class="material-icons-round">chevron_right</span>
+            </button>
+            <button class="home-mission-tile" onclick="app.startMission()">
+              <span class="home-mission-icon"><span class="material-icons-round">auto_stories</span></span>
+              <span><strong>오늘의 말씀</strong><small>암송하기</small><b>+100P</b></span>
+              <span class="material-icons-round">chevron_right</span>
+            </button>
+            <button class="home-mission-tile" onclick="app.switchView('ranking')">
+              <span class="home-mission-icon"><span class="material-icons-round">groups</span></span>
+              <span><strong>친구에게</strong><small>응원 보내기</small><b>+30P</b></span>
+              <span class="material-icons-round">chevron_right</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="home-friend-activity-section">
+          <div class="home-widget-title">
+            <span>친구 활동</span>
+            <button onclick="app.switchView('journey')">전체보기</button>
+          </div>
+          <div id="homeFriendActivityList" class="home-friend-card-list"></div>
         </section>
       </div>
     </div>
@@ -981,7 +926,7 @@
           </div>
 
           <div class="app-version" style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-en); font-weight: 500; letter-spacing: 0.5px; opacity: 0.7;">
-            Version 1.5.8
+            Version 1.5.11
           </div>
         </div>
 
@@ -995,13 +940,13 @@
       <span class="material-icons-round">auto_stories</span>
       <span>오늘의 말씀</span>
     </button>
-    <button class="bottom-nav-item" id="bottomNavEvents" onclick="app.switchView('events')">
-      <span class="material-icons-round">campaign</span>
-      <span>이벤트</span>
-    </button>
     <button class="bottom-nav-item" id="bottomNavJourney" onclick="app.switchView('journey')">
       <span class="material-icons-round">map</span>
       <span>성경여정</span>
+    </button>
+    <button class="bottom-nav-item" id="bottomNavRanking" onclick="app.switchView('ranking')">
+      <span class="material-icons-round">emoji_events</span>
+      <span>명예의 전당</span>
     </button>
     <button class="bottom-nav-item" id="bottomNavSettings" onclick="app.switchView('settings')">
       <span class="material-icons-round">settings</span>
@@ -2303,6 +2248,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <script src="bible_data.js?v=1.5.2"></script>
-  <script src="app.js?v=1.5.8"></script>
+  <script src="app.js?v=1.5.11"></script>
 </body>
 </html>

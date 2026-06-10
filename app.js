@@ -1025,9 +1025,9 @@ class SimonEduApp {
     const map = {
       dashboard: 'bottomNavDashboard',
       attendance: 'bottomNavDashboard',
-      ranking: 'bottomNavJourney',
-      events: 'bottomNavEvents',
-      eventDetail: 'bottomNavEvents',
+      ranking: 'bottomNavRanking',
+      events: 'bottomNavDashboard',
+      eventDetail: 'bottomNavDashboard',
       journey: 'bottomNavJourney',
       settings: 'bottomNavSettings'
     };
@@ -1172,6 +1172,10 @@ class SimonEduApp {
     const progressPercent = Math.min(Math.round((curIdx / bibleData.length) * 100), 100);
     const progressPct = document.getElementById('progressPct');
     if (progressPct) progressPct.textContent = `${progressPercent}%`;
+    const homeProgressBar = document.getElementById('homeProgressBar');
+    if (homeProgressBar) homeProgressBar.style.width = `${progressPercent}%`;
+    const homeProgressCount = document.getElementById('homeProgressCount');
+    if (homeProgressCount) homeProgressCount.textContent = `(${Math.min(curIdx + 1, bibleData.length)}/${bibleData.length})`;
     
     const circle = document.getElementById('missionCircle');
     if (circle) {
@@ -1189,7 +1193,7 @@ class SimonEduApp {
 
     if (curIdx < bibleData.length) {
       const currentVerse = bibleData[curIdx];
-      if (titleEl) titleEl.textContent = `요한계시록 ${currentVerse.chapter}장 ${currentVerse.verse}절`;
+      if (titleEl) titleEl.textContent = `${currentVerse.chapter}장 ${currentVerse.verse}절`;
       
       if (hasDoneMissionToday) {
         if (previewEl) previewEl.textContent = `오늘의 암송 미션을 완료하셨습니다! 내일 다음 구절 시험이 해금됩니다. (현재 본문: "${currentVerse.text}")`;
@@ -1235,6 +1239,7 @@ class SimonEduApp {
     // 5.5 Render Scripture Challenge Card
     this.renderChallengeCard();
     this.renderHomeEventsAndNotices();
+    this.renderHomeFriendActivities();
     this.renderJourneyView();
   }
 
@@ -1252,21 +1257,19 @@ class SimonEduApp {
 
     const statusEl = document.getElementById('homeAttendanceStatus');
     if (statusEl) {
-      statusEl.innerHTML = doneToday
-        ? `<span class="material-icons-round">verified</span> 오늘 출석 완료`
-        : `<span class="material-icons-round">event_available</span> 오늘 출석 전`;
+      statusEl.textContent = doneToday ? '오늘 출석 완료' : '출석체크';
     }
 
     const streakEl = document.getElementById('homeAttendanceStreak');
     if (streakEl) {
-      streakEl.textContent = `연속 출석 ${consecutive}일 · ${remainText}`;
+      streakEl.textContent = doneToday ? `연속 ${consecutive}일` : `연속 ${consecutive}일`;
     }
 
     const btn = document.getElementById('btnHomeAttendance');
     if (btn) {
       btn.disabled = doneToday;
       btn.classList.toggle('completed', doneToday);
-      btn.textContent = doneToday ? '오늘 출석 완료' : '출석 보상 받기';
+      btn.setAttribute('aria-label', doneToday ? `오늘 출석 완료, ${remainText}` : `출석체크, ${remainText}`);
     }
   }
 
@@ -1301,20 +1304,23 @@ class SimonEduApp {
       return;
     }
 
-    list.innerHTML = events.slice(0, 3).map(evt => {
+    list.innerHTML = events.slice(0, 5).map((evt, index) => {
       const bannerUrl = this.getEventBannerUrl(evt);
       const bgStyle = bannerUrl
         ? `background-image: linear-gradient(0deg, rgba(20,20,20,0.72), rgba(20,20,20,0.18)), url('${this.escapeHtml(bannerUrl)}');`
         : '';
       return `
-        <button class="event-banner-card ${bannerUrl ? 'has-image' : ''}" style="${bgStyle}" onclick="app.openEventFromHome('${evt.id}')">
+        <button class="event-banner-card ${bannerUrl ? 'has-image' : ''}" style="${bgStyle}" onclick="app.openEventFromHome('${evt.id}')" aria-label="${this.escapeHtml(evt.title || this.getEventTypeLabel(evt))}">
           <div class="event-banner-overlay">
-            <span class="material-icons-round">${this.getEventIcon(evt)}</span>
             <div>
               <div class="event-banner-title">${this.escapeHtml(evt.title || this.getEventTypeLabel(evt))}</div>
-              <div class="event-banner-meta">${this.getEventTypeLabel(evt)} · ${this.escapeHtml(evt.endDate || '진행 중')}</div>
+              <div class="event-banner-meta">기간 내 시험에 참여해 주세요.</div>
+              <div class="event-banner-date">${this.escapeHtml(evt.startDate || '진행 중')} ~ ${this.escapeHtml(evt.endDate || '진행 중')}</div>
+              <span class="event-banner-cta">자세히 보기 <span class="material-icons-round">chevron_right</span></span>
             </div>
+            <span class="material-icons-round event-banner-art">${this.getEventIcon(evt)}</span>
           </div>
+          ${index === 0 ? '<div class="event-banner-dots"><span class="active"></span><span></span><span></span><span></span><span></span></div>' : ''}
         </button>
       `;
     }).join('');
@@ -1332,11 +1338,40 @@ class SimonEduApp {
       <button class="notice-item-compact" onclick="app.openNotice('${notice.id}')">
         <div class="notice-item-title-col">
           <span class="material-icons-round" style="font-size:1rem;color:var(--accent-amber);">notifications</span>
+          <span class="notice-new-badge">NEW</span>
           <span class="notice-item-compact-title">${this.escapeHtml(notice.title)}</span>
         </div>
         <span class="notice-item-compact-date">${this.escapeHtml(notice.date)}</span>
       </button>
     `).join('');
+  }
+
+  renderHomeFriendActivities() {
+    const list = document.getElementById('homeFriendActivityList');
+    if (!list) return;
+    const friends = this.getFriendUsers().slice(0, 3);
+    if (friends.length === 0) {
+      list.innerHTML = '<div class="home-empty-state">최근 친구 활동이 없습니다.</div>';
+      return;
+    }
+    list.innerHTML = friends.map(friend => {
+      const verse = this.getCurrentUserVerse(friend);
+      const name = this.escapeHtml(friend.name || friend.username || '사용자');
+      const initial = this.escapeHtml(name.charAt(0));
+      const online = this.isUserOnline(friend);
+      const status = verse.verse > 1 ? '진행 중' : '완료!';
+      return `
+        <div class="home-friend-card">
+          <div class="home-friend-avatar ${online ? 'online' : ''}">${initial}</div>
+          <div class="home-friend-body">
+            <strong>${name}</strong>
+            <span>요한계시록 ${verse.chapter}장</span>
+            <small>${status}</small>
+          </div>
+          <em>${verse.chapter}장</em>
+        </div>
+      `;
+    }).join('');
   }
 
   renderEventsView() {
@@ -1866,6 +1901,8 @@ class SimonEduApp {
   renderChallengeCard() {
     const card = document.getElementById('challengeCard');
     if (!card) return;
+    card.style.display = 'none';
+    return;
 
     if (!this.hasActiveSpecialChallengeEvent()) {
       card.style.display = 'none';
@@ -2563,7 +2600,7 @@ class SimonEduApp {
   updateExamEntryVisibility() {
     const visible = this.hasActiveExamEvent();
     const card = document.getElementById('examShortcutCard');
-    if (card) card.style.display = visible ? 'block' : 'none';
+    if (card) card.style.display = 'none';
     const navTab = document.getElementById('navTabExam');
     if (navTab) navTab.style.display = visible ? '' : 'none';
   }

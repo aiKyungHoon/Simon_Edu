@@ -49,7 +49,7 @@ class _WebViewScreenState extends State<WebViewScreen>
   bool _isProfileLoading = true;
   List<dynamic> _pointsHistory = [];
 
-  static const String _appWebVersion = '1.5.3';
+  static const String _appWebVersion = '1.5.6';
   final String _targetUrl =
       'https://simon-edu-bible-game.firebaseapp.com?platform=app&app_v=$_appWebVersion';
 
@@ -80,49 +80,7 @@ class _WebViewScreenState extends State<WebViewScreen>
                 _loadingProgress = 0.0;
               });
             },
-            onPageFinished: (String url) {
-              setState(() {
-                _isLoading = false;
-              });
-              _isPageFinished = true;
-              _checkIntroFinished();
-              _updateNavigationState();
-              _injectJavaScriptBridge();
-              if (_fcmToken != null) {
-                _syncTokenToWebView(_fcmToken);
-              }
-              _syncPlatformToWebView();
-
-              // Synchronize auth state and active view state after page finish
-              _controller?.runJavaScript('''
-                (function() {
-                  if (window.app && window.app.currentUser && window.MobileAppChannel) {
-                    window.MobileAppChannel.postMessage(JSON.stringify({
-                      event: 'login',
-                      role: window.app.currentUser.role || 'user'
-                    }));
-                    var activeView = document.querySelector('.view-container.active');
-                    if (activeView) {
-                      window.MobileAppChannel.postMessage(JSON.stringify({
-                        event: 'view_changed',
-                        view: activeView.id.replace('View', '')
-                      }));
-                    }
-                  }
-                })();
-              ''');
-              if (_pendingDeepLink != null) {
-                final link = _pendingDeepLink!;
-                _pendingDeepLink = null;
-                Future.delayed(const Duration(milliseconds: 500), () {
-                  if (mounted && _controller != null) {
-                    debugPrint('Executing pending deep link JS: $link');
-                    _controller!.runJavaScript(
-                        'if (window.handleDeepLink) { window.handleDeepLink("$link"); }');
-                  }
-                });
-              }
-            },
+            onPageFinished: _handlePageFinished,
             onWebResourceError: (WebResourceError error) {
               debugPrint('WebView Resource Error: ${error.description}');
             },
@@ -205,6 +163,62 @@ class _WebViewScreenState extends State<WebViewScreen>
     } else {
       debugPrint('Page not loaded. Saving pending deep link: $linkStr');
       _pendingDeepLink = linkStr;
+    }
+  }
+
+  void _handlePageFinished(String url) {
+    try {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+      });
+      _isPageFinished = true;
+      _checkIntroFinished();
+      unawaited(_updateNavigationState().catchError((Object error) {
+        debugPrint('Error updating WebView navigation state: $error');
+      }));
+      _injectJavaScriptBridge();
+      if (_fcmToken != null) {
+        _syncTokenToWebView(_fcmToken);
+      }
+      _syncPlatformToWebView();
+
+      // Synchronize auth state and active view state after page finish.
+      unawaited(_controller?.runJavaScript('''
+        (function() {
+          if (window.app && window.app.currentUser && window.MobileAppChannel) {
+            window.MobileAppChannel.postMessage(JSON.stringify({
+              event: 'login',
+              role: window.app.currentUser.role || 'user'
+            }));
+            var activeView = document.querySelector('.view-container.active');
+            if (activeView) {
+              window.MobileAppChannel.postMessage(JSON.stringify({
+                event: 'view_changed',
+                view: activeView.id.replace('View', '')
+              }));
+            }
+          }
+        })();
+      ''').catchError((Object error) {
+        debugPrint('Error syncing WebView page-finished state: $error');
+      }));
+
+      if (_pendingDeepLink != null) {
+        final link = _pendingDeepLink!;
+        _pendingDeepLink = null;
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted && _controller != null) {
+            debugPrint('Executing pending deep link JS: $link');
+            unawaited(_controller!.runJavaScript(
+                'if (window.handleDeepLink) { window.handleDeepLink(${jsonEncode(link)}); }'));
+          }
+        });
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Error handling WebView page finish for $url: $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 
@@ -335,11 +349,11 @@ class _WebViewScreenState extends State<WebViewScreen>
         final view = data['view'];
         int newIndex = _currentIndex;
         final shouldHideBottomNav = view == 'game' || view == 'exam';
-        if (view == 'dashboard') {
+        if (view == 'dashboard' || view == 'events' || view == 'eventDetail') {
           newIndex = 0;
-        } else if (view == 'events' || view == 'eventDetail') {
+        } else if (view == 'journey') {
           newIndex = 1;
-        } else if (view == 'journey' || view == 'ranking') {
+        } else if (view == 'ranking') {
           newIndex = 2;
         } else if (view == 'settings') {
           newIndex = 3;
@@ -414,9 +428,9 @@ class _WebViewScreenState extends State<WebViewScreen>
 
     String viewName = 'dashboard';
     if (index == 1) {
-      viewName = 'events';
-    } else if (index == 2) {
       viewName = 'journey';
+    } else if (index == 2) {
+      viewName = 'ranking';
     } else if (index == 3) {
       viewName = 'settings';
     }
@@ -427,6 +441,17 @@ class _WebViewScreenState extends State<WebViewScreen>
     if (index == 3) {
       _syncUserProfile();
     }
+  }
+
+  void _openEventsFromSettings() {
+    if (_controller == null || !_isLoggedIn) return;
+    HapticFeedback.lightImpact();
+    setState(() {
+      _currentIndex = 0;
+      _hideBottomNav = false;
+    });
+    _controller!.runJavaScript(
+        'if (window.app && window.app.switchView) { window.app.switchView("events"); }');
   }
 
   @override
@@ -576,7 +601,7 @@ class _WebViewScreenState extends State<WebViewScreen>
                             _requestNotificationPermission()
                                 .then((_) => _syncUserProfile());
                           },
-                          onOpenEvents: () => _switchWebViewTab(1),
+                          onOpenEvents: _openEventsFromSettings,
                         ),
 
                       // Linear progress bar for loading
@@ -620,14 +645,14 @@ class _WebViewScreenState extends State<WebViewScreen>
                       label: '오늘의 말씀',
                     ),
                     BottomNavigationBarItem(
-                      icon: Icon(Icons.campaign_rounded),
-                      activeIcon: Icon(Icons.campaign_rounded),
-                      label: '이벤트',
-                    ),
-                    BottomNavigationBarItem(
                       icon: Icon(Icons.map_rounded),
                       activeIcon: Icon(Icons.map_rounded),
                       label: '성경여정',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.emoji_events_rounded),
+                      activeIcon: Icon(Icons.emoji_events_rounded),
+                      label: '명예의 전당',
                     ),
                     BottomNavigationBarItem(
                       icon: Icon(Icons.settings_rounded),
@@ -1026,6 +1051,145 @@ class _WebViewScreenState extends State<WebViewScreen>
   }
 }
 
+void _openWebPopup({
+  required BuildContext context,
+  required String title,
+  required String url,
+  VoidCallback? onLogout,
+}) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) {
+      return Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: const BoxDecoration(
+          color: Color(0xFFFDF8E6),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: Color(0x1FB8860B)),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF3D341C),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded,
+                        color: Color(0xFF96855B)),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
+                ),
+                child: _PopupWebView(
+                  url: url,
+                  onLogout: () {
+                    Navigator.of(context).pop();
+                    onLogout?.call();
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class _PopupWebView extends StatefulWidget {
+  final String url;
+  final VoidCallback? onLogout;
+
+  const _PopupWebView({
+    required this.url,
+    this.onLogout,
+  });
+
+  @override
+  State<_PopupWebView> createState() => _PopupWebViewState();
+}
+
+class _PopupWebViewState extends State<_PopupWebView> {
+  late final WebViewController _controller;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0xFFFDF8E6))
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (_) {
+            setState(() {
+              _isLoading = true;
+            });
+          },
+          onPageFinished: (_) {
+            setState(() {
+              _isLoading = false;
+            });
+          },
+        ),
+      )
+      ..addJavaScriptChannel(
+        'MobileAppChannel',
+        onMessageReceived: (JavaScriptMessage message) {
+          try {
+            final Map<String, dynamic> data = json.decode(message.message);
+            if (data['event'] == 'logout') {
+              widget.onLogout?.call();
+            }
+          } catch (e) {
+            debugPrint('Popup WebView channel error: $e');
+          }
+        },
+      )
+      ..loadRequest(Uri.parse(widget.url));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        WebViewWidget(controller: _controller),
+        if (_isLoading)
+          const Center(
+            child: CircularProgressIndicator(
+              color: Color(0xFFB8860B),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class NativeSettingsView extends StatelessWidget {
   final String userName;
   final String userEmail;
@@ -1231,6 +1395,56 @@ class NativeSettingsView extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0x1FB8860B)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3D341C).withOpacity(0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              leading: const Icon(
+                Icons.monetization_on_rounded,
+                color: Color(0xFFB8860B),
+                size: 24,
+              ),
+              title: const Text(
+                '포인트 내역',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF3D341C),
+                ),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$userPoints P',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFB8860B),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: Color(0xFF96855B)),
+                ],
+              ),
+              onTap: () => _showPointHistoryDialog(context),
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // 2. 설정 메뉴
           Container(
             decoration: BoxDecoration(
@@ -1384,228 +1598,6 @@ class NativeSettingsView extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 16),
-
-          // 2. 포인트 내역
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0x1FB8860B)),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF3D341C).withOpacity(0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: ListTile(
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-              leading: const Icon(
-                Icons.monetization_on_rounded,
-                color: Color(0xFFB8860B),
-                size: 24,
-              ),
-              title: const Text(
-                '포인트 내역',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF3D341C),
-                ),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '$userPoints P',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFB8860B),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Icon(Icons.chevron_right_rounded,
-                      color: Color(0xFF96855B)),
-                ],
-              ),
-              onTap: () => _showPointHistoryDialog(context),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 3. 약관 및 정책
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0x1FB8860B)),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF3D341C).withOpacity(0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
-                  child: Row(
-                    children: [
-                      Icon(Icons.description_rounded,
-                          color: Color(0xFFB8860B), size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        '약관 및 정책',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF3D341C),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(color: Color(0x1FB8860B)),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                  title: const Text(
-                    '이용약관',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF3D341C),
-                    ),
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded,
-                      color: Color(0xFF96855B)),
-                  onTap: () {
-                    _openWebPopup(
-                      context: context,
-                      title: '이용약관',
-                      url:
-                          'https://simon-edu-bible-game.firebaseapp.com/Terms_of_Use',
-                    );
-                  },
-                ),
-                const Divider(color: Color(0x1FB8860B), height: 1),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                  title: const Text(
-                    '개인정보처리방침',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF3D341C),
-                    ),
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded,
-                      color: Color(0xFF96855B)),
-                  onTap: () {
-                    _openWebPopup(
-                      context: context,
-                      title: '개인정보처리방침',
-                      url:
-                          'https://simon-edu-bible-game.firebaseapp.com/privacy',
-                    );
-                  },
-                ),
-                const Divider(color: Color(0x1FB8860B), height: 1),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                  title: const Text(
-                    '포인트 정책',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF3D341C),
-                    ),
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded,
-                      color: Color(0xFF96855B)),
-                  onTap: () {
-                    _openWebPopup(
-                      context: context,
-                      title: '포인트 정책',
-                      url:
-                          'https://simon-edu-bible-game.firebaseapp.com/points_policy',
-                    );
-                  },
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          const SizedBox(height: 16),
-
-          // 4. 로그아웃 및 회원탈퇴 그룹
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0x1FB8860B)),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF3D341C).withOpacity(0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                  leading: const Icon(Icons.logout_rounded,
-                      color: Color(0xFFEF4444), size: 20),
-                  title: const Text(
-                    '로그아웃',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFEF4444),
-                    ),
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded,
-                      color: Color(0xFF96855B)),
-                  onTap: onLogout,
-                ),
-                const Divider(color: Color(0x1FB8860B), height: 1),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                  leading: const Icon(Icons.person_remove_rounded,
-                      color: Color(0xFF96855B), size: 20),
-                  title: const Text(
-                    '회원 탈퇴',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF96855B),
-                    ),
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded,
-                      color: Color(0xFF96855B)),
-                  onTap: () {
-                    _openWebPopup(
-                      context: context,
-                      title: '회원 탈퇴',
-                      url:
-                          'https://simon-edu-bible-game.firebaseapp.com/Delete_account',
-                      onLogout: onLogout,
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 24),
 
           // Version info center aligned
@@ -1627,21 +1619,26 @@ class NativeSettingsView extends StatelessWidget {
   }
 
   void _showPointHistoryDialog(BuildContext context) {
+    final history = List<Map<String, dynamic>>.from(
+      pointsHistory.reversed
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item)),
+    );
+
+    if (history.isEmpty && userPoints > 0) {
+      history.add({
+        'type': 'legacy',
+        'title': '이전 활동 누적 포인트',
+        'amount': userPoints,
+        'date': '기존 적립 이력',
+      });
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (BuildContext context) {
-        final List<dynamic> reversedHistory = List.from(pointsHistory.reversed);
-        if (reversedHistory.isEmpty && userPoints > 0) {
-          reversedHistory.add({
-            'type': 'legacy',
-            'title': '이전 활동 누적 포인트',
-            'amount': userPoints,
-            'date': '기존 적립 이력',
-          });
-        }
-
+      builder: (context) {
         return Container(
           height: MediaQuery.of(context).size.height * 0.7,
           decoration: const BoxDecoration(
@@ -1653,7 +1650,6 @@ class NativeSettingsView extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // Drag handle
               const SizedBox(height: 12),
               Container(
                 width: 40,
@@ -1663,12 +1659,9 @@ class NativeSettingsView extends StatelessWidget {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(height: 8),
-
-              // Header
               Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1688,42 +1681,26 @@ class NativeSettingsView extends StatelessWidget {
                   ],
                 ),
               ),
-
-              // Points Summary Card
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: const Color(0x1FB8860B)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF3D341C).withOpacity(0.02),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.monetization_on_rounded,
-                              color: Color(0xFFB8860B), size: 24),
-                          SizedBox(width: 8),
-                          Text(
-                            '현재 보유 포인트',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF6B5C37),
-                            ),
-                          ),
-                        ],
+                      const Text(
+                        '현재 보유 포인트',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF6B5C37),
+                        ),
                       ),
                       Text(
                         '$userPoints P',
@@ -1737,149 +1714,63 @@ class NativeSettingsView extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-
-              // History List
+              const SizedBox(height: 12),
               Expanded(
-                child: reversedHistory.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.monetization_on_outlined,
-                              size: 64,
-                              color: const Color(0xFF96855B).withOpacity(0.3),
-                            ),
-                            const SizedBox(height: 16),
-                            const Text(
-                              '아직 포인트 적립 내역이 없습니다.',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF96855B),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              '출석 체크와 말씀 암송을 통해 포인트를 쌓아보세요!',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFFB8860B),
-                              ),
-                            ),
-                            const SizedBox(height: 40),
-                          ],
+                child: history.isEmpty
+                    ? const Center(
+                        child: Text(
+                          '아직 포인트 적립 내역이 없습니다.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF96855B),
+                          ),
                         ),
                       )
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                        itemCount: reversedHistory.length,
-                        separatorBuilder: (context, index) => const Divider(
+                        itemCount: history.length,
+                        separatorBuilder: (_, __) => const Divider(
                           color: Color(0x1FB8860B),
                           height: 1,
                         ),
                         itemBuilder: (context, index) {
-                          final item =
-                              reversedHistory[index] as Map<String, dynamic>;
-                          final type = item['type'] ?? '';
-                          final title = item['title'] ?? '포인트 적립';
-                          final amount = item['amount'] ?? 0;
-                          final date = item['date'] ?? '';
+                          final item = history[index];
+                          final title = item['title']?.toString() ?? '포인트 적립';
+                          final date = item['date']?.toString() ?? '';
+                          final amount = (item['amount'] ?? 0).toString();
 
-                          // Styling configurations based on type
-                          Color bgColor;
-                          Color iconColor;
-                          IconData iconData;
-
-                          switch (type) {
-                            case 'signup':
-                              bgColor = const Color(0xFFFFF4EB);
-                              iconColor = const Color(0xFFFD7E14);
-                              iconData = Icons.celebration_rounded;
-                              break;
-                            case 'attendance':
-                              bgColor = const Color(0xFFEBFDF2);
-                              iconColor = const Color(0xFF20C997);
-                              iconData = Icons.calendar_today_rounded;
-                              break;
-                            case 'challenge':
-                              bgColor = const Color(0xFFF3EBFD);
-                              iconColor = const Color(0xFF7048E8);
-                              iconData = Icons.menu_book_rounded;
-                              break;
-                            case 'admin':
-                              bgColor = const Color(0xFFF1F3F5);
-                              iconColor = const Color(0xFF495057);
-                              iconData = Icons.admin_panel_settings_rounded;
-                              break;
-                            case 'legacy':
-                              bgColor = const Color(0xFFFFFBEB);
-                              iconColor = const Color(0xFFF59E0B);
-                              iconData = Icons.monetization_on_rounded;
-                              break;
-                            default:
-                              bgColor = const Color(0xFFFFFBEB);
-                              iconColor = const Color(0xFFF59E0B);
-                              iconData = Icons.monetization_on_rounded;
-                          }
-
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Row(
-                              children: [
-                                // Icon Circle
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: bgColor,
-                                    shape: BoxShape.circle,
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const CircleAvatar(
+                              backgroundColor: Color(0xFFFFFBEB),
+                              child: Icon(Icons.monetization_on_rounded,
+                                  color: Color(0xFFB8860B)),
+                            ),
+                            title: Text(
+                              title,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF3D341C),
+                              ),
+                            ),
+                            subtitle: date.isEmpty
+                                ? null
+                                : Text(
+                                    date,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF96855B),
+                                    ),
                                   ),
-                                  child: Icon(
-                                    iconData,
-                                    color: iconColor,
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-
-                                // Text details
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        title,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF3D341C),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        date,
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Color(0xFF96855B),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // Amount text
-                                Text(
-                                  '+${amount}P',
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFFB8860B),
-                                  ),
-                                ),
-                              ],
+                            trailing: Text(
+                              '+$amount P',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFB8860B),
+                              ),
                             ),
                           );
                         },
@@ -1889,154 +1780,6 @@ class NativeSettingsView extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-// Web Popup Helpers
-void _openWebPopup({
-  required BuildContext context,
-  required String title,
-  required String url,
-  VoidCallback? onLogout,
-}) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) {
-      return Container(
-        height: MediaQuery.of(context).size.height * 0.85,
-        decoration: const BoxDecoration(
-          color: Color(0xFFFDF8E6),
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        child: Column(
-          children: [
-            // Header bar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: const BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Color(0x1FB8860B)),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF3D341C),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded,
-                        color: Color(0xFF96855B)),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-            // WebView Content
-            Expanded(
-              child: ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(20),
-                  bottomRight: Radius.circular(20),
-                ),
-                child: _PopupWebView(
-                  url: url,
-                  onLogout: () {
-                    // Close the popup first
-                    Navigator.of(context).pop();
-                    // Trigger logout callback
-                    if (onLogout != null) {
-                      onLogout();
-                    }
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-class _PopupWebView extends StatefulWidget {
-  final String url;
-  final VoidCallback? onLogout;
-
-  const _PopupWebView({
-    required this.url,
-    this.onLogout,
-  });
-
-  @override
-  State<_PopupWebView> createState() => _PopupWebViewState();
-}
-
-class _PopupWebViewState extends State<_PopupWebView> {
-  late final WebViewController _controller;
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFFFDF8E6))
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) {
-            setState(() {
-              _isLoading = true;
-            });
-          },
-          onPageFinished: (_) {
-            setState(() {
-              _isLoading = false;
-            });
-          },
-        ),
-      )
-      ..addJavaScriptChannel(
-        'MobileAppChannel',
-        onMessageReceived: (JavaScriptMessage message) {
-          try {
-            final Map<String, dynamic> data = json.decode(message.message);
-            if (data['event'] == 'logout') {
-              if (widget.onLogout != null) {
-                widget.onLogout!();
-              }
-            }
-          } catch (e) {
-            debugPrint('Popup WebView channel error: $e');
-          }
-        },
-      )
-      ..loadRequest(Uri.parse(widget.url));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        WebViewWidget(controller: _controller),
-        if (_isLoading)
-          const Center(
-            child: CircularProgressIndicator(
-              color: Color(0xFFB8860B),
-            ),
-          ),
-      ],
     );
   }
 }
