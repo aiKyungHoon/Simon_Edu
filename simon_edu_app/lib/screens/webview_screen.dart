@@ -34,10 +34,13 @@ class _WebViewScreenState extends State<WebViewScreen>
   bool _introVisible = false;
   bool _videoCompleted = false;
   int _currentIndex = 0;
+  int _unreadNotificationsCount = 0;
   bool _isLoggedIn = false;
   bool _hideBottomNav = false;
   String _appVersion = '';
   String? _fcmToken;
+  DateTime? _lastPressedAt;
+  String _currentWebView = 'dashboard';
 
   // Native Settings Profile State
   String _userName = '';
@@ -49,9 +52,10 @@ class _WebViewScreenState extends State<WebViewScreen>
   bool _isProfileLoading = true;
   List<dynamic> _pointsHistory = [];
 
-  static const String _appWebVersion = '1.5.6';
-  final String _targetUrl =
-      'https://simon-edu-bible-game.firebaseapp.com?platform=app&app_v=$_appWebVersion';
+  static const String _appWebVersion = '1.5.13';
+  final String _targetUrl = kDebugMode
+      ? 'http://localhost:8080?platform=app&app_v=$_appWebVersion'
+      : 'https://simon-edu-bible-game.firebaseapp.com?platform=app&app_v=$_appWebVersion';
 
   @override
   void initState() {
@@ -346,28 +350,40 @@ class _WebViewScreenState extends State<WebViewScreen>
           _hideBottomNav = false;
         });
       } else if (event == 'view_changed') {
-        final view = data['view'];
+        final view = data['view'] as String?;
+        _currentWebView = view ?? 'dashboard';
         int newIndex = _currentIndex;
-        final shouldHideBottomNav = view == 'game' || view == 'exam';
-        if (view == 'dashboard' || view == 'events' || view == 'eventDetail') {
+        final shouldHideBottomNav = view == 'game' || 
+                                    view == 'exam' || 
+                                    view == 'journeyChapterDetail' || 
+                                    view == 'journeyVerseStudy' || 
+                                    view == 'journeyResult' ||
+                                    view == 'eventDetail' ||
+                                    view == 'noticeDetail';
+        if (view == 'dashboard' || view == 'events' || view == 'eventDetail' || view == 'noticeDetail') {
           newIndex = 0;
-        } else if (view == 'journey') {
+        } else if (view == 'journey' || 
+                   view == 'journeyChapterDetail' || 
+                   view == 'journeyVerseStudy' || 
+                   view == 'journeyResult') {
           newIndex = 1;
         } else if (view == 'ranking') {
           newIndex = 2;
-        } else if (view == 'settings') {
+        } else if (view == 'notifications') {
           newIndex = 3;
+        } else if (view == 'settings') {
+          newIndex = 4;
         }
         if (newIndex != _currentIndex ||
             shouldHideBottomNav != _hideBottomNav) {
           setState(() {
             _currentIndex = newIndex;
             _hideBottomNav = shouldHideBottomNav;
-            if (newIndex == 3) {
+            if (newIndex == 4) {
               _isProfileLoading = true;
             }
           });
-          if (newIndex == 3) {
+          if (newIndex == 4) {
             _syncUserProfile();
           }
         }
@@ -421,7 +437,7 @@ class _WebViewScreenState extends State<WebViewScreen>
 
     setState(() {
       _currentIndex = index;
-      if (index == 3) {
+      if (index == 4) {
         _isProfileLoading = true;
       }
     });
@@ -432,13 +448,15 @@ class _WebViewScreenState extends State<WebViewScreen>
     } else if (index == 2) {
       viewName = 'ranking';
     } else if (index == 3) {
+      viewName = 'notifications';
+    } else if (index == 4) {
       viewName = 'settings';
     }
 
     _controller!.runJavaScript(
         'if (window.app && window.app.switchView) { window.app.switchView("$viewName"); }');
 
-    if (index == 3) {
+    if (index == 4) {
       _syncUserProfile();
     }
   }
@@ -557,157 +575,179 @@ class _WebViewScreenState extends State<WebViewScreen>
       );
     }
 
-    return Stack(
-      children: [
-        Scaffold(
-          backgroundColor: const Color(0xFFFDF8E6),
-          body: SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                Expanded(
-                  child: Stack(
-                    children: [
-                      Offstage(
-                        offstage: _isLoggedIn && _currentIndex == 3,
-                        child: _controller != null
-                            ? WebViewWidget(controller: _controller!)
-                            : const SizedBox(),
-                      ),
-
-                      if (_isLoggedIn && _currentIndex == 3)
-                        NativeSettingsView(
-                          userName: _userName,
-                          userEmail: _userEmail,
-                          userPoints: _userPoints,
-                          pushEnabled: _pushEnabled,
-                          marketingPushEnabled: _marketingPushEnabled,
-                          isPermissionGranted: _isNotificationPermissionGranted,
-                          isLoading: _isProfileLoading,
-                          version: _appVersion.isEmpty ? '1.4.2' : _appVersion,
-                          fcmToken: _fcmToken,
-                          pointsHistory: _pointsHistory,
-                          onLogout: () {
-                            _controller?.runJavaScript(
-                                'if (window.app && window.app.logout) { window.app.logout(); }');
-                          },
-                          onWithdraw: () {
-                            _controller?.runJavaScript(
-                                'if (window.app && window.app.withdrawAccount) { window.app.withdrawAccount(); }');
-                          },
-                          onPushChanged: _togglePushSetting,
-                          onMarketingChanged: _toggleMarketingSetting,
-                          onRequestPermission: () {
-                            _requestNotificationPermission()
-                                .then((_) => _syncUserProfile());
-                          },
-                          onOpenEvents: _openEventsFromSettings,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _handleBackNavigation();
+      },
+      child: Stack(
+        children: [
+          Scaffold(
+            backgroundColor: const Color(0xFFFDF8E6),
+            body: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        Offstage(
+                          offstage: _isLoggedIn && _currentIndex == 4,
+                          child: _controller != null
+                              ? WebViewWidget(controller: _controller!)
+                              : const SizedBox(),
                         ),
 
-                      // Linear progress bar for loading
-                      if (_isLoading && _currentIndex != 3)
-                        Positioned(
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          child: LinearProgressIndicator(
-                            value: _loadingProgress > 0.0
-                                ? _loadingProgress
-                                : null,
-                            color: theme.colorScheme.primary,
-                            backgroundColor: const Color(0xFFFDF8E6),
-                            minHeight: 3,
+                        if (_isLoggedIn && _currentIndex == 4)
+                          NativeSettingsView(
+                            userName: _userName,
+                            userEmail: _userEmail,
+                            userPoints: _userPoints,
+                            pushEnabled: _pushEnabled,
+                            marketingPushEnabled: _marketingPushEnabled,
+                            isPermissionGranted: _isNotificationPermissionGranted,
+                            isLoading: _isProfileLoading,
+                            version: _appVersion.isEmpty ? '1.4.2' : _appVersion,
+                            fcmToken: _fcmToken,
+                            pointsHistory: _pointsHistory,
+                            onLogout: () {
+                              _controller?.runJavaScript(
+                                  'if (window.app && window.app.logout) { window.app.logout(); }');
+                            },
+                            onWithdraw: () {
+                              _controller?.runJavaScript(
+                                  'if (window.app && window.app.withdrawAccount) { window.app.withdrawAccount(); }');
+                            },
+                            onPushChanged: _togglePushSetting,
+                            onMarketingChanged: _toggleMarketingSetting,
+                            onRequestPermission: () {
+                              _requestNotificationPermission()
+                                  .then((_) => _syncUserProfile());
+                            },
+                            onOpenEvents: _openEventsFromSettings,
                           ),
-                        ),
-                    ],
+
+                        // Linear progress bar for loading
+                        if (_isLoading && _currentIndex != 4)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            child: LinearProgressIndicator(
+                              value: _loadingProgress > 0.0
+                                  ? _loadingProgress
+                                  : null,
+                              color: theme.colorScheme.primary,
+                              backgroundColor: const Color(0xFFFDF8E6),
+                              minHeight: 3,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          bottomNavigationBar: _isLoggedIn && !_hideBottomNav
-              ? BottomNavigationBar(
-                  currentIndex: _currentIndex,
-                  onTap: _switchWebViewTab,
-                  backgroundColor: const Color(0xFFFDF8E6),
-                  selectedItemColor: const Color(0xFFB8860B),
-                  unselectedItemColor: const Color(0xFF96855B),
-                  selectedLabelStyle: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 12),
-                  unselectedLabelStyle: const TextStyle(
-                      fontWeight: FontWeight.w500, fontSize: 11),
-                  elevation: 8,
-                  type: BottomNavigationBarType.fixed,
-                  items: const [
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.menu_book_rounded),
-                      activeIcon: Icon(Icons.menu_book_rounded),
-                      label: '오늘의 말씀',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.map_rounded),
-                      activeIcon: Icon(Icons.map_rounded),
-                      label: '성경여정',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.emoji_events_rounded),
-                      activeIcon: Icon(Icons.emoji_events_rounded),
-                      label: '명예의 전당',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.settings_rounded),
-                      activeIcon: Icon(Icons.settings_rounded),
-                      label: '설정',
-                    ),
-                  ],
-                )
-              : null,
-        ),
-        if (_showIntro)
-          Positioned.fill(
-            child: IntroOverlay(
-              visible: _introVisible,
-              isPageLoaded: _isPageFinished,
-              onFadeOutComplete: () {
-                if (mounted) {
-                  setState(() {
-                    _showIntro = false;
-                  });
-                }
-              },
-              onSkip: () {
-                if (mounted) {
-                  if (_isPageFinished) {
-                    setState(() {
-                      _introVisible = false;
-                    });
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("앱을 불러오는 중입니다. 잠시만 기다려주세요."),
-                        duration: Duration(milliseconds: 1500),
-                        backgroundColor: Color(0xFFB8860B),
+            bottomNavigationBar: _isLoggedIn && !_hideBottomNav
+                ? BottomNavigationBar(
+                    currentIndex: _currentIndex,
+                    onTap: _switchWebViewTab,
+                    backgroundColor: const Color(0xFFFDF8E6),
+                    selectedItemColor: const Color(0xFFB8860B),
+                    unselectedItemColor: const Color(0xFF96855B),
+                    selectedLabelStyle: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 12),
+                    unselectedLabelStyle: const TextStyle(
+                        fontWeight: FontWeight.w500, fontSize: 11),
+                    elevation: 8,
+                    type: BottomNavigationBarType.fixed,
+                    items: [
+                      const BottomNavigationBarItem(
+                        icon: Icon(Icons.menu_book_rounded),
+                        activeIcon: Icon(Icons.menu_book_rounded),
+                        label: '오늘의 말씀',
                       ),
-                    );
-                  }
-                }
-              },
-              onVideoCompleted: () {
-                if (mounted) {
-                  // Wait for 2.0 seconds so the user can see the final branding scene (children & logo) before fading out
-                  Future.delayed(const Duration(milliseconds: 2000), () {
-                    if (mounted) {
-                      setState(() {
-                        _videoCompleted = true;
-                      });
-                      _checkIntroFinished();
-                    }
-                  });
-                }
-              },
-            ),
+                      const BottomNavigationBarItem(
+                        icon: Icon(Icons.map_rounded),
+                        activeIcon: Icon(Icons.map_rounded),
+                        label: '성경여정',
+                      ),
+                      const BottomNavigationBarItem(
+                        icon: Icon(Icons.emoji_events_rounded),
+                        activeIcon: Icon(Icons.emoji_events_rounded),
+                        label: '명예의 전당',
+                      ),
+                      BottomNavigationBarItem(
+                        icon: _unreadNotificationsCount > 0
+                            ? Badge.count(
+                                count: _unreadNotificationsCount,
+                                child: const Icon(Icons.notifications_rounded),
+                              )
+                            : const Icon(Icons.notifications_rounded),
+                        activeIcon: _unreadNotificationsCount > 0
+                            ? Badge.count(
+                                count: _unreadNotificationsCount,
+                                child: const Icon(Icons.notifications_rounded),
+                              )
+                            : const Icon(Icons.notifications_rounded),
+                        label: '알림센터',
+                      ),
+                      const BottomNavigationBarItem(
+                        icon: Icon(Icons.settings_rounded),
+                        activeIcon: Icon(Icons.settings_rounded),
+                        label: '설정',
+                      ),
+                    ],
+                  )
+                : null,
           ),
-      ],
+          if (_showIntro)
+            Positioned.fill(
+              child: IntroOverlay(
+                visible: _introVisible,
+                isPageLoaded: _isPageFinished,
+                onFadeOutComplete: () {
+                  if (mounted) {
+                    setState(() {
+                      _showIntro = false;
+                    });
+                  }
+                },
+                onSkip: () {
+                  if (mounted) {
+                    if (_isPageFinished) {
+                      setState(() {
+                        _introVisible = false;
+                      });
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("앱을 불러오는 중입니다. 잠시만 기다려주세요."),
+                          duration: Duration(milliseconds: 1500),
+                          backgroundColor: Color(0xFFB8860B),
+                        ),
+                      );
+                    }
+                  }
+                },
+                onVideoCompleted: () {
+                  if (mounted) {
+                    // Wait for 2.0 seconds so the user can see the final branding scene (children & logo) before fading out
+                    Future.delayed(const Duration(milliseconds: 2000), () {
+                      if (mounted) {
+                        setState(() {
+                          _videoCompleted = true;
+                        });
+                        _checkIntroFinished();
+                      }
+                    });
+                  }
+                },
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -718,6 +758,51 @@ class _WebViewScreenState extends State<WebViewScreen>
           _introVisible = false;
         });
       }
+    }
+  }
+
+  Future<void> _handleBackNavigation() async {
+    if (_controller == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    try {
+      final result = await _controller!.runJavaScriptReturningResult(
+        'window.app ? window.app.handleBackNavigation() : "tab_screen"'
+      );
+      final String resultStr = result.toString().replaceAll('"', '').trim();
+
+      if (resultStr == 'modal_closed' || resultStr == 'navigated' || resultStr == 'confirmation_opened') {
+        // WebView back navigation handled successfully
+        return;
+      }
+    } catch (e) {
+      debugPrint('Error running handleBackNavigation: $e');
+    }
+
+    // Double-back-to-exit logic for Tab views on Android
+    final now = DateTime.now();
+    if (_lastPressedAt == null || now.difference(_lastPressedAt!) > const Duration(seconds: 3)) {
+      _lastPressedAt = now;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            '한 번 더 누르면 종료됩니다.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white, fontSize: 14),
+          ),
+          backgroundColor: Colors.black.withOpacity(0.7),
+          behavior: SnackBarBehavior.floating,
+          width: 220,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      SystemNavigator.pop();
     }
   }
 
@@ -746,7 +831,8 @@ class _WebViewScreenState extends State<WebViewScreen>
               points: window.app.currentUser.points || 0,
               pushEnabled: window.app.currentUser.pushEnabled !== false,
               marketingPushEnabled: !!window.app.currentUser.marketingPushEnabled,
-              pointsHistory: window.app.currentUser.pointsHistory || []
+              pointsHistory: window.app.currentUser.pointsHistory || [],
+              unreadNotificationsCount: window.app.currentUser.notifications ? window.app.currentUser.notifications.filter(function(n) { return !(n.isRead || n.read); }).length : 0
             });
           }
           return '{}';
@@ -770,6 +856,7 @@ class _WebViewScreenState extends State<WebViewScreen>
           _pushEnabled = data['pushEnabled'] ?? false;
           _marketingPushEnabled = data['marketingPushEnabled'] ?? false;
           _pointsHistory = data['pointsHistory'] ?? [];
+          _unreadNotificationsCount = data['unreadNotificationsCount'] ?? 0;
           _isNotificationPermissionGranted =
               status.isGranted || status.isProvisional;
           _isProfileLoading = false;

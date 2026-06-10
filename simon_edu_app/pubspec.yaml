@@ -44,6 +44,7 @@ dependencies:
   firebase_auth: ^4.12.0
   cloud_firestore: ^4.15.0
   package_info_plus: ^9.0.1
+  flutter_screenutil: ^5.9.3
 
 dev_dependencies:
   flutter_test:
@@ -69,6 +70,7 @@ flutter:
 
   assets:
     - assets/videos/intro.mp4
+    - assets/bible_data.json
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

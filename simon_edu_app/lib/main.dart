@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'core/push/push_notification_service.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 // import 'screens/home_screen.dart'; // Uncomment to test with the HomeScreen
 
 @pragma('vm:entry-point')
@@ -84,13 +85,20 @@ class MyApp extends StatelessWidget {
       ),
     );
 
-    return MaterialApp(
-      title: 'Simon Edu 말씀 암송',
-      theme: lightTheme,
-      darkTheme: darkTheme,
-      themeMode: ThemeMode.system, // follow system setting
-      debugShowCheckedModeBanner: false,
-      home: const SplashScreen(),
+    return ScreenUtilInit(
+      designSize: const Size(393, 852),
+      minTextAdapt: true,
+      splitScreenMode: true,
+      builder: (context, child) {
+        return MaterialApp(
+          title: 'Simon Edu 말씀 암송',
+          theme: lightTheme,
+          darkTheme: darkTheme,
+          themeMode: ThemeMode.system, // follow system setting
+          debugShowCheckedModeBanner: false,
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }

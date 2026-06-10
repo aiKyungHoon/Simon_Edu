@@ -8,7 +8,7 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.5.11">
+  <link rel="stylesheet" href="style.css?v=1.5.13">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
@@ -16,8 +16,8 @@
     (function() {
       const params = new URLSearchParams(window.location.search);
       const IS_APP_WEBVIEW = params.get('platform') === 'app';
-      const WEB_VER = '1.5.11';
-      const APP_WEB_VER = '1.5.6';
+      const WEB_VER = '1.5.13';
+      const APP_WEB_VER = '1.5.13';
       const VERSION_KEY = IS_APP_WEBVIEW ? 'simon_app_web_version' : 'simon_web_version';
       const ACTIVE_VER = IS_APP_WEBVIEW ? APP_WEB_VER : WEB_VER;
       window.SIMON_CLIENT_TYPE = IS_APP_WEBVIEW ? 'app' : 'web';
@@ -60,7 +60,7 @@
   <header>
     <div class="header-left">
       <div class="logo">
-        <span class="material-icons-round" style="color: var(--accent-purple); font-size: 1.8rem;">auto_stories</span>
+        <span class="material-icons-round" style="color: #b8860b; font-size: 1.8rem;">auto_stories</span>
         Simon<span>Edu</span>
       </div>
     </div>
@@ -118,7 +118,7 @@
         </div>
 
         <div class="nav-point-badge" onclick="app.handlePointBadgeClick()" style="cursor: pointer;">
-          <span class="material-icons-round" style="font-size: 1.1rem; color: #f59e0b;">monetization_on</span>
+          <span class="material-icons-round" style="font-size: 1.1rem; color: #b8860b;">monetization_on</span>
           <span id="navPoints">0</span> P
         </div>
         <div class="nav-user-info" onclick="app.handleUserAvatarClick()">
@@ -214,22 +214,19 @@
       <div class="dashboard-grid-left">
         <div id="dashboardView" class="view-container">
       <div class="dashboard-single-container">
-        <!-- Daily Mission Card -->
         <section class="home-hero-card">
           <div class="home-hero-head">
             <div class="home-hero-title">
-              <span class="material-icons-round">emoji_events</span>
+              <span class="material-icons-round" style="color: #fbbf24;">emoji_events</span>
               오늘의 말씀 암송 미션
             </div>
             <button class="home-record-btn" onclick="app.openAllRankings()">
-              도전 기록
-              <span class="material-icons-round">chevron_right</span>
+              도전 기록 &gt;
             </button>
           </div>
           <div class="home-verse-layout">
-            <div class="home-verse-art" aria-hidden="true">
-              <span class="material-icons-round home-art-cross">church</span>
-              <span class="material-icons-round home-art-book">auto_stories</span>
+            <div class="home-verse-art" id="homeVerseArt" aria-hidden="true">
+              <!-- dynamically loaded vector artwork -->
             </div>
             <div class="home-verse-copy">
               <span class="home-verse-book-chip">요한계시록</span>
@@ -263,45 +260,80 @@
           </div>
         </section>
 
-        <section class="notice-section">
-          <div class="home-widget-title">
-            <span>공지사항</span>
-            <button onclick="app.switchView('events')">전체보기</button>
-          </div>
-          <div id="homeNoticeList" class="notice-list-compact">
-            <div class="home-empty-state">등록된 공지사항이 없습니다.</div>
-          </div>
-        </section>
-
         <section class="home-mission-section">
           <div class="home-widget-title">
             <span>오늘의 미션</span>
+            <button onclick="app.switchView('attendance')">더보기 &gt;</button>
           </div>
           <div class="home-mission-grid">
             <button class="home-mission-tile" id="btnHomeAttendance" onclick="app.checkIn()">
-              <span class="home-mission-icon"><span class="material-icons-round">event_available</span></span>
+              <span class="home-mission-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                <span class="material-icons-round">event_available</span>
+              </span>
               <span><strong id="homeAttendanceStatus">출석체크</strong><small id="homeAttendanceStreak">연속 출석 0일</small><b>+50P</b></span>
               <span class="material-icons-round">chevron_right</span>
             </button>
             <button class="home-mission-tile" onclick="app.startMission()">
-              <span class="home-mission-icon"><span class="material-icons-round">auto_stories</span></span>
+              <span class="home-mission-icon" style="background: rgba(184, 134, 11, 0.1); color: #b8860b;">
+                <span class="material-icons-round">auto_stories</span>
+              </span>
               <span><strong>오늘의 말씀</strong><small>암송하기</small><b>+100P</b></span>
               <span class="material-icons-round">chevron_right</span>
             </button>
             <button class="home-mission-tile" onclick="app.switchView('ranking')">
-              <span class="home-mission-icon"><span class="material-icons-round">groups</span></span>
+              <span class="home-mission-icon" style="background: rgba(138, 100, 14, 0.1); color: #8a640e;">
+                <span class="material-icons-round">groups</span>
+              </span>
               <span><strong>친구에게</strong><small>응원 보내기</small><b>+30P</b></span>
               <span class="material-icons-round">chevron_right</span>
             </button>
           </div>
         </section>
 
+        <!-- New: Bible Journey widget on Dashboard -->
+        <section class="home-journey-section">
+          <div class="home-widget-title">
+            <span>성경여정</span>
+            <button onclick="app.switchView('journey')">전체보기 &gt;</button>
+          </div>
+          <div class="home-journey-container">
+            <div class="home-journey-left">
+              <div class="home-journey-title-row">
+                <strong>요한계시록 여정</strong>
+                <button class="btn-help-bubble" onclick="app.openModal('modalJourneyInfo')" aria-label="도움말">?</button>
+              </div>
+              <div class="home-journey-progress-label">전체 진행률</div>
+              <div class="home-journey-progress-stats">
+                <span class="pct" id="homeJourneyProgressPct">0%</span>
+                <span class="count" id="homeJourneyProgressCount">0 / 22장</span>
+              </div>
+              <div class="home-journey-progress-track">
+                <div class="home-journey-progress-fill" id="homeJourneyProgressBar"></div>
+              </div>
+              <button class="btn-continue-journey" onclick="app.startOngoingChapter()">이어서 학습하기</button>
+            </div>
+            <div class="home-journey-right" id="homeJourneyChaptersList">
+              <!-- Dynamically populated chapters (1장 ~ 22장 circles) -->
+            </div>
+          </div>
+        </section>
+
         <section class="home-friend-activity-section">
           <div class="home-widget-title">
             <span>친구 활동</span>
-            <button onclick="app.switchView('journey')">전체보기</button>
+            <button onclick="app.switchView('ranking')">전체보기 &gt;</button>
           </div>
           <div id="homeFriendActivityList" class="home-friend-card-list"></div>
+        </section>
+
+        <section class="notice-section">
+          <div class="home-widget-title">
+            <span>공지사항</span>
+            <button onclick="app.switchView('events')">전체보기 &gt;</button>
+          </div>
+          <div id="homeNoticeList" class="notice-list-compact">
+            <div class="home-empty-state">등록된 공지사항이 없습니다.</div>
+          </div>
         </section>
       </div>
     </div>
@@ -411,56 +443,246 @@
 
         <!-- 3.255. Event Detail View -->
         <div id="eventDetailView" class="view-container">
-          <div class="event-detail-wrapper" id="eventDetailContent">
-            <!-- Rendered by app.renderEventDetailView() -->
+          <div class="dashboard-single-container">
+            <div class="page-header-bar">
+              <button class="btn-header-back" onclick="app.switchView('events')" aria-label="뒤로가기">
+                <span class="material-icons-round">arrow_back</span>
+              </button>
+              <h1>이벤트 상세</h1>
+              <div style="width: 40px;"></div>
+            </div>
+            <div class="event-detail-wrapper" id="eventDetailContent" style="margin-top: 1rem;">
+              <!-- Rendered by app.renderEventDetailView() -->
+            </div>
           </div>
         </div>
 
         <!-- 3.26. Bible Journey View -->
         <div id="journeyView" class="view-container">
-          <div class="dashboard-single-container">
-            <div class="journey-header-card">
-              <p class="home-section-eyebrow">BIBLE JOURNEY</p>
-              <h2>성경여정</h2>
-              <p id="journeyProgressText">요한계시록 전체 여정을 준비 중입니다.</p>
-              <div class="journey-progress-stats">
-                <strong id="journeyChapterCount">0 / 21장</strong>
-                <span id="journeyProgressPercent">진행률 0%</span>
+          <div class="dashboard-single-container journey-main-page">
+            <!-- Page Header Bar -->
+            <div class="page-header-bar" style="justify-content: center; position: relative;">
+              <h1 style="text-align: center;">요한계시록 여정</h1>
+            </div>
+
+            <!-- Modern Circle Progress Header Card -->
+            <div class="journey-header-card-modern">
+              <div class="journey-circle-progress-wrapper">
+                <svg width="84" height="84" viewBox="0 0 84 84">
+                  <circle cx="42" cy="42" r="36" class="circle-bg" />
+                  <circle cx="42" cy="42" r="36" class="circle-fill" id="journeyCircleFill" stroke-dasharray="226.19" stroke-dashoffset="226.19" />
+                </svg>
+                <div class="journey-circle-text">
+                  <span class="current" id="journeyCurChapter">0</span>
+                  <span class="divider">/</span>
+                  <span class="total">22</span>
+                </div>
               </div>
-              <div class="journey-progress-track">
-                <div class="journey-progress-bar" id="journeyProgressBar"></div>
+              <div class="journey-header-info-modern">
+                <div class="journey-badge">요한계시록 여정</div>
+                <h2>전체 진행률 <span id="journeyProgressPercentModern">0%</span></h2>
+                <p id="journeyNextTarget">다음 목표: 1장 완독</p>
               </div>
             </div>
-            <div id="journeyChapterGrid" class="chapter-cards-grid"></div>
-            <div class="journey-rewards-section">
-              <div class="home-widget-title">
-                <span>장 완독 보상</span>
+
+            <!-- 완독 보상 리스트 (카드) -->
+            <div class="journey-rewards-section-modern">
+              <div class="section-title-row">
+                <h3>완독 보상</h3>
+                <button class="btn-info-dialog" onclick="app.openModal('modalJourneyInfo')" aria-label="정보">
+                  여정 안내 <span class="material-icons-round" style="font-size: 1rem;">help_outline</span>
+                </button>
               </div>
-              <div id="journeyRewardList" class="journey-reward-list"></div>
+              <div class="journey-rewards-scroll" id="journeyRewardsScroll">
+                <!-- Dynamically generated rewards items -->
+              </div>
             </div>
-            <div class="journey-hall-section">
-              <div class="home-widget-title">
-                <span>명예의 전당</span>
-                <button onclick="app.openAllRankings()">전체보기</button>
+
+            <!-- 장 목록 탭 및 그리드 -->
+            <div class="journey-chapters-section">
+              <div class="journey-tabs">
+                <button class="journey-tab active" id="journeyTabAll" onclick="app.setJourneyTab('all')">전체 장</button>
+                <button class="journey-tab" id="journeyTabCompleted" onclick="app.setJourneyTab('completed')">완독한 장</button>
               </div>
-              <div class="ranking-tabs">
-                <button class="ranking-tab active" id="rankTabAll" onclick="app.setRankingTab('all')">전체 랭킹</button>
-                <button class="ranking-tab" id="rankTabFriends" onclick="app.setRankingTab('friends')">친구 랭킹</button>
-                <button class="ranking-tab" id="rankTabWeekly" onclick="app.setRankingTab('weekly')">주간 랭킹</button>
+              <div class="journey-chapters-grid" id="journeyChaptersGrid">
+                <!-- Dynamically generated 22 chapters -->
               </div>
-              <div id="journeyRankingList" class="app-card-list"></div>
             </div>
-            <div class="friends-card">
-              <div class="home-widget-title">
-                <span>친구 목록</span>
-              </div>
-              <div id="friendsList" class="friends-list-container"></div>
+
+            <!-- Sticky Bottom Start Button -->
+            <div class="journey-sticky-bottom">
+              <button class="btn-journey-start-floating" id="journeyFloatingStartBtn" onclick="app.startOngoingChapter()">
+                <span class="material-icons-round">auto_stories</span>
+                <span id="journeyFloatingStartText">이어서 하기</span>
+              </button>
             </div>
-            <div class="activity-feed-card">
-              <div class="home-widget-title">
-                <span>친구 활동</span>
+
+          </div>
+        </div>
+
+        <!-- Bible Chapter Detail View -->
+        <div id="journeyChapterDetailView" class="view-container">
+          <div class="dashboard-single-container journey-detail-page">
+            <!-- Page Header Bar -->
+            <div class="page-header-bar">
+              <button class="btn-header-back" onclick="app.switchView('journey')" aria-label="뒤로가기">
+                <span class="material-icons-round">chevron_left</span>
+              </button>
+              <h1 id="chapterDetailTitle">요한계시록 4장</h1>
+              <button class="btn-header-share" onclick="app.shareChapterProgress()" aria-label="공유">
+                <span class="material-icons-round">share</span>
+              </button>
+            </div>
+
+            <!-- Chapter Progress Card -->
+            <div class="chapter-progress-card">
+              <div class="chapter-progress-info">
+                <span class="chapter-status-pill" id="chapterStatusPill">진행 중</span>
+                <div class="chapter-progress-percent" id="chapterProgressPercent">60% <small>(18/30절)</small></div>
               </div>
-              <div id="friendActivityFeed" class="activity-list"></div>
+              <div class="chapter-progress-track">
+                <div class="chapter-progress-bar" id="chapterProgressBar"></div>
+              </div>
+            </div>
+
+            <!-- Tabs: 절 목록 / 요약 -->
+            <div class="chapter-detail-tabs">
+              <button class="detail-tab active" id="chapterTabVerses" onclick="app.setChapterDetailTab('verses')">절 목록</button>
+              <button class="detail-tab" id="chapterTabSummary" onclick="app.setChapterDetailTab('summary')">요약</button>
+            </div>
+
+            <!-- Tab Content: Verses List -->
+            <div class="chapter-tab-content active" id="chapterVersesContent">
+              <div class="verse-status-list" id="chapterVerseList">
+                <!-- Dynamically generated list of verses (완료, 진행중, 잠김) -->
+              </div>
+            </div>
+
+            <!-- Tab Content: Summary -->
+            <div class="chapter-tab-content" id="chapterSummaryContent" style="display: none;">
+              <div class="chapter-summary-card glass-panel">
+                <h4 id="chapterSummaryTitle">4장 요약</h4>
+                <p id="chapterSummaryText">하늘의 열린 문과 하나님의 보좌, 보좌에 둘러선 이십사 장로들과 네 생물이 밤낮 쉬지 않고 하나님을 찬양하는 영광스러운 하늘 예배의 모습을 보여줍니다.</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Bible Verse Study View -->
+        <div id="journeyVerseStudyView" class="view-container">
+          <div class="dashboard-single-container journey-verse-page">
+            <!-- Page Header Bar -->
+            <div class="page-header-bar">
+              <button class="btn-header-back" onclick="app.goBackToChapter()" aria-label="뒤로가기">
+                <span class="material-icons-round">chevron_left</span>
+              </button>
+              <h1 id="verseStudyTitle">요한계시록 4장 6절</h1>
+              <div class="verse-header-actions">
+                <button class="btn-header-action" onclick="app.toggleVerseBookmark()" aria-label="북마크">
+                  <span class="material-icons-round" id="btnVerseBookmark">bookmark_border</span>
+                </button>
+                <button class="btn-header-action" onclick="app.changeVerseTextSize()" aria-label="글자 크기">
+                  <span class="material-icons-round">format_size</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Verse Study Box -->
+            <div class="verse-study-container">
+              <div class="verse-study-card glass-panel" id="verseStudyCard">
+                <div class="quote-icon-top">“</div>
+                <div class="verse-study-text" id="verseStudyText">
+                  보좌 앞에 수정과 같은 유리 바다가 있고 보좌 가운데와 보좌 둘레에 네 생물이 있는데 앞뒤에 눈이 가득하더라
+                </div>
+                <div class="quote-icon-bottom">”</div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="verse-action-buttons">
+              <button class="btn-verse-quiz-start" onclick="app.startJourneyQuizFromStudy()">
+                <span class="material-icons-round">emoji_events</span>
+                암송 완료 (퀴즈 시작)
+              </button>
+              <button class="btn-verse-review-study" onclick="app.reviewVerseStudy()">
+                <span class="material-icons-round">menu_book</span>
+                다시 학습하기
+              </button>
+            </div>
+
+            <!-- Footer Verse Pagination -->
+            <div class="verse-pagination-footer">
+              <button class="btn-pagination-nav" id="btnPrevVerse" onclick="app.navigateVerse(-1)">
+                <span class="material-icons-round">chevron_left</span>
+                이전 절
+              </button>
+              <div class="pagination-divider"></div>
+              <button class="btn-pagination-nav" id="btnNextVerse" onclick="app.navigateVerse(1)">
+                다음 절
+                <span class="material-icons-round">chevron_right</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Bible Quiz Result View -->
+        <div id="journeyResultView" class="view-container">
+          <div class="dashboard-single-container journey-result-page">
+            <div class="result-celebration-container">
+              <div class="celebration-trophy">
+                <div class="trophy-wrapper animate-bounce">
+                  <svg viewBox="0 0 100 100" width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="45" fill="#fef3c7" />
+                    <!-- Golden Trophy -->
+                    <path d="M35,30 L65,30 L60,55 C58,62 42,62 40,55 Z" fill="#fbbf24" stroke="#d97706" stroke-width="2" />
+                    <path d="M47,58 L53,58 L55,72 L45,72 Z" fill="#d97706" />
+                    <rect x="38" y="72" width="24" height="8" rx="2" fill="#78350f" />
+                    <!-- Handles -->
+                    <path d="M35,35 H30 C25,35 25,48 30,48 H35" fill="none" stroke="#fbbf24" stroke-width="3.5" stroke-linecap="round" />
+                    <path d="M65,35 H70 C75,35 75,48 70,48 H65" fill="none" stroke="#fbbf24" stroke-width="3.5" stroke-linecap="round" />
+                    <!-- Stars -->
+                    <path d="M50,15 L52,20 L57,20 L53,23 L55,28 L50,25 L45,28 L47,23 L43,20 L48,20 Z" fill="#fbbf24" />
+                  </svg>
+                </div>
+              </div>
+
+              <h2 class="result-title">암송 완료!</h2>
+              <div class="result-subtitle" id="journeyResultSubtitle">요한계시록 4장 6절</div>
+
+              <!-- Reward Card -->
+              <div class="result-reward-card glass-panel">
+                <div class="reward-row">
+                  <span class="reward-label">암송 성공 보상</span>
+                  <span class="reward-value" id="journeyResultPoints">+10 P</span>
+                </div>
+                <div class="reward-row" id="journeyResultCheckInRow" style="display: none;">
+                  <span class="reward-label">출석 체크 보너스</span>
+                  <span class="reward-value" id="journeyResultCheckInPoints">+50 P</span>
+                </div>
+                <div class="reward-row" id="journeyResultChapterRow" style="display: none;">
+                  <span class="reward-label" id="journeyResultChapterTitle">4장 완독 보상</span>
+                  <span class="reward-value" id="journeyResultChapterPoints">+200 P</span>
+                </div>
+                <div class="reward-divider"></div>
+                <div class="reward-row total">
+                  <span class="reward-label">총 획득 포인트</span>
+                  <span class="reward-value-total" id="journeyResultTotalPoints">+10 P</span>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="result-actions">
+                <button class="btn-result-primary" id="btnResultNextVerse" onclick="app.actionResultNextVerse()">
+                  다음 절 학습하기
+                  <span class="material-icons-round">arrow_forward</span>
+                </button>
+                <button class="btn-result-secondary" onclick="app.actionResultToChapter()">
+                  <span class="material-icons-round">format_list_bulleted</span>
+                  장 목록으로 이동
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -590,7 +812,14 @@
     <!-- 3.5. Simon Exam View -->
     <div id="examView" class="view-container">
       <div class="dashboard-single-container">
-        <div class="dashboard-card glass-panel" style="padding: 2rem; text-align: center; max-width: 600px; margin: 2rem auto;">
+        <div class="page-header-bar">
+          <button class="btn-header-back" onclick="app.switchView('events')" aria-label="뒤로가기">
+            <span class="material-icons-round">arrow_back</span>
+          </button>
+          <h1>사명자 시험 안내</h1>
+          <div style="width: 40px;"></div>
+        </div>
+        <div class="dashboard-card glass-panel" style="padding: 2rem; text-align: center; max-width: 600px; margin: 0 auto;">
           <span class="material-icons-round" style="font-size: 4.5rem; color: var(--accent-blue); margin-bottom: 1rem; display: block; filter: drop-shadow(0 0 10px rgba(59,130,246,0.3));">assignment_turned_in</span>
           
           <h2 style="font-size: 1.6rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem; font-family: var(--font-kr);">시몬에듀 사명자 시험</h2>
@@ -649,8 +878,13 @@
         
         <!-- Game Screen -->
         <div class="game-main-panel glass-panel">
-          <div class="game-header-bar">
-            <div class="game-title" id="gameVerseTitle">요한계시록 7:1 빈칸 시험</div>
+          <div class="game-header-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <button class="btn-header-back" onclick="app.handleBackNavigation()" aria-label="뒤로가기" style="background: none; border: none; color: var(--text-primary); cursor: pointer; padding: 4px; display: inline-flex; align-items: center; justify-content: center;">
+                <span class="material-icons-round">arrow_back</span>
+              </button>
+              <div class="game-title" id="gameVerseTitle" style="margin: 0;">요한계시록 7:1 빈칸 시험</div>
+            </div>
             <div class="game-stats">
               <div class="game-stat-item timer">
                 <span class="material-icons-round">alarm</span>
@@ -926,10 +1160,47 @@
           </div>
 
           <div class="app-version" style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-en); font-weight: 500; letter-spacing: 0.5px; opacity: 0.7;">
-            Version 1.5.11
+            Version 1.5.13
           </div>
         </div>
 
+      </div>
+    </div>
+
+    <!-- 4.8. Notifications Center View -->
+    <div id="notificationsView" class="view-container">
+      <div class="dashboard-single-container">
+        <div class="page-header-bar" style="justify-content: center; position: relative;">
+          <h1>알림 센터</h1>
+        </div>
+        <div class="dashboard-card glass-panel" style="padding: 1.25rem; text-align: left; max-width: 600px; margin: 0 auto;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <span style="font-weight: 800; font-size: 1.05rem; color: var(--text-primary);">최근 알림</span>
+            <button class="btn-clear-notifications" onclick="app.clearNotifications(event)" style="background: none; border: none; color: #b8860b; font-weight: 700; font-size: 0.85rem; cursor: pointer;">모두 읽음</button>
+          </div>
+          <div id="notificationsPageList" style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <div class="notification-empty">새로운 알림이 없습니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4.9. Notice Detail View -->
+    <div id="noticeDetailView" class="view-container">
+      <div class="dashboard-single-container">
+        <!-- Page Header Bar -->
+        <div class="page-header-bar">
+          <button class="btn-header-back" onclick="app.switchView('dashboard')" aria-label="뒤로가기" id="btnNoticeDetailBack">
+            <span class="material-icons-round">arrow_back</span>
+          </button>
+          <h1>공지사항 상세</h1>
+          <div style="width: 40px;"></div> <!-- Spacer to align title center -->
+        </div>
+        <div class="dashboard-card glass-panel" style="padding: 1.5rem; text-align: left; max-width: 600px; margin: 0 auto;">
+          <h2 id="noticeDetailTitle" style="font-size: 1.35rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem; word-break: keep-all;">공지사항 제목</h2>
+          <div id="noticeDetailDate" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.25rem;">2026.06.05</div>
+          <div id="noticeDetailBody" style="font-size: 0.92rem; color: var(--text-secondary); line-height: 1.6; white-space: pre-wrap; word-break: keep-all;">본문 내용</div>
+        </div>
       </div>
     </div>
 
@@ -947,6 +1218,13 @@
     <button class="bottom-nav-item" id="bottomNavRanking" onclick="app.switchView('ranking')">
       <span class="material-icons-round">emoji_events</span>
       <span>명예의 전당</span>
+    </button>
+    <button class="bottom-nav-item" id="bottomNavNotifications" onclick="app.switchView('notifications')">
+      <div style="position: relative; display: inline-flex;">
+        <span class="material-icons-round">notifications</span>
+        <span class="notification-badge" id="bottomNavNotificationBadge" style="display: none; position: absolute; top: -4px; right: -4px; width: 14px; height: 14px; font-size: 8px; border-radius: 50%; background: #ef4444; color: white; align-items: center; justify-content: center;">0</span>
+      </div>
+      <span>알림센터</span>
     </button>
     <button class="bottom-nav-item" id="bottomNavSettings" onclick="app.switchView('settings')">
       <span class="material-icons-round">settings</span>
@@ -973,6 +1251,49 @@
       <div class="modal-btn-container">
         <button class="btn-primary" style="background: var(--accent-purple);" onclick="app.createCrew(true)">크루 생성하기</button>
         <button class="btn-game secondary" onclick="app.closeModal('modalCreateCrew')">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Journey Info/Guidance -->
+  <div class="modal-overlay" id="modalJourneyInfo">
+    <div class="modal-content glass-panel" style="border-color: var(--accent-amber);">
+      <div class="modal-icon"><span class="material-icons-round" style="font-size: 3rem; color: var(--accent-amber);">emoji_events</span></div>
+      <div class="modal-title" style="color: var(--accent-amber);">성경 여정 안내</div>
+      <div class="modal-body" style="text-align: left; line-height: 1.6;">
+        <p style="margin-bottom: 0.75rem; font-weight: bold;">📖 성경 여정은 요한계시록을 장별로 완독하며 믿음을 키우는 장기 훈련 콘텐츠입니다.</p>
+        <ul style="list-style-type: disc; padding-left: 1.2rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;">
+          <li>각 장의 모든 절을 암송 통과하면 <strong>장 완독 포인트 보상</strong>을 받을 수 있습니다.</li>
+          <li>모든 장(1장~22장)을 완독하면 <strong>'요한계시록 마스터' 특별 칭호</strong>가 지급됩니다.</li>
+          <li>장 목록과 절 학습 화면을 통해 본인의 학습 페이스에 맞춰 언제든 이어서 학습할 수 있습니다.</li>
+        </ul>
+        <div class="rewards-detail-modal" style="background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.2); padding: 0.75rem; border-radius: 12px;">
+          <h4 style="margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: bold; color: var(--accent-amber);">완독 보상 상세</h4>
+          <div style="display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--text-primary);">
+            <div style="display: flex; justify-content: space-between;"><span>1장 완독 보상</span><strong>+200P</strong></div>
+            <div style="display: flex; justify-content: space-between;"><span>5장 완독 보상</span><strong>+500P</strong></div>
+            <div style="display: flex; justify-content: space-between;"><span>10장 완독 보상</span><strong>+1,000P</strong></div>
+            <div style="display: flex; justify-content: space-between;"><span>22장 완독 보상</span><strong>+3,000P + 특별 칭호</strong></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-btn-container">
+        <button class="btn-primary" style="background: var(--accent-amber);" onclick="app.closeModal('modalJourneyInfo')">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Exit Game Confirm -->
+  <div class="modal-overlay" id="modalExitConfirm">
+    <div class="modal-content glass-panel" style="border-color: var(--accent-red);">
+      <div class="modal-icon"><span class="material-icons-round" style="font-size: 3rem; color: #ef4444;">warning_amber</span></div>
+      <div class="modal-title" style="color: #ef4444;">학습을 종료할까요?</div>
+      <div class="modal-body" style="color: var(--text-secondary); line-height: 1.5;">
+        지금 종료하면 진행 중인 암송 시험이 취소됩니다. 정말 포기하시겠습니까?
+      </div>
+      <div class="modal-btn-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; width: 100%;">
+        <button class="btn-secondary" onclick="app.closeModal('modalExitConfirm')">계속하기</button>
+        <button class="btn-primary" style="background: #ef4444; border: none; color: white;" onclick="app.closeModal('modalExitConfirm'); app.exitGame();">포기하기</button>
       </div>
     </div>
   </div>
@@ -2248,6 +2569,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <script src="bible_data.js?v=1.5.2"></script>
-  <script src="app.js?v=1.5.11"></script>
+  <script src="app.js?v=1.5.13"></script>
 </body>
 </html>
