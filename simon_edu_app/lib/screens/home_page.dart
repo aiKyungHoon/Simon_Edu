@@ -1226,7 +1226,6 @@ class BibleJourneyCard extends StatelessWidget {
 
                       final isCompleted = curIdx > lastIdx;
                       final isOngoing = !isCompleted && curIdx >= firstIdx;
-                      final isLocked = curIdx < firstIdx;
 
                       // Renders circle design
                       Color circleBg = const Color(0xFFF4EFE0);

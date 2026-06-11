@@ -28,8 +28,6 @@ class _WebViewScreenState extends State<WebViewScreen>
   bool _isPageFinished = false;
   bool _isLoading = true;
   double _loadingProgress = 0.0;
-  bool _canGoBack = false;
-  bool _canGoForward = false;
   bool _showIntro = false;
   bool _introVisible = false;
   bool _videoCompleted = false;
@@ -40,9 +38,10 @@ class _WebViewScreenState extends State<WebViewScreen>
   String _appVersion = '';
   String? _fcmToken;
   DateTime? _lastPressedAt;
-  String _currentWebView = 'dashboard';
   bool _webViewInNativeRoute = false;
   final ValueNotifier<int> _nativeRouteDepth = ValueNotifier<int>(0);
+  final ValueNotifier<bool> _nativeRouteChromeHidden =
+      ValueNotifier<bool>(false);
   int _nativeRouteCounter = 0;
 
   // Native Settings Profile State
@@ -55,7 +54,7 @@ class _WebViewScreenState extends State<WebViewScreen>
   bool _isProfileLoading = true;
   List<dynamic> _pointsHistory = [];
 
-  static const String _appWebVersion = '1.5.13';
+  static const String _appWebVersion = '1.5.17';
   final String _targetUrl = kDebugMode
       ? 'http://localhost:8080?platform=app&app_v=$_appWebVersion'
       : 'https://simon-edu-bible-game.firebaseapp.com?platform=app&app_v=$_appWebVersion';
@@ -129,6 +128,7 @@ class _WebViewScreenState extends State<WebViewScreen>
       _linkSubscription?.cancel();
     }
     _nativeRouteDepth.dispose();
+    _nativeRouteChromeHidden.dispose();
     super.dispose();
   }
 
@@ -233,14 +233,6 @@ class _WebViewScreenState extends State<WebViewScreen>
   // Update navigation history state
   Future<void> _updateNavigationState() async {
     if (_controller == null) return;
-    final canBack = await _controller!.canGoBack();
-    final canForward = await _controller!.canGoForward();
-    if (mounted) {
-      setState(() {
-        _canGoBack = canBack;
-        _canGoForward = canForward;
-      });
-    }
   }
 
   // Inject JS to override console.log and bind playConfetti/triggerQuizFail events to Flutter
@@ -355,7 +347,6 @@ class _WebViewScreenState extends State<WebViewScreen>
         });
       } else if (event == 'view_changed') {
         final view = data['view'] as String?;
-        _currentWebView = view ?? 'dashboard';
         int newIndex = _currentIndex;
         final shouldHideBottomNav = view == 'game' ||
             view == 'exam' ||
@@ -433,6 +424,8 @@ class _WebViewScreenState extends State<WebViewScreen>
         }
       } else if (event == 'open_native_screen') {
         unawaited(_openNativeWebScreen(data));
+      } else if (event == 'native_route_chrome') {
+        _nativeRouteChromeHidden.value = data['hidden'] == true;
       }
     } catch (e) {
       debugPrint('Error parsing MobileAppChannel message: $e');
@@ -450,6 +443,7 @@ class _WebViewScreenState extends State<WebViewScreen>
     final routeDepth = _nativeRouteCounter + 1;
     _nativeRouteCounter = routeDepth;
     _nativeRouteDepth.value = routeDepth;
+    _nativeRouteChromeHidden.value = false;
     if (!_webViewInNativeRoute || !_hideBottomNav) {
       setState(() {
         _webViewInNativeRoute = true;
@@ -479,6 +473,7 @@ class _WebViewScreenState extends State<WebViewScreen>
             controller: _controller!,
             depth: routeDepth,
             activeDepth: _nativeRouteDepth,
+            chromeHidden: _nativeRouteChromeHidden,
           );
         },
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -503,6 +498,7 @@ class _WebViewScreenState extends State<WebViewScreen>
       _nativeRouteDepth.value = routeDepth - 1;
     }
     _nativeRouteCounter = routeDepth - 1;
+    _nativeRouteChromeHidden.value = false;
     final hasNativeRoute = _nativeRouteCounter > 0;
     setState(() {
       _webViewInNativeRoute = hasNativeRoute;
@@ -572,6 +568,17 @@ class _WebViewScreenState extends State<WebViewScreen>
     });
     _controller!.runJavaScript(
         'if (window.app && window.app.switchView) { window.app.switchView("events"); }');
+  }
+
+  void _openNoticesFromSettings() {
+    if (_controller == null || !_isLoggedIn) return;
+    HapticFeedback.lightImpact();
+    setState(() {
+      _currentIndex = 0;
+      _hideBottomNav = false;
+    });
+    _controller!.runJavaScript(
+        'if (window.app && window.app.openNotices) { window.app.openNotices(); } else if (window.app && window.app.switchView) { window.app.switchView("notices"); }');
   }
 
   @override
@@ -730,6 +737,7 @@ class _WebViewScreenState extends State<WebViewScreen>
                               _requestNotificationPermission()
                                   .then((_) => _syncUserProfile());
                             },
+                            onOpenNotices: _openNoticesFromSettings,
                             onOpenEvents: _openEventsFromSettings,
                           ),
 
@@ -1252,12 +1260,14 @@ class _NativeWebRoutePage extends StatelessWidget {
     required this.controller,
     required this.depth,
     required this.activeDepth,
+    required this.chromeHidden,
   });
 
   final String title;
   final WebViewController controller;
   final int depth;
   final ValueListenable<int> activeDepth;
+  final ValueListenable<bool> chromeHidden;
 
   @override
   Widget build(BuildContext context) {
@@ -1267,41 +1277,50 @@ class _NativeWebRoutePage extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
-            Container(
-              height: 52,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: const BoxDecoration(
-                color: Color(0xFFFFFBEB),
-                border: Border(
-                  bottom: BorderSide(color: Color(0x1FB8860B)),
-                ),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      color: Color(0xFF3D341C),
-                      size: 20,
-                    ),
-                    tooltip: '뒤로가기',
-                  ),
-                  Expanded(
-                    child: Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF3D341C),
-                      ),
+            ValueListenableBuilder<bool>(
+              valueListenable: chromeHidden,
+              builder: (context, hidden, _) {
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  height: hidden ? 0 : 52,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFFFBEB),
+                    border: Border(
+                      bottom: BorderSide(color: Color(0x1FB8860B)),
                     ),
                   ),
-                  const SizedBox(width: 48),
-                ],
-              ),
+                  child: ClipRect(
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.of(context).maybePop(),
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Color(0xFF3D341C),
+                            size: 20,
+                          ),
+                          tooltip: '뒤로가기',
+                        ),
+                        Expanded(
+                          child: Text(
+                            title,
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF3D341C),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 48),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
             Expanded(
               child: ValueListenableBuilder<int>(
@@ -1475,6 +1494,7 @@ class NativeSettingsView extends StatelessWidget {
   final ValueChanged<bool> onPushChanged;
   final ValueChanged<bool> onMarketingChanged;
   final VoidCallback onRequestPermission;
+  final VoidCallback onOpenNotices;
   final VoidCallback onOpenEvents;
   final List<dynamic> pointsHistory;
 
@@ -1494,6 +1514,7 @@ class NativeSettingsView extends StatelessWidget {
     required this.onPushChanged,
     required this.onMarketingChanged,
     required this.onRequestPermission,
+    required this.onOpenNotices,
     required this.onOpenEvents,
     required this.pointsHistory,
   });
@@ -1759,7 +1780,7 @@ class NativeSettingsView extends StatelessWidget {
                           color: Color(0xFF3D341C))),
                   trailing: const Icon(Icons.chevron_right_rounded,
                       color: Color(0xFF96855B)),
-                  onTap: onOpenEvents,
+                  onTap: onOpenNotices,
                 ),
                 const Divider(color: Color(0x1FB8860B), height: 1),
                 ListTile(

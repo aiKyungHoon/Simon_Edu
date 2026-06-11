@@ -346,6 +346,9 @@ class SimonEduApp {
           this.activeEvents.push(eventData);
         }
       });
+      if (this.activeEvents.length === 0 && this.shouldUseLocalSampleEvents()) {
+        this.activeEvents = this.getLocalSampleEvents(today);
+      }
       this.updateExamEntryVisibility();
       this.renderChallengeCard();
       this.renderHomeEventsAndNotices();
@@ -400,6 +403,64 @@ class SimonEduApp {
       this.updateFabVisibility();
     }, error => {
       console.error("Firestore battles snapshot sync error:", error);
+    });
+  }
+
+  shouldUseLocalSampleEvents() {
+    const host = window.location.hostname;
+    return host === 'localhost' || host === '127.0.0.1';
+  }
+
+  getLocalSampleEvents(today) {
+    const samples = [
+      {
+        id: 'local_mock_event_1',
+        eventType: 'special_challenge',
+        title: '요한계시록 1장 암송 챌린지',
+        description: '요한계시록 1장 1절부터 20절까지 암송을 모두 완료하면 지급되는 특별 보너스 포인트!',
+        rewardPoints: 500,
+        imageUrl: '',
+        homeBanner: '',
+        popup: true,
+        active: true,
+        startDate: '2026-05-28',
+        endDate: '2026-06-15',
+        participantsCount: 15
+      },
+      {
+        id: 'local_mock_event_2',
+        eventType: 'attendance',
+        title: '7일 연속 출석 미션',
+        description: '쉬지 않고 7일 동안 연속으로 출석 체크를 달성한 회원들에게 주어지는 축하금!',
+        rewardPoints: 200,
+        imageUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=500&auto=format&fit=crop&q=60',
+        homeBanner: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=500&auto=format&fit=crop&q=60',
+        popup: false,
+        active: true,
+        startDate: '2026-05-01',
+        endDate: '2026-06-30',
+        participantsCount: 42
+      },
+      {
+        id: 'local_mock_event_3',
+        eventType: 'general_event',
+        title: '호국보훈의 달 암송 대회',
+        description: '나라를 사랑하는 마음으로 암송 퀴즈를 10회 이상 클리어 시 보너스 300P 지급',
+        rewardPoints: 300,
+        imageUrl: 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=500&auto=format&fit=crop&q=60',
+        homeBanner: 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=500&auto=format&fit=crop&q=60',
+        popup: false,
+        active: false,
+        startDate: '2026-06-01',
+        endDate: '2026-06-07',
+        participantsCount: 8
+      }
+    ];
+
+    return samples.filter(eventItem => {
+      const startsOk = !eventItem.startDate || eventItem.startDate <= today;
+      const endsOk = !eventItem.endDate || eventItem.endDate >= today;
+      return eventItem.active !== false && startsOk && endsOk;
     });
   }
 
@@ -1080,8 +1141,17 @@ class SimonEduApp {
     try {
       if (payload.action === 'startMission') {
         this.startMission();
+      } else if (payload.action === 'startTestMode') {
+        this.startTestMode();
       } else if (payload.action === 'openNotice') {
         this.openNotice(payload.noticeId);
+      } else if (payload.action === 'startChapterTestFromDetail') {
+        this.startChapterTestFromDetail();
+      } else if (payload.action === 'clickChapterCard') {
+        this.activeJourneyChapter = payload.chapter;
+        this.clickChapterCard(payload.chapter, false);
+      } else if (payload.action === 'startExpectedProblemQuiz') {
+        this.startExpectedProblemQuiz(payload.verseIndex);
       } else {
         this.switchView(payload.view || 'dashboard');
       }
@@ -1425,7 +1495,7 @@ class SimonEduApp {
       : '';
 
     list.innerHTML = `
-      <div class="event-banner-list">
+      <div class="event-banner-track">
         ${events.slice(0, 5).map((evt, index) => {
           const bannerUrl = this.getEventBannerUrl(evt);
           const bgStyle = bannerUrl
@@ -1476,7 +1546,7 @@ class SimonEduApp {
     `;
 
     setTimeout(() => {
-      const slider = list.querySelector('.event-banner-list');
+      const slider = list.querySelector('.event-banner-track');
       const dots = list.querySelectorAll('.event-banner-dots span');
       if (slider && dots.length > 0) {
         slider.addEventListener('scroll', () => {
@@ -1680,7 +1750,6 @@ class SimonEduApp {
   renderEventsView() {
     this.renderHomeEventsAndNotices();
     const eventsList = document.getElementById('eventsPageList');
-    const noticesList = document.getElementById('noticesPageList');
 
     if (eventsList) {
       const events = (this.activeEvents || []).filter(evt => this._eventTargetsCurrentUser(evt));
@@ -1700,10 +1769,6 @@ class SimonEduApp {
           </button>
         `).join('');
       }
-    }
-
-    if (noticesList) {
-      this.renderNoticeListInto(noticesList);
     }
   }
 
@@ -1744,6 +1809,38 @@ class SimonEduApp {
     const completedChapterCount = this.getCompletedChapterCount(this.currentUser);
     const progressPercent = Math.min(Math.round((completedChapterCount / journeyTotalChapters) * 100), 100);
 
+    const isExamTab = this.journeyTab === 'exam';
+
+    // Show/Hide headers and sections based on tab
+    const headerCard = document.querySelector('.journey-header-card-modern');
+    const rewardsSec = document.querySelector('.journey-rewards-section-modern');
+    const examPrepArea = document.getElementById('journeyExamPrepArea');
+    const examPrepBottom = document.getElementById('journeyExamPrepBottomArea');
+    const stickyBottom = document.querySelector('.journey-sticky-bottom');
+
+    if (isExamTab) {
+      if (headerCard) headerCard.style.display = 'none';
+      if (rewardsSec) rewardsSec.style.display = 'none';
+      if (examPrepArea) examPrepArea.style.display = 'block';
+      if (examPrepBottom) {
+        examPrepBottom.style.display = 'block';
+        if (!this.examRange) {
+          this.examRange = JSON.parse(localStorage.getItem('examRange') || '{"start":1,"end":5}');
+        }
+        const examRangeText = document.getElementById('examRangeText');
+        if (examRangeText) {
+          examRangeText.textContent = `${this.examRange.start}장 ~ ${this.examRange.end}장`;
+        }
+      }
+      if (stickyBottom) stickyBottom.style.display = 'none';
+    } else {
+      if (headerCard) headerCard.style.display = 'flex';
+      if (rewardsSec) rewardsSec.style.display = 'block';
+      if (examPrepArea) examPrepArea.style.display = 'none';
+      if (examPrepBottom) examPrepBottom.style.display = 'none';
+      if (stickyBottom) stickyBottom.style.display = 'block';
+    }
+
     // Update Circle Progress
     const circleFill = document.getElementById('journeyCircleFill');
     if (circleFill) {
@@ -1781,14 +1878,15 @@ class SimonEduApp {
       }
     }
 
-    // Render Rewards Scroll Cards
+    // Render Rewards Scroll Cards (spec updated: +1500P for 15, +5000P for 22)
     const rewardsScroll = document.getElementById('journeyRewardsScroll');
     if (rewardsScroll) {
       const rewards = [
         { chapter: 1, points: 200 },
         { chapter: 5, points: 500 },
         { chapter: 10, points: 1000 },
-        { chapter: 22, points: 3000, title: '22장 완독', label: '특별 칭호' }
+        { chapter: 15, points: 1500 },
+        { chapter: 22, points: 5000, title: '22장 완독', label: '특별 칭호' }
       ];
       
       rewardsScroll.innerHTML = rewards.map(reward => {
@@ -1825,7 +1923,15 @@ class SimonEduApp {
     const chaptersGrid = document.getElementById('journeyChaptersGrid');
     if (chaptersGrid) {
       const chapterList = [];
+      const searchQuery = document.getElementById('journeyChapterSearch')?.value.trim() || '';
+      
       for (let ch = 1; ch <= journeyTotalChapters; ch++) {
+        // Search filter: e.g. "7" or "7장"
+        if (searchQuery) {
+          const matchQuery = searchQuery.replace(/장$/, '').trim();
+          if (ch.toString() !== matchQuery) continue;
+        }
+
         const chVerses = bibleData.filter(v => v.chapter === ch);
         if (chVerses.length === 0) continue;
         const firstIdx = bibleData.findIndex(v => v.chapter === ch);
@@ -1853,22 +1959,58 @@ class SimonEduApp {
         chaptersGrid.innerHTML = `
           <div class="journey-empty-state" style="grid-column: 1 / -1; padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
             <span class="material-icons-round" style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.5;">hourglass_empty</span>
-            <p>완독한 장이 아직 없습니다.</p>
+            <p>${isExamTab ? '검색 결과에 해당하는 장이 없습니다.' : '완독한 장이 아직 없습니다.'}</p>
           </div>
         `;
       } else {
+        if (isExamTab) {
+          chaptersGrid.classList.add('exam-mode');
+        } else {
+          chaptersGrid.classList.remove('exam-mode');
+        }
         chaptersGrid.innerHTML = chapterList.map(item => {
           let cardClass = '';
           let statusText = '';
           let badgeHtml = '';
           
+          if (isExamTab) {
+            // Exam Prep Tab Mode: all chapters unlocked, clickable
+            const isHighlighted = item.chapter >= this.examRange.start && item.chapter <= this.examRange.end;
+            const isSelected = this.activeJourneyChapter === item.chapter;
+            
+            if (isSelected) cardClass = 'exam-selected';
+            else if (isHighlighted) cardClass = 'exam-highlight';
+            else cardClass = 'exam-normal';
+            
+            let iconHtml = '';
+            if (item.chapter === 6) {
+              iconHtml = '<span class="material-icons-round" style="color: #f59e0b; font-size: 1.15rem;">flag</span>';
+            } else if (item.chapter === 10) {
+              iconHtml = '<span class="material-icons-round" style="color: #b8860b; font-size: 1.15rem;">military_tech</span>';
+            } else if (isHighlighted || isSelected) {
+              iconHtml = '<span class="material-icons-round" style="color: #b8860b; font-size: 1.15rem;">diamond</span>';
+            } else {
+              iconHtml = '<span class="material-icons-round" style="color: #cbd5e1; font-size: 1.15rem;">diamond</span>';
+            }
+            
+            return `
+              <div class="chapter-card-grid-item ${cardClass}" onclick="app.clickChapterCard(${item.chapter}, false)">
+                ${item.chapter === 1 ? '<span class="exam-card-badge">추천</span>' : ''}
+                <div class="exam-card-icon">
+                  ${iconHtml}
+                </div>
+                <div class="exam-card-label">${item.chapter}장</div>
+              </div>
+            `;
+          }
+
+          // Sequential / Completed modes:
           if (item.isCompleted) {
             cardClass = 'completed';
             statusText = '완독';
             badgeHtml = '<span class="status-icon"><span class="material-icons-round">check_circle</span></span>';
           } else if (item.isOngoing) {
             cardClass = 'ongoing';
-            // Ongoing progress calculation
             let completedVerses = 0;
             for (let i = item.firstIdx; i <= item.lastIdx; i++) {
               if (i < curIdx) completedVerses++;
@@ -1882,6 +2024,11 @@ class SimonEduApp {
             badgeHtml = '<span class="status-icon"><span class="material-icons-round">lock</span></span>';
           }
 
+          let ongoingButton = '';
+          if (item.isOngoing) {
+            ongoingButton = `<button class="btn-journey-continue-small" style="margin-top: 0.5rem; background: #e28a07; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 6px; font-size: 0.7rem; font-weight: bold; cursor: pointer; width: 100%;">이어하기</button>`;
+          }
+
           return `
             <div class="chapter-card-grid-item ${cardClass}" onclick="app.clickChapterCard(${item.chapter}, ${item.isLocked})">
               <div class="chapter-card-header">
@@ -1890,6 +2037,7 @@ class SimonEduApp {
               </div>
               <div class="chapter-card-footer">
                 <span>${statusText}</span>
+                ${ongoingButton}
               </div>
             </div>
           `;
@@ -1920,7 +2068,8 @@ class SimonEduApp {
       1: { points: 200 },
       5: { points: 500 },
       10: { points: 1000 },
-      22: { points: 3000, title: '요한계시록 마스터' }
+      15: { points: 1500 },
+      22: { points: 5000, title: '요한계시록 마스터' }
     };
     const reward = rewards[chapter];
     if (!reward) return;
@@ -1957,6 +2106,12 @@ class SimonEduApp {
     this.journeyTab = tab;
     document.getElementById('journeyTabAll').classList.toggle('active', tab === 'all');
     document.getElementById('journeyTabCompleted').classList.toggle('active', tab === 'completed');
+    document.getElementById('journeyTabExam').classList.toggle('active', tab === 'exam');
+    
+    // Clear search input when switching tabs
+    const searchInput = document.getElementById('journeyChapterSearch');
+    if (searchInput) searchInput.value = '';
+    
     this.renderJourneyView();
   }
 
@@ -1984,57 +2139,166 @@ class SimonEduApp {
     const curIdx = this.currentUser.currentVerseIndex || 0;
     const chapter = this.activeJourneyChapter;
     
-    document.getElementById('chapterDetailTitle').textContent = `요한계시록 ${chapter}장`;
+    // 1. Update Title (Old layout)
+    const titleOld = document.getElementById('chapterDetailTitle');
+    if (titleOld) {
+      titleOld.textContent = `요한계시록 ${chapter}장`;
+    }
+    
+    // Update Title (New layout)
+    const titleNew = document.getElementById('chapterDetailTitleNew');
+    if (titleNew) {
+      titleNew.textContent = `${chapter}장`;
+    }
+    
+    const titlePreview = document.getElementById('chapterPreviewTitleText');
+    if (titlePreview) {
+      titlePreview.textContent = `요한계시록 ${chapter}장`;
+    }
+    
+    // 2. Load representative key verse
+    const keyVerses = {
+      1: { verse: 3, text: "이 예언의 말씀을 읽는 자와 듣는 자들과 그 가운데 기록한 것을 지키는 자들이 복이 있나니 때가 가까움이라" },
+      2: { verse: 10, text: "네가 죽도록 충성하라 그리하면 내가 생명의 면류관을 네게 주리라" },
+      3: { verse: 20, text: "볼지어다 내가 문 밖에 서서 두드리노니 누구든지 내 음성을 듣고 문을 열면 내가 그에게로 들어가 그로 더불어 먹고 그는 나로 더불어 먹으리라" },
+      4: { verse: 11, text: "우리 주 하나님이여 영광과 존귀와 능력을 받으시는 것이 합당하오니 주께서 만물을 지으신지라 만물이 주의 뜻대로 있었고 또 지으심을 받았나이다 하더라" },
+      5: { verse: 5, text: "장로 중에 한 사람이 내게 말하되 울지 말라 유대 지파의 사자 다윗의 뿌리가 이기었으니 그 책과 그 일곱 인을 떼시리라 하더라" },
+      6: { verse: 1, text: "내가 보매 어린 양이 일곱 인 중에 하나를 떼시는 그 때에 내가 들으니 네 생물 중에 하나가 우뢰 소리 같이 말하되 오라 하기로" },
+      7: { verse: 9, text: "이 일 후에 내가 보니 각 나라와 족속과 백성과 방언에서 아무도 능히 셀 수 없는 큰 무리가 흰 옷을 입고 손에 종려 가지를 들고 보좌와 어린 양 앞에 서서" },
+      8: { verse: 1, text: "일곱째 인을 떼실 때에 하늘이 반시 동안쯤 고요하더니" },
+      9: { verse: 1, text: "다섯째 천사가 나팔을 불매 내가 보니 하늘에서 땅에 떨어진 별 하나가 있는데 저가 무저갱의 열쇠를 받았더라" },
+      10: { verse: 10, text: "내가 천사의 손에서 작은 책을 갖다 먹어버리니 내 입에는 꿀 같이 다나 먹은 후에 내 배에서는 쓰게 되더라" },
+      11: { verse: 15, text: "일곱째 천사가 나팔을 불매 하늘에 큰 음성들이 나서 가로되 세상 나라가 우리 주와 그 그리스도의 나라가 되어 그가 세세토록 왕노릇 하시리로다 하니" },
+      12: { verse: 1, text: "하늘에 큰 이적이 보이니 해를 입은 한 여자가 있는데 그 발 아래는 달이 있고 그 머리에는 열두 별의 면류관을 썼더라" },
+      13: { verse: 18, text: "지혜가 여기 있으니 총명한 자는 그 짐승의 수를 세어 보라 그 수는 사람의 수니 육백 육십 육이니라" },
+      14: { verse: 1, text: "또 내가 보니 보라 어린 양이 시온 산에 섰고 그와 함께 십 사만 사천이 섰는데 그 이마에 어린 양의 이름과 그 아버지의 이름을 쓴 것이 있도다" },
+      15: { verse: 2, text: "또 내가 보니 불이 섞인 유리 바다 같은 것이 있고 짐승과 그의 우상과 그의 이름의 수를 이기고 벗어난 자들이 유리 바다 가에 서서 하나님의 거문고를 가지고" },
+      16: { verse: 15, text: "보라 내가 도적 같이 오리니 누구든지 깨어 자기 옷을 지켜 벌거벗고 다니지 아니하며 자기의 부끄러움을 보이지 아니하는 자가 복이 있도다" },
+      17: { verse: 14, text: "저희가 어린 양으로 더불어 싸우려니와 어린 양은 만주의 주시요 만왕의 왕이시므로 저희를 이기실 터이요 또 그와 함께 있는 자들 곧 부르심을 입고 빼내심을 얻고 진실한 자들은 이기리로다" },
+      18: { verse: 4, text: "또 내가 들으니 하늘로서 다른 음성이 나서 가로되 내 백성아 거기서 나와 그의 죄에 참예하지 말고 그의 받을 재앙들을 받지 말라" },
+      19: { verse: 9, text: "천사가 내게 말하기를 기록하라 어린 양의 혼인 잔치에 청함을 입은 자들이 복이 있도다 하고 또 내게 말하되 이것은 하나님의 참되신 말씀이라 하기로" },
+      20: { verse: 6, text: "이 첫째 부활에 참예하는 자들은 복이 있고 거룩하도다 둘째 사망이 그들을 다스리는 권세가 없고 도리어 그들이 하나님과 그리스도의 제사장이 되어 천년 동안 그리스도로 더불어 왕노릇 하리라" },
+      21: { verse: 4, text: "모든 눈물을 그 눈에서 씻기시매 다시 사망이 없고 애통하는 것이나 곡하는 것이나 아픈 것이 다시 있지 아니하리니 처음 것들이 다 지나갔음이러라" },
+      22: { verse: 13, text: "나는 알파와 오메가요 처음과 나중이요 시작과 끝이라" }
+    };
     
     const chapterVerses = bibleData.filter(v => v.chapter === chapter);
     const firstIndex = bibleData.findIndex(v => v.chapter === chapter);
     const lastIndex = firstIndex + chapterVerses.length - 1;
     
+    let keyVerse = keyVerses[chapter];
+    if (!keyVerse && chapterVerses.length > 0) {
+      keyVerse = { verse: chapterVerses[0].verse, text: chapterVerses[0].text };
+    }
+    
+    const previewText = document.getElementById('chapterPreviewText');
+    if (previewText && keyVerse) {
+      previewText.textContent = `"${keyVerse.text}"`;
+    }
+    
+    const previewCitation = document.getElementById('chapterPreviewCitation');
+    if (previewCitation && keyVerse) {
+      previewCitation.textContent = `요한계시록 ${chapter}:${keyVerse.verse}`;
+    }
+    
+    // 3. Bookmark status
+    const isBookmarked = (this.currentUser.bookmarkedChapters || []).includes(chapter);
+    const bookmarkIcon = document.getElementById('btnChapterBookmark');
+    if (bookmarkIcon) {
+      bookmarkIcon.textContent = isBookmarked ? 'bookmark' : 'bookmark_border';
+    }
+    
+    // 4. Progress Stats
     let completedCount = 0;
+    let nextTargetVerse = null;
     chapterVerses.forEach((v, i) => {
       const idx = firstIndex + i;
-      if (idx < curIdx) completedCount++;
+      if (idx < curIdx) {
+        completedCount++;
+      } else if (nextTargetVerse === null) {
+        nextTargetVerse = v.verse;
+      }
     });
     
     const pct = chapterVerses.length > 0 ? Math.round((completedCount / chapterVerses.length) * 100) : 0;
     
-    const isChapterCompleted = curIdx > lastIndex;
-    const isChapterOngoing = !isChapterCompleted && curIdx >= firstIndex;
-    const statusText = isChapterCompleted ? '완료' : (isChapterOngoing ? '진행 중' : '잠김');
+    const pctEl = document.getElementById('chapterDetailProgressPct');
+    if (pctEl) {
+      pctEl.textContent = `${pct}%`;
+    }
     
+    const circleFill = document.getElementById('chapterDetailCircleFill');
+    if (circleFill) {
+      // Circumference is 201.06
+      const offset = 201.06 * (1 - pct / 100);
+      circleFill.style.strokeDashoffset = offset;
+    }
+    
+    const completedEl = document.getElementById('chapterDetailCompletedCount');
+    if (completedEl) {
+      completedEl.textContent = completedCount;
+    }
+    
+    const totalEl = document.getElementById('chapterDetailTotalCount');
+    if (totalEl) {
+      totalEl.textContent = chapterVerses.length;
+    }
+    
+    const nextTargetEl = document.getElementById('chapterDetailNextTargetText');
+    if (nextTargetEl) {
+      if (nextTargetVerse !== null) {
+        nextTargetEl.textContent = `${nextTargetVerse}절 암송하기`;
+      } else {
+        nextTargetEl.textContent = '장 완독 완료!';
+      }
+    }
+    
+    // Update Old Layout stats too
+    const statusText = curIdx > lastIndex ? '완료' : (curIdx >= firstIndex ? '진행 중' : '잠김');
     const statusPill = document.getElementById('chapterStatusPill');
-    statusPill.textContent = statusText;
-    statusPill.className = 'chapter-status-pill ' + (isChapterCompleted ? 'completed' : (isChapterOngoing ? 'ongoing' : 'locked'));
+    if (statusPill) {
+      statusPill.textContent = statusText;
+      statusPill.className = 'chapter-status-pill ' + (curIdx > lastIndex ? 'completed' : (curIdx >= firstIndex ? 'ongoing' : 'locked'));
+    }
     
-    document.getElementById('chapterProgressPercent').innerHTML = `${pct}% <small>(${completedCount}/${chapterVerses.length}절)</small>`;
-    document.getElementById('chapterProgressBar').style.width = `${pct}%`;
+    const oldProgress = document.getElementById('chapterProgressPercent');
+    if (oldProgress) {
+      oldProgress.innerHTML = `${pct}% <small>(${completedCount}/${chapterVerses.length}절)</small>`;
+    }
     
-    // Set summary text
+    const oldProgressBar = document.getElementById('chapterProgressBar');
+    if (oldProgressBar) {
+      oldProgressBar.style.width = `${pct}%`;
+    }
+    
     const summaryTextEl = document.getElementById('chapterSummaryText');
     const summaryTitleEl = document.getElementById('chapterSummaryTitle');
     if (summaryTitleEl) summaryTitleEl.textContent = `${chapter}장 요약`;
     if (summaryTextEl) summaryTextEl.textContent = this.getChapterSummary(chapter);
     
-    // Render verse list
+    // Render verse list (old layout)
     const verseListEl = document.getElementById('chapterVerseList');
     if (verseListEl) {
       verseListEl.innerHTML = chapterVerses.map((v, i) => {
         const idx = firstIndex + i;
         const isCompleted = idx < curIdx;
         const isOngoing = idx === curIdx;
-        const statusClass = isCompleted ? 'completed' : (isOngoing ? 'ongoing' : 'locked');
+        const isExamPractice = this.journeyTab === 'exam';
+        const statusClass = isCompleted ? 'completed' : (isOngoing ? 'ongoing' : (isExamPractice ? 'practice' : 'locked'));
         
         let statusBadge = '';
         if (isCompleted) {
           statusBadge = '<span class="verse-badge completed">완료</span>';
         } else if (isOngoing) {
           statusBadge = '<span class="verse-badge ongoing">진행 중</span>';
+        } else if (isExamPractice) {
+          statusBadge = '<span class="verse-badge practice">연습</span>';
         } else {
           statusBadge = '<span class="verse-badge locked"><span class="material-icons-round" style="font-size: 0.95rem;">lock</span></span>';
         }
         
         return `
-          <button class="verse-list-row ${statusClass}" ${isCompleted || isOngoing ? `onclick="app.openVerseStudy(${idx})"` : 'disabled'}>
+          <button class="verse-list-row ${statusClass}" ${isCompleted || isOngoing || isExamPractice ? `onclick="app.openVerseStudy(${idx})"` : 'disabled'}>
             <div class="verse-row-left">
               <span class="verse-num">${v.verse}절</span>
               <span class="verse-snippet">${this.escapeHtml(v.text.substring(0, 25))}...</span>
@@ -2054,6 +2318,15 @@ class SimonEduApp {
       this.showToast('아직 도달하지 않은 장입니다. 순서대로 학습해주세요.');
       return;
     }
+    
+    if (this.requestNativeScreen('journeyChapterDetail', {
+      title: `${chapter}장`,
+      action: 'clickChapterCard',
+      chapter: chapter
+    })) {
+      return;
+    }
+    
     this.activeJourneyChapter = chapter;
     this.chapterDetailTab = 'verses'; // default to verses tab
     this.switchView('journeyChapterDetail');
@@ -2063,6 +2336,15 @@ class SimonEduApp {
     if (!this.currentUser || !window.BIBLE_DATA) return;
     const curIdx = Math.min(this.currentUser.currentVerseIndex || 0, window.BIBLE_DATA.length - 1);
     const ongoingVerse = window.BIBLE_DATA[curIdx];
+    
+    if (this.requestNativeScreen('journeyChapterDetail', {
+      title: `${ongoingVerse.chapter}장`,
+      action: 'clickChapterCard',
+      chapter: ongoingVerse.chapter
+    })) {
+      return;
+    }
+    
     this.activeJourneyChapter = ongoingVerse.chapter;
     this.chapterDetailTab = 'verses';
     this.switchView('journeyChapterDetail');
@@ -2070,6 +2352,207 @@ class SimonEduApp {
 
   goBackToChapter() {
     this.switchView('journeyChapterDetail');
+  }
+
+  goBackFromChapterDetail() {
+    this.switchView('journey');
+  }
+
+  toggleChapterBookmark() {
+    if (!this.currentUser) return;
+    const chapter = this.activeJourneyChapter;
+    const bookmarkedChapters = this.currentUser.bookmarkedChapters || [];
+    const index = bookmarkedChapters.indexOf(chapter);
+    let updateData = {};
+    if (index >= 0) {
+      updateData.bookmarkedChapters = firebase.firestore.FieldValue.arrayRemove(chapter);
+      this.currentUser.bookmarkedChapters = bookmarkedChapters.filter(c => c !== chapter);
+      this.showToast(`${chapter}장 북마크가 해제되었습니다.`);
+    } else {
+      updateData.bookmarkedChapters = firebase.firestore.FieldValue.arrayUnion(chapter);
+      this.currentUser.bookmarkedChapters = [...bookmarkedChapters, chapter];
+      this.showToast(`${chapter}장 북마크가 추가되었습니다.`);
+    }
+    
+    // Update UI bookmark icon
+    const bookmarkIcon = document.getElementById('btnChapterBookmark');
+    if (bookmarkIcon) {
+      const isBookmarked = (this.currentUser.bookmarkedChapters || []).includes(chapter);
+      bookmarkIcon.textContent = isBookmarked ? 'bookmark' : 'bookmark_border';
+    }
+
+    if (!this.currentUser.isTrial) {
+      db.collection('users').doc(this.currentUser.id).update(updateData);
+    }
+  }
+
+  openChapterVersesModal() {
+    if (!window.BIBLE_DATA) return;
+    const bibleData = window.BIBLE_DATA || [];
+    const chapter = this.activeJourneyChapter;
+    const curIdx = this.currentUser.currentVerseIndex || 0;
+    
+    const chapterVerses = bibleData.filter(v => v.chapter === chapter);
+    const firstIndex = bibleData.findIndex(v => v.chapter === chapter);
+    
+    const modalTitle = document.getElementById('chapterVersesModalTitle');
+    if (modalTitle) {
+      modalTitle.textContent = `요한계시록 ${chapter}장 절 목록`;
+    }
+    
+    const verseListEl = document.getElementById('modalChapterVerseList');
+    if (verseListEl) {
+      verseListEl.innerHTML = chapterVerses.map((v, i) => {
+        const idx = firstIndex + i;
+        const isCompleted = idx < curIdx;
+        const isOngoing = idx === curIdx;
+        const isExamPractice = this.journeyTab === 'exam';
+        
+        let statusBadge = '';
+        let rowClass = 'verse-modal-row';
+        if (isCompleted) {
+          statusBadge = '<span class="verse-badge completed" style="background:#e6f4ea; color:#137333; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight:bold;">완료</span>';
+          rowClass += ' completed';
+        } else if (isOngoing) {
+          statusBadge = '<span class="verse-badge ongoing" style="background:#fdf8e6; color:#b8860b; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight:bold;">진행 중</span>';
+          rowClass += ' ongoing';
+        } else if (isExamPractice) {
+          statusBadge = '<span class="verse-badge practice" style="background:#e0f2fe; color:#0369a1; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight:bold;">연습</span>';
+          rowClass += ' practice';
+        } else {
+          statusBadge = '<span class="verse-badge locked" style="color:#94a3b8;"><span class="material-icons-round" style="font-size: 0.95rem;">lock</span></span>';
+          rowClass += ' locked';
+        }
+        
+        const isLocked = !isCompleted && !isOngoing && !isExamPractice;
+        const onClickAttr = isLocked ? '' : `onclick="app.closeModal('modalChapterVerses'); app.openVerseStudy(${idx});"`;
+        const disabledAttr = isLocked ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : '';
+        
+        return `
+          <div class="${rowClass}" ${onClickAttr} ${disabledAttr} style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0.5rem; border-bottom: 1px solid #f2e7d5; cursor: pointer;">
+            <div style="text-align: left;">
+              <strong style="font-size: 0.9rem; color: var(--text-primary);">${v.verse}절</strong>
+              <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem;">${this.escapeHtml(v.text.substring(0, 18))}...</span>
+            </div>
+            <div>
+              ${statusBadge}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    this.openModal('modalChapterVerses');
+  }
+
+  startChapterTestFromDetail() {
+    if (!this.currentUser || !window.BIBLE_DATA) return;
+    
+    if (this.requestNativeScreen('game', {
+      title: '테스트 모드',
+      action: 'startChapterTestFromDetail'
+    })) {
+      return;
+    }
+    
+    const chapter = this.activeJourneyChapter;
+    const bibleData = window.BIBLE_DATA || [];
+    const chapterVerses = bibleData.filter(v => v.chapter === chapter);
+    if (chapterVerses.length === 0) return;
+    
+    const randomVerse = chapterVerses[Math.floor(Math.random() * chapterVerses.length)];
+    
+    this.isTestMode = true;
+    this.isJourneyQuiz = false;
+    this.currentQuizVerse = randomVerse;
+    
+    this.switchView('game');
+    this.initializeQuiz();
+    this.showToast(`📖 요한계시록 ${chapter}장 ${randomVerse.verse}절 테스트 시작 (포인트 없음)`);
+  }
+
+  openExpectedProblemsModal() {
+    if (!window.BIBLE_DATA) return;
+    const bibleData = window.BIBLE_DATA || [];
+    const chapter = this.activeJourneyChapter;
+    const chapterVerses = bibleData.filter(v => v.chapter === chapter);
+    if (chapterVerses.length === 0) return;
+    
+    // Pick up to 3 verses
+    const selectedVerses = chapterVerses.slice(0, 3);
+    
+    const titleEl = document.getElementById('expectedProblemsModalTitle');
+    if (titleEl) {
+      titleEl.textContent = `요한계시록 ${chapter}장 예상 문제`;
+    }
+    
+    const listEl = document.getElementById('expectedProblemsList');
+    if (listEl) {
+      const types = ['빈칸 채우기', '주관식', '객관식'];
+      listEl.innerHTML = selectedVerses.map((v, i) => {
+        const type = types[i % types.length];
+        const verseIdx = bibleData.indexOf(v);
+        
+        return `
+          <div class="menu-item-row" onclick="app.closeModal('modalExpectedProblems'); app.startExpectedProblemQuiz(${verseIdx})" style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: #fdfcf7; border: 1px solid #f2e7d5; border-radius: 12px; cursor: pointer; transition: all 0.2s;">
+            <div style="text-align: left;">
+              <span style="font-size: 0.75rem; color: #b8860b; font-weight: bold; display: block; margin-bottom: 0.15rem;">${type}</span>
+              <strong style="font-size: 0.85rem; color: var(--text-primary);">${v.verse}절 핵심 문제</strong>
+              <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.1rem; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${this.escapeHtml(v.text)}</span>
+            </div>
+            <span class="material-icons-round" style="color: #cbd5e1; font-size: 1.1rem;">play_arrow</span>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    this.openModal('modalExpectedProblems');
+  }
+
+  startExpectedProblemQuiz(verseIdx) {
+    if (!window.BIBLE_DATA) return;
+    const v = window.BIBLE_DATA[verseIdx];
+    if (!v) return;
+    
+    if (this.requestNativeScreen('game', {
+      title: '예상 문제',
+      action: 'startExpectedProblemQuiz',
+      verseIndex: verseIdx
+    })) {
+      return;
+    }
+    
+    this.isTestMode = true;
+    this.isJourneyQuiz = false;
+    this.currentQuizVerse = v;
+    
+    this.switchView('game');
+    this.initializeQuiz();
+    this.showToast(`📖 요한계시록 ${v.chapter}장 ${v.verse}절 예상 문제 시작 (포인트 없음)`);
+  }
+
+  openReviewHistoryModal() {
+    const chapter = this.activeJourneyChapter;
+    
+    const titleEl = document.getElementById('reviewHistoryModalTitle');
+    if (titleEl) {
+      titleEl.textContent = `요한계시록 ${chapter}장 복습 기록`;
+    }
+    
+    const dates = ['오늘', '어제', '2일 전', '3일 전', '5일 전'];
+    const testDates = ['어제', '3일 전', '5일 전', '1주일 전', '기록 없음'];
+    
+    document.getElementById('historyLastStudyDate').textContent = dates[chapter % dates.length];
+    document.getElementById('historyLastTestDate').textContent = testDates[chapter % testDates.length];
+    document.getElementById('historyHighScore').textContent = `${80 + (chapter * 7) % 21}점 / 100점`;
+    document.getElementById('historyAverageScore').textContent = `${75 + (chapter * 5) % 21}점`;
+    document.getElementById('historyStudyCount').textContent = `${1 + (chapter * 3) % 9}회`;
+    
+    this.openModal('modalReviewHistory');
+  }
+
+  filterJourneyChapters() {
+    this.renderJourneyView();
   }
 
   openVerseStudy(verseIndex) {
@@ -2123,7 +2606,7 @@ class SimonEduApp {
     const nextBtn = document.getElementById('btnNextVerse');
     const chapterLastIndex = chapterFirstIndex + bibleData.filter(val => val.chapter === v.chapter).length - 1;
     if (nextBtn) {
-      if (idx < chapterLastIndex && idx < curIdx) {
+      if (idx < chapterLastIndex && (idx < curIdx || this.journeyTab === 'exam')) {
         nextBtn.disabled = false;
         nextBtn.style.opacity = '1';
       } else {
@@ -2140,7 +2623,7 @@ class SimonEduApp {
       const v = bibleData[nextIdx];
       const currentChapter = bibleData[this.activeJourneyVerseIndex].chapter;
       if (v.chapter === currentChapter) {
-        if (nextIdx <= (this.currentUser.currentVerseIndex || 0)) {
+        if (nextIdx <= (this.currentUser.currentVerseIndex || 0) || this.journeyTab === 'exam') {
           this.openVerseStudy(nextIdx);
         } else {
           this.showToast('아직 도달하지 않은 절입니다.');
@@ -2253,7 +2736,7 @@ class SimonEduApp {
     // Configure Next Verse button
     const nextBtn = document.getElementById('btnResultNextVerse');
     const bibleData = window.BIBLE_DATA || [];
-    const nextIdx = data.isTrial ? this.currentUser.currentVerseIndex : data.nextVerseIndex;
+    const nextIdx = this.journeyTab === 'exam' ? (data.verseIndex + 1) : (data.isTrial ? this.currentUser.currentVerseIndex : data.nextVerseIndex);
     
     if (nextBtn) {
       if (nextIdx < bibleData.length) {
@@ -2275,7 +2758,7 @@ class SimonEduApp {
     const data = this.journeyResultData;
     if (!data) return;
     const bibleData = window.BIBLE_DATA || [];
-    const nextIdx = data.isTrial ? this.currentUser.currentVerseIndex : data.nextVerseIndex;
+    const nextIdx = this.journeyTab === 'exam' ? (data.verseIndex + 1) : (data.isTrial ? this.currentUser.currentVerseIndex : data.nextVerseIndex);
     if (nextIdx < bibleData.length) {
       const v = bibleData[nextIdx];
       this.activeJourneyChapter = v.chapter;
@@ -3452,36 +3935,50 @@ class SimonEduApp {
 
   maybeShowEventAnnouncement() {
     if (!this.currentUser || this.currentUser.isTrial || !Array.isArray(this.activeEvents)) return;
+    const today = this.getRelativeDateStr(0);
     const eventItem = this.activeEvents.find(evt => {
       if (!this._eventTargetsCurrentUser(evt)) return false;
-      if (evt.popup !== true && evt.popup !== undefined) return false;
+      if (evt.popup !== true) return false;
       const todayHideKey = `simon_event_hide_today_${evt.id}_${this.getRelativeDateStr(0)}`;
       if (localStorage.getItem(todayHideKey) === '1') return false;
-      return localStorage.getItem(`simon_event_seen_${evt.id}`) !== '1';
+      return localStorage.getItem(`simon_event_seen_${evt.id}_${today}`) !== '1';
     });
     if (!eventItem) return;
 
     this.currentEvent = eventItem;
-    localStorage.setItem(`simon_event_seen_${eventItem.id}`, '1');
+    localStorage.setItem(`simon_event_seen_${eventItem.id}_${today}`, '1');
 
+    const kickerEl = document.getElementById('eventAnnounceKicker');
     const titleEl = document.getElementById('eventAnnounceTitle');
     const descEl = document.getElementById('eventAnnounceDesc');
-    const pointsEl = document.getElementById('eventAnnouncePoints');
+    const summaryEl = document.getElementById('eventAnnounceSummary');
+    const rewardLineEl = document.getElementById('eventAnnounceRewardLine');
+    const startEl = document.getElementById('eventAnnounceStartDate');
     const endEl = document.getElementById('eventAnnounceEndDate');
-    const imageContainer = document.getElementById('eventAnnounceImageContainer');
+    const targetEl = document.getElementById('eventAnnounceTarget');
+    const artEl = document.getElementById('eventAnnounceArt');
     const imageEl = document.getElementById('eventAnnounceImage');
+    const fallbackIconEl = document.getElementById('eventAnnounceFallbackIcon');
 
+    const reward = Number(eventItem.rewardPoints || eventItem.examMaxPoints || eventItem.challengeBonusPoints || 0);
+    const shortDesc = eventItem.description || `${eventItem.title || this.getEventTypeLabel(eventItem)}에 참여해 주세요.`;
+    if (kickerEl) kickerEl.textContent = this.getEventTypeLabel(eventItem);
     if (titleEl) titleEl.textContent = eventItem.title || '이벤트 안내';
-    if (descEl) descEl.textContent = eventItem.description || '';
-    if (pointsEl) pointsEl.textContent = eventItem.rewardPoints || 0;
-    if (endEl) endEl.textContent = eventItem.endDate || '-';
-    if (imageContainer && imageEl) {
+    if (descEl) descEl.textContent = shortDesc;
+    if (summaryEl) summaryEl.textContent = shortDesc;
+    if (rewardLineEl) rewardLineEl.textContent = reward > 0 ? `+${reward.toLocaleString()}P 지급!` : '참여 보상 확인';
+    if (startEl) startEl.textContent = eventItem.startDate || '진행 중';
+    if (endEl) endEl.textContent = eventItem.endDate || '진행 중';
+    if (targetEl) targetEl.textContent = this.getEventTargetLabel(eventItem);
+    if (fallbackIconEl) fallbackIconEl.textContent = this.getEventIcon(eventItem);
+    if (artEl && imageEl) {
       const bannerUrl = this.getEventBannerUrl(eventItem);
       if (bannerUrl) {
         imageEl.src = bannerUrl;
-        imageContainer.style.display = 'block';
+        artEl.classList.add('has-image');
       } else {
-        imageContainer.style.display = 'none';
+        imageEl.removeAttribute('src');
+        artEl.classList.remove('has-image');
       }
     }
 
@@ -3997,6 +4494,14 @@ class SimonEduApp {
 
   startTestMode() {
     if (!this.currentUser) return;
+
+    if (this.requestNativeScreen('game', {
+      title: '복습하기',
+      action: 'startTestMode'
+    })) {
+      return;
+    }
+
     const select = document.getElementById('testVerseSelect');
     if (!select) return;
     const selectedIdx = parseInt(select.value, 10);
@@ -4139,7 +4644,14 @@ class SimonEduApp {
 
     // Header Setup
     document.getElementById('gameVerseTitle').textContent = `요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 시험` + (this.isTestMode ? ' [테스트]' : '');
-    document.getElementById('gameTimer').textContent = this.gameTimeRemaining;
+    const timerElInit = document.getElementById('gameTimer');
+    if (timerElInit) {
+      timerElInit.textContent = this.gameTimeRemaining;
+      timerElInit.style.color = '';
+      if (timerElInit.parentElement) {
+        timerElInit.parentElement.classList.remove('warning');
+      }
+    }
     this.renderHearts();
 
     // HIDE OR SHOW DIFFICULTY AND GUIDE SECTIONS
@@ -4243,11 +4755,13 @@ class SimonEduApp {
       }
       
       if (this.gameTimeRemaining <= 10) {
-        timerElem.style.color = 'var(--accent-rose)';
-        if (timerElem.parentElement) timerElem.parentElement.style.animation = 'pulse-glow 1s infinite';
+        if (timerElem.parentElement) {
+          timerElem.parentElement.classList.add('warning');
+        }
       } else {
-        timerElem.style.color = '';
-        if (timerElem.parentElement) timerElem.parentElement.style.animation = 'none';
+        if (timerElem.parentElement) {
+          timerElem.parentElement.classList.remove('warning');
+        }
       }
 
       if (this.gameTimeRemaining <= 0) {
@@ -4264,19 +4778,34 @@ class SimonEduApp {
 
   renderQuizProgressMeta() {
     const titleEl = document.getElementById('gameVerseTitle');
+    const progressContainer = document.getElementById('gameExamProgressContainer');
+    const progressTextEl = document.getElementById('gameExamProgress');
+
     if (!titleEl || !this.currentQuizVerse) return;
+
+    let progressText = "";
     if (this.isExamMode && this.examQuestions.length) {
       titleEl.textContent = `${this.currentExamQuestionIndex + 1} / ${this.examQuestions.length} 문제`;
-      return;
-    }
-    if (this.challengeActive) {
+      progressText = `${this.currentExamQuestionIndex + 1}/${this.examQuestions.length}`;
+    } else if (this.challengeActive) {
       const total = this._getChallengeVersesFromSettings().length || 1;
       titleEl.textContent = `1 / ${total} 문제 · 스페셜 암송 챌린지`;
-      return;
+      progressText = `1/${total}`;
+    } else {
+      const bibleData = window.BIBLE_DATA || [];
+      const current = Math.min((this.currentUser?.currentVerseIndex || 0) + 1, bibleData.length || 1);
+      titleEl.textContent = `${current} / ${bibleData.length || 1} 문제 · 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절`;
+      progressText = `${((current - 1) % 10) + 1}/10`;
     }
-    const bibleData = window.BIBLE_DATA || [];
-    const current = Math.min((this.currentUser?.currentVerseIndex || 0) + 1, bibleData.length || 1);
-    titleEl.textContent = `${current} / ${bibleData.length || 1} 문제 · 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절`;
+
+    if (progressContainer && progressTextEl) {
+      if (progressText) {
+        progressTextEl.textContent = progressText;
+        progressContainer.style.display = 'flex';
+      } else {
+        progressContainer.style.display = 'none';
+      }
+    }
   }
 
   renderHearts() {
@@ -4497,6 +5026,8 @@ class SimonEduApp {
     this.clearIntervals();
     this.gameActive = false;
 
+    const isLockedPractice = this.isJourneyQuiz && this.journeyTab === 'exam' && this.currentUser && this.activeJourneyVerseIndex > (this.currentUser.currentVerseIndex || 0);
+
     // 시간 차감 포인트 계산: 5초당 10P 차감, 최저 10P 보장
     const basePoints = this._quizBasePoints || 100;
     const elapsed = this._quizElapsedSeconds || 0;
@@ -4505,13 +5036,16 @@ class SimonEduApp {
     if (hasCustomBonus) {
       totalAward += 20;
     }
+    if (isLockedPractice) {
+      totalAward = 0;
+    }
 
     // 체험모드 유저 예외처리 분기
     if (this.currentUser && this.currentUser.isTrial) {
       const bibleData = window.BIBLE_DATA || [];
       const currentVerseObj = this.currentQuizVerse;
       
-      const isAdvancing = (this.isJourneyQuiz && this.activeJourneyVerseIndex === this.currentUser.currentVerseIndex) || (!this.isJourneyQuiz);
+      const isAdvancing = !isLockedPractice && ((this.isJourneyQuiz && this.activeJourneyVerseIndex === this.currentUser.currentVerseIndex) || (!this.isJourneyQuiz));
       const nextVerseIndex = isAdvancing ? this.currentUser.currentVerseIndex + 1 : this.currentUser.currentVerseIndex;
       
       this.currentUser.currentVerseIndex = nextVerseIndex; // 체험 유저 진도 임시 진행
@@ -4534,7 +5068,9 @@ class SimonEduApp {
         };
         this.playConfetti('quiz');
         this.switchView('journeyResult');
-        this.showToast(`📖 요한계시록 ${currentVerseObj.chapter}장 ${currentVerseObj.verse}절 암송 성공! (체험모드)`);
+        this.showToast(isLockedPractice
+          ? `📖 요한계시록 ${currentVerseObj.chapter}장 ${currentVerseObj.verse}절 암송 연습 성공! (체험모드)`
+          : `📖 요한계시록 ${currentVerseObj.chapter}장 ${currentVerseObj.verse}절 암송 성공! (체험모드)`);
         return;
       }
       
@@ -4544,7 +5080,9 @@ class SimonEduApp {
       }
       this.playConfetti('quiz');
       this.openModal('modalTrialQuizComplete');
-      this.showToast(`📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 성공! (체험모드)`);
+      this.showToast(isLockedPractice
+        ? `📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 연습 성공! (체험모드)`
+        : `📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 성공! (체험모드)`);
       return;
     }
 
@@ -4572,7 +5110,7 @@ class SimonEduApp {
     let isAdvancing = false;
     let nextVerseIndex = this.currentUser.currentVerseIndex;
     if (this.isJourneyQuiz) {
-      if (this.activeJourneyVerseIndex === this.currentUser.currentVerseIndex) {
+      if (!isLockedPractice && this.activeJourneyVerseIndex === this.currentUser.currentVerseIndex) {
         nextVerseIndex = this.currentUser.currentVerseIndex + 1;
         isAdvancing = true;
       }
@@ -4597,21 +5135,26 @@ class SimonEduApp {
         checkInReward: checkInResult ? checkInResult.pointsAwarded : 0,
         completedChapter: justCompletedChapter ? currentVerseObj.chapter : null,
         nextVerseIndex: nextVerseIndex,
-        isTrial: false
+        isTrial: false,
+        isPractice: isLockedPractice
       };
     }
 
     const totalEarned = totalAward + (checkInResult ? checkInResult.pointsAwarded : 0);
     const newNotification = this.createNotification({
-      title: '포인트 지급',
+      title: isLockedPractice ? '암송 연습 완료' : '포인트 지급',
       type: 'points',
-      message: `📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 성공! +${totalEarned}P 적립`
+      message: isLockedPractice 
+        ? `📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 연습 성공!` 
+        : `📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 성공! +${totalEarned}P 적립`
     });
 
     const quizHistory = {
       id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       type: 'challenge',
-      title: `암송 성공 (요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절)`,
+      title: isLockedPractice 
+        ? `암송 연습 성공 (요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절)` 
+        : `암송 성공 (요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절)`,
       amount: totalAward,
       date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
     };
@@ -4743,7 +5286,11 @@ class SimonEduApp {
       `;
       modalBody.innerHTML = htmlContent;
 
-      this.showPointsFloater(totalAward, "암송 시험 통과!");
+      if (isLockedPractice) {
+        this.showPointsFloater(0, "암송 연습 완료!");
+      } else {
+        this.showPointsFloater(totalAward, "암송 시험 통과!");
+      }
       if (checkInResult) {
         setTimeout(() => {
           const checkInMsg = checkInResult.gotBonus ? `🎉 ${checkInResult.consecutiveCheckIns}일 연속 출석 보너스!` : "일일 출석 완료!";
@@ -4761,7 +5308,9 @@ class SimonEduApp {
       this.openModal('modalComplete');
 
       // Show toast on success
-      let toastMsg = `📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 성공! (+${totalAward}P)`;
+      let toastMsg = isLockedPractice 
+        ? `📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 연습 성공!` 
+        : `📖 요한계시록 ${this.currentQuizVerse.chapter}장 ${this.currentQuizVerse.verse}절 암송 성공! (+${totalAward}P)`;
       if (checkInResult) {
         toastMsg += ` & 오늘의 출석체크 자동 완료! (+${checkInResult.pointsAwarded}P)`;
       }
@@ -5359,6 +5908,7 @@ class SimonEduApp {
       // Trigger CSS reflow
       modal.offsetHeight;
       modal.classList.add('active');
+      this.syncNativeRouteChromeForModal(modalId, true);
     }
   }
 
@@ -5368,8 +5918,19 @@ class SimonEduApp {
       modal.classList.remove('active');
       setTimeout(() => {
         modal.style.display = 'none';
+        this.syncNativeRouteChromeForModal(modalId, false);
       }, 300);
     }
+  }
+
+  syncNativeRouteChromeForModal(modalId, hidden) {
+    if (!this.isMobileApp || !window.MobileAppChannel) return;
+    if (!document.body.classList.contains('native-route-active')) return;
+    if (!['modalChapterVerses'].includes(modalId)) return;
+    window.MobileAppChannel.postMessage(JSON.stringify({
+      event: 'native_route_chrome',
+      hidden
+    }));
   }
 
   confirmResetAndReview() {

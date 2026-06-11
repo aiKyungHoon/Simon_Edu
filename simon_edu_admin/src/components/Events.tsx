@@ -48,6 +48,7 @@ export default function Events({ adminEmail }: EventsProps) {
   const [endDate, setEndDate] = useState('');
   const [targetRoles, setTargetRoles] = useState<string[]>([...PUBLISH_ROLES]);
   const [pushOnCreate, setPushOnCreate] = useState(true);
+  const [showHomePopup, setShowHomePopup] = useState(true);
   
   const [submitting, setSubmitting] = useState(false);
   const [examStartKey, setExamStartKey] = useState('1:1');
@@ -190,6 +191,7 @@ export default function Events({ adminEmail }: EventsProps) {
     setActive(true);
     setTargetRoles([...PUBLISH_ROLES]);
     setPushOnCreate(true);
+    setShowHomePopup(true);
     loadMissionSettings();
     
     // Default dates
@@ -217,6 +219,7 @@ export default function Events({ adminEmail }: EventsProps) {
     setEndDate(event.endDate);
     setTargetRoles(event.targetRoles && event.targetRoles.length > 0 ? event.targetRoles : [...PUBLISH_ROLES]);
     setPushOnCreate(event.pushOnCreate !== false);
+    setShowHomePopup(event.popup === true);
     loadMissionSettings();
     setShowModal(true);
   };
@@ -334,7 +337,7 @@ export default function Events({ adminEmail }: EventsProps) {
         rewardPoints: effectiveRewardPoints,
         imageUrl: uploadedImageUrl || fallbackImageUrl,
         homeBanner: uploadedImageUrl || fallbackImageUrl,
-        popup: active && pushOnCreate,
+        popup: showHomePopup,
         active,
         startDate,
         endDate,
@@ -773,6 +776,19 @@ export default function Events({ adminEmail }: EventsProps) {
                 />
                 <label htmlFor="evtPushOnCreate" style={{ cursor: 'pointer', margin: 0 }}>
                   저장 시 앱 알림 및 푸시 자동 등록 ({eventType === 'mission_exam' ? '특정사명자' : '전체인원'})
+                </label>
+              </div>
+
+              <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  id="evtShowHomePopup"
+                  checked={showHomePopup}
+                  onChange={(e) => setShowHomePopup(e.target.checked)}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <label htmlFor="evtShowHomePopup" style={{ cursor: 'pointer', margin: 0 }}>
+                  앱 홈 진입 시 이벤트 팝업 노출
                 </label>
               </div>
 
