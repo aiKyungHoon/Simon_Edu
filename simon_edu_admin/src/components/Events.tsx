@@ -345,6 +345,7 @@ export default function Events({ adminEmail }: EventsProps) {
         targetUsers: [],
         targetRoles: eventType === 'mission_exam' ? targetRoles : [],
         pushOnCreate,
+        updatedAt: new Date().getTime(),
       };
 
       await saveMissionSettingsForEvent();
@@ -355,19 +356,45 @@ export default function Events({ adminEmail }: EventsProps) {
         if (!isMock) {
           const eventRef = doc(db, 'events', editingEvent.id);
           await updateDoc(eventRef, eventData);
-        }
+          await logAdminAction(
+            'event_edit',
+            `이벤트 수정: ${title} (${effectiveRewardPoints}P)`,
+            editingEvent.id,
+            title
+          );
+          alert('이벤트가 수정되었습니다.');
+        } else {
+          // If it is a mock event, convert it to a real event by writing it to Firestore!
+          const docRef = await addDoc(collection(db, 'events'), {
+            ...eventData,
+            participantsCount: 0
+          });
 
-        await logAdminAction(
-          'event_edit',
-          `이벤트 수정: ${title} (${effectiveRewardPoints}P)`,
-          editingEvent.id,
-          title
-        );
+          if (active && pushOnCreate) {
+            await addDoc(collection(db, 'push_queue'), {
+              title: `이벤트 안내: ${title}`,
+              body: description,
+              target: eventType === 'mission_exam' ? targetRoles : [],
+              targetGroups: eventType === 'mission_exam' ? targetRoles : [],
+              targetUsers: [],
+              targetRoles: eventType === 'mission_exam' ? targetRoles : [],
+              eventId: docRef.id,
+              eventTitle: title,
+              status: 'pending',
+              createdAt: serverTimestamp(),
+              sentAt: null,
+              error: null
+            });
+          }
 
-        if (isMock) {
-          setEvents(events.map(e => e.id === editingEvent.id ? { ...e, ...eventData } : e));
+          await logAdminAction(
+            'event_create',
+            `이벤트 생성 (Mock에서 변환): ${title} (${effectiveRewardPoints}P)`,
+            docRef.id,
+            title
+          );
+          alert('이벤트가 데이터베이스에 실제 이벤트로 저장되었습니다.');
         }
-        alert('이벤트가 수정되었습니다.');
       } else {
         // Create Mode
         const docRef = await addDoc(collection(db, 'events'), {

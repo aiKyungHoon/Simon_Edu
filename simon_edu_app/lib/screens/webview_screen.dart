@@ -54,10 +54,8 @@ class _WebViewScreenState extends State<WebViewScreen>
   bool _isProfileLoading = true;
   List<dynamic> _pointsHistory = [];
 
-  static const String _appWebVersion = '1.5.17';
-  final String _targetUrl = kDebugMode
-      ? 'http://localhost:8080?platform=app&app_v=$_appWebVersion'
-      : 'https://simon-edu-bible-game.firebaseapp.com?platform=app&app_v=$_appWebVersion';
+  static const String _appWebVersion = '1.5.23';
+  final String _targetUrl = 'https://simon-edu-bible-game.firebaseapp.com?platform=app&app_v=$_appWebVersion';
 
   @override
   void initState() {
@@ -518,6 +516,10 @@ class _WebViewScreenState extends State<WebViewScreen>
     switch (view) {
       case 'game':
         return '암송 챌린지';
+      case 'events':
+        return '이벤트';
+      case 'eventDetail':
+        return '이벤트 상세';
       case 'notices':
         return '공지사항';
       case 'noticeDetail':
@@ -567,7 +569,7 @@ class _WebViewScreenState extends State<WebViewScreen>
       _hideBottomNav = false;
     });
     _controller!.runJavaScript(
-        'if (window.app && window.app.switchView) { window.app.switchView("events"); }');
+        'if (window.app && window.app.openEvents) { window.app.openEvents(); } else if (window.app && window.app.switchView) { window.app.switchView("events"); }');
   }
 
   void _openNoticesFromSettings() {

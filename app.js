@@ -99,9 +99,12 @@ class SimonEduApp {
     this.eventCorrectCount = 0;
     this.eventIncorrectCount = 0;
     this.examSubmissions = null;
+    this.missionExamSubmissions = [];
+    this.missionExamListenerUnsubscribe = null;
     this.activeEvents = [];
     this.currentRankingTab = 'all';
     this.currentEventDetail = null;
+    this.shownEventAnnouncementIds = [];
 
     this.crews = [];
     this.battles = [];
@@ -185,6 +188,8 @@ class SimonEduApp {
           });
       } else {
         this.currentUser = null;
+        this.stopMissionExamRankingListener();
+        this.missionExamSubmissions = [];
         document.body.classList.remove('logged-in');
         const userNav = document.getElementById('userNav');
         if (userNav) userNav.style.display = 'none';
@@ -337,7 +342,7 @@ class SimonEduApp {
     // Sync active events for in-app event popup
     db.collection('events').onSnapshot(snapshot => {
       this.activeEvents = [];
-      const today = new Date().toISOString().split('T')[0];
+      const today = this.getRelativeDateStr(0);
       snapshot.forEach(doc => {
         const eventData = { id: doc.id, ...doc.data() };
         const startsOk = !eventData.startDate || eventData.startDate <= today;
@@ -368,6 +373,7 @@ class SimonEduApp {
     }, error => {
       console.error("Firestore events snapshot sync error:", error);
     });
+
 
     // Sync crews in real-time
     db.collection('crews').onSnapshot(snapshot => {
@@ -912,6 +918,8 @@ class SimonEduApp {
     if (this.currentUser && this.currentUser.isTrial) {
       this.currentUser = null;
       this.isTrialMode = false;
+      this.stopMissionExamRankingListener();
+      this.missionExamSubmissions = [];
       document.body.classList.remove('logged-in');
       const authForm = document.getElementById('authForm');
       if (authForm) authForm.reset();
@@ -926,6 +934,8 @@ class SimonEduApp {
     auth.signOut()
       .then(() => {
         this.currentUser = null;
+        this.stopMissionExamRankingListener();
+        this.missionExamSubmissions = [];
         const authForm = document.getElementById('authForm');
         if (authForm) authForm.reset();
         const userNav = document.getElementById('userNav');
@@ -1046,7 +1056,7 @@ class SimonEduApp {
     const activeView = document.getElementById(viewName + 'View');
     if (activeView) {
       activeView.classList.add('active');
-      if (this.isMobileApp && ['game', 'notices', 'noticeDetail'].includes(viewName)) {
+      if (this.isMobileApp && ['game', 'notices', 'noticeDetail', 'events', 'eventDetail'].includes(viewName)) {
         activeView.classList.remove('app-page-enter');
         void activeView.offsetWidth;
         activeView.classList.add('app-page-enter');
@@ -1145,6 +1155,8 @@ class SimonEduApp {
         this.startTestMode();
       } else if (payload.action === 'openNotice') {
         this.openNotice(payload.noticeId);
+      } else if (payload.action === 'openEvent') {
+        this.openEventFromHome(payload.eventId);
       } else if (payload.action === 'startChapterTestFromDetail') {
         this.startChapterTestFromDetail();
       } else if (payload.action === 'clickChapterCard') {
@@ -1161,6 +1173,7 @@ class SimonEduApp {
   }
 
   openNotices() {
+    this.noticesPrevView = this.currentViewName || 'dashboard';
     if (this.requestNativeScreen('notices', {
       title: '공지사항',
       action: 'switchView'
@@ -1168,6 +1181,17 @@ class SimonEduApp {
       return;
     }
     this.switchView('notices');
+  }
+
+  openEvents() {
+    this.eventsPrevView = this.currentViewName || 'dashboard';
+    if (this.requestNativeScreen('events', {
+      title: '이벤트',
+      action: 'switchView'
+    })) {
+      return;
+    }
+    this.switchView('events');
   }
 
   handlePointBadgeClick() {
@@ -1255,6 +1279,7 @@ class SimonEduApp {
     // Initialize FAB visibility
     this.updateFabVisibility();
 
+    this.startMissionExamRankingListener();
     this.renderNotifications();
     this.updateExamEntryVisibility();
     this.maybeShowEventAnnouncement();
@@ -2854,15 +2879,6 @@ class SimonEduApp {
     `).join('');
   }
 
-  setRankingTab(tabName) {
-    this.currentRankingTab = tabName;
-    document.querySelectorAll('.ranking-tab').forEach(tab => tab.classList.remove('active'));
-    const tabId = `rankTab${tabName.charAt(0).toUpperCase()}${tabName.slice(1)}`;
-    const target = document.getElementById(tabId);
-    if (target) target.classList.add('active');
-    this.renderJourneyRanking();
-  }
-
   renderFriendsPanel() {
     const list = document.getElementById('friendsList');
     const feed = document.getElementById('friendActivityFeed');
@@ -2915,7 +2931,155 @@ class SimonEduApp {
   }
 
   getWeeklyFaithXp(user) {
-    return Number(user.weeklyFaithXP ?? user.weeklyFaithXp ?? user.faithXPThisWeek ?? user.faithXpThisWeek ?? user.faithXP ?? user.faithXp ?? user.points ?? 0);
+    return Number(user.weeklyFaithXP ?? user.weeklyFaithXp ?? user.faithXPThisWeek ?? user.faithXpThisWeek ?? user.weeklyPoints ?? user.pointsThisWeek ?? 0);
+  }
+
+  getRankingScore(user, tab = this.currentRankingTab || 'all') {
+    return tab === 'weekly' ? this.getWeeklyFaithXp(user) : this.getRankingXp(user);
+  }
+
+  getRankedUsers(tab = this.currentRankingTab || 'all') {
+    const sortedUsers = [...this.users].sort((a, b) => this.getRankingScore(b, tab) - this.getRankingScore(a, tab));
+    let currentRank = 1;
+    for (let i = 0; i < sortedUsers.length; i++) {
+      if (i > 0 && this.getRankingScore(sortedUsers[i], tab) < this.getRankingScore(sortedUsers[i - 1], tab)) {
+        currentRank = i + 1;
+      }
+      sortedUsers[i].rank = currentRank;
+    }
+    return sortedUsers;
+  }
+
+  getUserDisplayName(user) {
+    return user?.username || user?.name || user?.email || '사용자';
+  }
+
+  getUserInitial(user) {
+    return this.getUserDisplayName(user).trim().charAt(0) || 'U';
+  }
+
+  canViewMissionExamRanking() {
+    if (!this.currentUser || this.currentUser.isTrial) return false;
+    const role = String(this.currentUser.role || 'user').trim().toLowerCase();
+    return !['user', 'general', '일반'].includes(role);
+  }
+
+  startMissionExamRankingListener() {
+    if (!this.canViewMissionExamRanking()) {
+      this.stopMissionExamRankingListener();
+      this.missionExamSubmissions = [];
+      return;
+    }
+    if (this.missionExamListenerUnsubscribe) return;
+
+    this.missionExamListenerUnsubscribe = db.collection('mission_exam_submissions').onSnapshot(snapshot => {
+      this.missionExamSubmissions = [];
+      snapshot.forEach(doc => {
+        this.missionExamSubmissions.push({ id: doc.id, ...doc.data() });
+      });
+
+      const rankingView = document.getElementById('rankingView');
+      if (rankingView && rankingView.classList.contains('active')) {
+        this.renderLeaderboardWidget();
+      }
+    }, error => {
+      console.error("Firestore mission_exam_submissions snapshot sync error:", error);
+    });
+  }
+
+  stopMissionExamRankingListener() {
+    if (this.missionExamListenerUnsubscribe) {
+      this.missionExamListenerUnsubscribe();
+      this.missionExamListenerUnsubscribe = null;
+    }
+  }
+
+  getMissionExamRankedRows() {
+    const rowsByKey = new Map();
+    const pushRow = (row) => {
+      if (!row) return;
+      const applicantName = String(row.applicantName || row.name || row.username || '').trim();
+      const region = String(row.region || '').trim();
+      const score = Number(row.score ?? row.bestScore ?? row.lastScore ?? 0);
+      if (!applicantName && score <= 0) return;
+
+      const key = row.regionNameKey || `${region}_${applicantName}` || row.id || `row_${rowsByKey.size}`;
+      const normalized = {
+        ...row,
+        applicantName: applicantName || '응시자',
+        region,
+        score,
+        attemptCount: Number(row.attemptCount ?? row.attempts?.length ?? 0),
+        updatedMillis: this.getMillisFromDateValue(row.updatedAt || row.lastAttemptDate || row.submittedAt),
+        userId: row.lastUserId || row.userId || row.id
+      };
+
+      const prev = rowsByKey.get(key);
+      if (
+        !prev ||
+        normalized.score > prev.score ||
+        (normalized.score === prev.score && normalized.attemptCount > prev.attemptCount) ||
+        (normalized.score === prev.score && normalized.attemptCount === prev.attemptCount && normalized.updatedMillis > prev.updatedMillis)
+      ) {
+        rowsByKey.set(key, normalized);
+      }
+    };
+
+    (this.missionExamSubmissions || []).forEach(pushRow);
+    (this.users || []).forEach(user => {
+      if (user?.examSubmission) {
+        pushRow({
+          ...user.examSubmission,
+          id: `legacy_${user.id}`,
+          userId: user.id,
+          applicantName: user.examSubmission.applicantName || user.examSubmission.name || user.username || user.name,
+          region: user.examSubmission.region || user.region || ''
+        });
+      }
+    });
+
+    const sortedRows = [...rowsByKey.values()].sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.attemptCount !== a.attemptCount) return b.attemptCount - a.attemptCount;
+      return b.updatedMillis - a.updatedMillis;
+    });
+
+    let currentRank = 1;
+    for (let i = 0; i < sortedRows.length; i++) {
+      if (i > 0 && sortedRows[i].score < sortedRows[i - 1].score) {
+        currentRank = i + 1;
+      }
+      sortedRows[i].rank = currentRank;
+    }
+    return sortedRows;
+  }
+
+  getMillisFromDateValue(value) {
+    if (!value) return 0;
+    if (typeof value.toMillis === 'function') return value.toMillis();
+    if (typeof value.seconds === 'number') return value.seconds * 1000;
+    if (typeof value === 'number') return value;
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  getMissionExamEventForRanking() {
+    return (this.activeEvents || []).find(evt => evt.eventType === 'mission_exam' && this._eventTargetsCurrentUser(evt));
+  }
+
+  formatEventDateRange(eventItem) {
+    if (!eventItem) return '';
+    const start = eventItem.startDate ? this.formatDateKoreanShort(eventItem.startDate) : '';
+    const end = eventItem.endDate ? this.formatDateKoreanShort(eventItem.endDate) : '';
+    if (start && end) return `${start} ~ ${end}`;
+    return start || end || '';
+  }
+
+  formatDateKoreanShort(dateStr) {
+    if (!dateStr) return '';
+    const parts = String(dateStr).split('-');
+    if (parts.length !== 3) return dateStr;
+    return `${parts[0]}.${parts[1]}.${parts[2]}`;
   }
 
   getUserTitle(user) {
@@ -3022,6 +3186,16 @@ class SimonEduApp {
     if (!eventItem) return;
     this.currentEvent = eventItem;
     this.currentEventDetail = eventItem;
+
+    const eventTitle = eventItem.title || this.getEventTypeLabel(eventItem) || '이벤트 상세';
+
+    if (this.requestNativeScreen('eventDetail', {
+      title: eventTitle,
+      action: 'openEvent',
+      eventId: eventId
+    })) {
+      return;
+    }
     this.switchView('eventDetail');
   }
 
@@ -3035,8 +3209,14 @@ class SimonEduApp {
     }
     this.currentEventDetail = eventItem;
     this.currentEvent = eventItem;
-    const status = this.getEventParticipationStatus(eventItem);
+
     const typeLabel = this.getEventTypeLabel(eventItem);
+    const headerTitleEl = document.getElementById('eventDetailHeaderTitle');
+    if (headerTitleEl) {
+      headerTitleEl.textContent = eventItem.title || typeLabel || '이벤트 상세';
+    }
+
+    const status = this.getEventParticipationStatus(eventItem);
     const targetLabel = this.getEventTargetLabel(eventItem);
     const buttonLabel = status === 'completed' ? '결과 보기' : status === 'in_progress' ? '이어하기' : '정보 입력 후 시험 시작하기';
     const bannerUrl = this.getEventBannerUrl(eventItem);
@@ -3649,19 +3829,56 @@ class SimonEduApp {
     if (!list) return;
     list.innerHTML = '';
 
-    // Sort all users by points descending
-    const sortedUsers = [...this.users].sort((a, b) => this.getRankingXp(b) - this.getRankingXp(a));
-    
-    // Compute joint ranks (standard competition ranking: 1-2-2-4)
-    let currentRank = 1;
-    for (let i = 0; i < sortedUsers.length; i++) {
-      if (i > 0 && this.getRankingXp(sortedUsers[i]) < this.getRankingXp(sortedUsers[i - 1])) {
-        currentRank = i + 1;
-      }
-      sortedUsers[i].rank = currentRank;
+    let tab = this.currentRankingTab || 'all';
+    const canViewMissionExam = this.canViewMissionExamRanking();
+    if (tab === 'mission_exam' && !canViewMissionExam) {
+      tab = 'all';
+      this.currentRankingTab = 'all';
+    }
+    const tabWrap = document.querySelector('#rankingView .ranking-tabs');
+    const missionTab = document.getElementById('rankingTabMissionExam');
+    if (tabWrap) tabWrap.classList.toggle('has-mission-tab', canViewMissionExam);
+    if (missionTab) missionTab.style.display = canViewMissionExam ? '' : 'none';
+    document.getElementById('rankingTabAll')?.classList.toggle('active', tab === 'all');
+    document.getElementById('rankingTabWeekly')?.classList.toggle('active', tab === 'weekly');
+    document.getElementById('rankingTabMissionExam')?.classList.toggle('active', tab === 'mission_exam');
+    const labelEl = document.getElementById('userRankingLabel');
+    if (labelEl) {
+      const label = tab === 'mission_exam' ? '사명자 시험 나의 랭킹' : (tab === 'weekly' ? '이번 주 나의 랭킹' : '실시간 나의 랭킹');
+      labelEl.innerHTML = `${label} <span class="material-icons-round">info</span>`;
+    }
+    const detailsLink = document.querySelector('#rankingView .rank-details-link span');
+    if (detailsLink && tab !== 'mission_exam') {
+      detailsLink.textContent = '전체 랭킹 확인하기';
     }
 
-    // Find current user's rank
+    if (tab === 'mission_exam') {
+      this.renderMissionExamRankingWidget(list);
+      return;
+    }
+
+    const sortedUsers = this.getRankedUsers(tab);
+    if (sortedUsers.length === 0) {
+      list.innerHTML = '<div class="home-empty-state">아직 랭킹 데이터가 없습니다.</div>';
+      return;
+    }
+    const hasScoreData = sortedUsers.some(user => this.getRankingScore(user, tab) > 0);
+    if (tab === 'weekly' && !hasScoreData) {
+      const rankTextEl = document.getElementById('userRankingText');
+      const rankPctEl = document.getElementById('userRankingPct');
+      if (rankTextEl) rankTextEl.textContent = '-위';
+      if (rankPctEl) rankPctEl.textContent = '이번 주 랭킹 데이터가 아직 없습니다.';
+      list.innerHTML = `
+        <div class="ranking-weekly-empty">
+          <span class="material-icons-round">event_repeat</span>
+          <strong>이번 주 랭킹 집계 전입니다.</strong>
+          <p>주간 포인트가 쌓이면 이곳에 이번 주 Top 10이 표시됩니다.</p>
+          <small>주간 랭킹은 주간 점수 필드 기준으로만 계산됩니다.</small>
+        </div>
+      `;
+      return;
+    }
+
     if (this.currentUser) {
       const myUser = sortedUsers.find(u => u.id === this.currentUser.id);
       const myRank = myUser ? myUser.rank : 1;
@@ -3684,7 +3901,7 @@ class SimonEduApp {
         if (this.currentUser.isTrial) {
           rankTextEl.textContent = `체험 모드 (랭킹 미등록)`;
         } else {
-          rankTextEl.textContent = `현재 ${myRank}위입니다!`;
+          rankTextEl.textContent = `${myRank}위`;
         }
       }
       const rankPctEl = document.getElementById('userRankingPct');
@@ -3695,35 +3912,56 @@ class SimonEduApp {
           rankPctEl.textContent = `전체 ${totalCount}명 중 상위 ${rankPercentage}%`;
         }
       }
+    }
 
-      // Render Top 10 users
-      sortedUsers.slice(0, 10).forEach((user) => {
-        const rank = user.rank;
-        const isMe = user.id === this.currentUser.id;
-        
-        const item = document.createElement('div');
-        item.className = `leaderboard-item ${isMe ? 'me' : ''}`;
+    const topThree = sortedUsers.slice(0, 3);
+    const podiumOrder = [topThree[1], topThree[0], topThree[2]].filter(Boolean);
+    const topThreeHtml = podiumOrder.map(user => {
+      const rank = user.rank;
+      const isMe = this.currentUser && user.id === this.currentUser.id;
+      const score = this.getRankingScore(user, tab);
+      return `
+        <div class="ranking-podium-card rank-${rank} ${isMe ? 'me' : ''}">
+          <span class="ranking-podium-medal" ${rank === 1 ? 'style="background:none; box-shadow:none; font-size:1.35rem; top:-0.8rem; right:0.4rem;"' : ''}>${rank === 1 ? '👑' : rank}</span>
+          <div class="ranking-podium-avatar">${this.escapeHtml(this.getUserInitial(user))}</div>
+          <strong>${this.escapeHtml(this.getUserDisplayName(user))}</strong>
+          <b>${score.toLocaleString()}P</b>
+        </div>
+      `;
+    }).join('');
 
-        // Rank Badge styling
-        let rankBadgeClass = 'rank-badge';
-        if (rank === 1) rankBadgeClass += ' rank-1';
-        else if (rank === 2) rankBadgeClass += ' rank-2';
-        else if (rank === 3) rankBadgeClass += ' rank-3';
+    const topIds = new Set(topThree.map(user => user.id));
+    const lowerUsers = sortedUsers
+      .filter(user => !topIds.has(user.id))
+      .slice(0, 7);
 
-        item.innerHTML = `
-          <div class="${rankBadgeClass}">${rank}</div>
-          <div class="leaderboard-avatar">${user.name.charAt(0)}</div>
-          <div class="leaderboard-name">${user.username || user.name} ${isMe ? '<span style="color:#d8b4fe; font-size:0.75rem;">(나)</span>' : ''}<span class="rank-item-badge">${this.getUserTitle(user)}</span></div>
-          <div class="leaderboard-points">${this.getRankingXp(user).toLocaleString()}</div>
-          ${!isMe && !this.hideBattleMode ? `
-          <button class="btn-mini" onclick="app.requestOneOnOneBattle('${user.id}', '${user.name}')" style="margin-left: 0.75rem;" title="1대1 대결 신청">
-            ⚔️
-          </button>
-          ` : ''}
-        `;
-        
-        list.appendChild(item);
-      });
+    const lowerRowsHtml = lowerUsers.map(user => this.renderRankingRow(user, tab)).join('');
+    const myUser = this.currentUser ? sortedUsers.find(user => user.id === this.currentUser.id) : null;
+    const shouldShowMyFixedRow = myUser && !sortedUsers.slice(0, 10).some(user => user.id === myUser.id);
+
+    list.innerHTML = `
+      ${tab === 'weekly' ? `
+        <div class="ranking-weekly-note">
+          <span class="material-icons-round">verified</span>
+          <span>이번 주 활동 포인트 기준 랭킹입니다.</span>
+        </div>
+      ` : ''}
+      <div class="ranking-podium">
+        ${topThreeHtml}
+      </div>
+      <div class="ranking-list-card">
+        ${lowerRowsHtml || '<div class="home-empty-state">추가 랭킹이 없습니다.</div>'}
+      </div>
+      ${shouldShowMyFixedRow ? `
+        <div class="ranking-my-fixed">
+          ${this.renderRankingRow(myUser, tab, true)}
+        </div>
+      ` : ''}
+    `;
+
+    if (myUser && sortedUsers.slice(0, 10).some(user => user.id === myUser.id)) {
+      const row = list.querySelector(`.ranking-row[data-user-id="${myUser.id}"]`);
+      if (row) row.classList.add('me');
     }
 
     // Re-render popup if it is open
@@ -3733,6 +3971,143 @@ class SimonEduApp {
       const filterText = searchInput ? searchInput.value : '';
       this.renderAllRankingsPopupList(filterText);
     }
+  }
+
+  renderMissionExamRankingWidget(list) {
+    const sortedRows = this.getMissionExamRankedRows();
+    const rankTextEl = document.getElementById('userRankingText');
+    const rankPctEl = document.getElementById('userRankingPct');
+    const detailsLink = document.querySelector('#rankingView .rank-details-link span');
+    if (detailsLink) detailsLink.textContent = '사명자 시험 랭킹 확인하기';
+
+    const myRow = this.currentUser
+      ? sortedRows.find(row => row.userId === this.currentUser.id || row.lastUserId === this.currentUser.id)
+      : null;
+
+    if (sortedRows.length === 0) {
+      if (rankTextEl) rankTextEl.textContent = '-위';
+      if (rankPctEl) rankPctEl.textContent = '사명자 시험 응시 데이터가 아직 없습니다.';
+      list.innerHTML = `
+        <div class="ranking-weekly-empty ranking-mission-empty">
+          <span class="material-icons-round">assignment_turned_in</span>
+          <strong>사명자 시험 랭킹 집계 전입니다.</strong>
+          <p>응시 결과가 저장되면 이곳에 사명자 시험 Top 10이 표시됩니다.</p>
+        </div>
+      `;
+      return;
+    }
+
+    if (myRow) {
+      const totalCount = sortedRows.length;
+      const rankPercentage = totalCount > 0 ? Math.round((myRow.rank / totalCount) * 100) : 0;
+      if (rankTextEl) rankTextEl.textContent = `${myRow.rank}위`;
+      if (rankPctEl) rankPctEl.textContent = `전체 ${totalCount}명 중 상위 ${rankPercentage}%`;
+    } else {
+      if (rankTextEl) rankTextEl.textContent = '-위';
+      if (rankPctEl) rankPctEl.textContent = '사명자 시험 응시 내역이 없습니다.';
+    }
+
+    const eventItem = this.getMissionExamEventForRanking();
+    const eventRange = this.formatEventDateRange(eventItem);
+    const eventBannerHtml = eventItem ? `
+      <div class="ranking-mission-banner">
+        <span class="material-icons-round">verified</span>
+        <div>
+          <strong>${this.escapeHtml(eventItem.title || '사명자 시험')}</strong>
+          <p>${eventRange ? this.escapeHtml(eventRange) : '진행 중인 사명자 시험'}</p>
+        </div>
+      </div>
+    ` : '';
+
+    const topThree = sortedRows.slice(0, 3);
+    const podiumOrder = [topThree[1], topThree[0], topThree[2]].filter(Boolean);
+    const topThreeHtml = podiumOrder.map(row => {
+      const isMe = this.currentUser && (row.userId === this.currentUser.id || row.lastUserId === this.currentUser.id);
+      return `
+        <div class="ranking-podium-card rank-${row.rank} ${isMe ? 'me' : ''}">
+          <span class="ranking-podium-medal" ${row.rank === 1 ? 'style="background:none; box-shadow:none; font-size:1.35rem; top:-0.8rem; right:0.4rem;"' : ''}>${row.rank === 1 ? '👑' : row.rank}</span>
+          <div class="ranking-podium-avatar">${this.escapeHtml((row.applicantName || '응').charAt(0))}</div>
+          <strong>${this.escapeHtml(row.applicantName || '응시자')}</strong>
+          <b>${Number(row.score || 0).toLocaleString()}점</b>
+        </div>
+      `;
+    }).join('');
+
+    const topIds = new Set(topThree.map(row => row.id || row.regionNameKey));
+    const lowerRows = sortedRows
+      .filter(row => !topIds.has(row.id || row.regionNameKey))
+      .slice(0, 7);
+    const lowerRowsHtml = lowerRows.map(row => this.renderMissionExamRankingRow(row)).join('');
+    const shouldShowMyFixedRow = myRow && !sortedRows.slice(0, 10).some(row => row === myRow);
+
+    list.innerHTML = `
+      ${eventBannerHtml}
+      <div class="ranking-podium">
+        ${topThreeHtml}
+      </div>
+      <div class="ranking-list-card">
+        ${lowerRowsHtml || '<div class="home-empty-state">추가 랭킹이 없습니다.</div>'}
+      </div>
+      ${shouldShowMyFixedRow ? `
+        <div class="ranking-my-fixed">
+          ${this.renderMissionExamRankingRow(myRow, true)}
+        </div>
+      ` : ''}
+    `;
+
+    const modal = document.getElementById('modalAllRankings');
+    if (modal && modal.classList.contains('active')) {
+      const searchInput = document.getElementById('rankingSearchInput');
+      const filterText = searchInput ? searchInput.value : '';
+      this.renderAllRankingsPopupList(filterText);
+    }
+  }
+
+  renderMissionExamRankingRow(row, fixed = false) {
+    const isMe = this.currentUser && (row.userId === this.currentUser.id || row.lastUserId === this.currentUser.id);
+    const rowId = row.id || row.regionNameKey || `${row.region || ''}_${row.applicantName || ''}`;
+    return `
+      <div class="ranking-row ${isMe ? 'me' : ''} ${fixed ? 'fixed' : ''}" data-exam-row-id="${this.escapeHtml(rowId)}">
+        <span class="ranking-row-rank" ${row.rank === 1 ? 'style="font-size: 1.15rem;"' : ''}>${row.rank === 1 ? '👑' : row.rank}</span>
+        <span class="ranking-row-avatar">${this.escapeHtml((row.applicantName || '응').charAt(0))}</span>
+        <strong>
+          ${isMe ? '나의 계정' : this.escapeHtml(row.applicantName || '응시자')}
+          ${row.region ? `<small>${this.escapeHtml(row.region)}</small>` : ''}
+        </strong>
+        <b>${Number(row.score || 0).toLocaleString()}점</b>
+      </div>
+    `;
+  }
+
+  renderRankingRow(user, tab = this.currentRankingTab || 'all', fixed = false) {
+    const rank = user.rank;
+    const isMe = this.currentUser && user.id === this.currentUser.id;
+    const score = this.getRankingScore(user, tab);
+    return `
+      <div class="ranking-row ${isMe ? 'me' : ''} ${fixed ? 'fixed' : ''}" data-user-id="${this.escapeHtml(user.id || '')}">
+        <span class="ranking-row-rank" ${rank === 1 ? 'style="font-size: 1.15rem;"' : ''}>${rank === 1 ? '👑' : rank}</span>
+        <span class="ranking-row-avatar">${this.escapeHtml(this.getUserInitial(user))}</span>
+        <strong>${isMe ? '나의 계정' : this.escapeHtml(this.getUserDisplayName(user))}</strong>
+        <b>${score.toLocaleString()}P</b>
+      </div>
+    `;
+  }
+
+  setRankingTab(tabName) {
+    if (tabName === 'mission_exam') {
+      this.currentRankingTab = this.canViewMissionExamRanking() ? 'mission_exam' : 'all';
+    } else {
+      this.currentRankingTab = tabName === 'weekly' ? 'weekly' : 'all';
+    }
+    this.renderLeaderboardWidget();
+  }
+
+  openRankingGuide() {
+    const missionItem = document.getElementById('rankingGuideMissionItem');
+    if (missionItem) {
+      missionItem.style.display = this.canViewMissionExamRanking() ? '' : 'none';
+    }
+    this.openModal('modalRankingGuide');
   }
 
   // 5.4.2 Overall Rankings Popup (v1.2.0)
@@ -3749,6 +4124,19 @@ class SimonEduApp {
     const list = document.getElementById('allRankingsList');
     if (!list) return;
     list.innerHTML = '';
+    const modalTitle = document.querySelector('#modalAllRankings .modal-title');
+
+    if (this.currentRankingTab === 'mission_exam' && this.canViewMissionExamRanking()) {
+      if (modalTitle) {
+        modalTitle.innerHTML = '<span class="material-icons-round" style="color: #f59e0b;">assignment_turned_in</span>사명자 시험 랭킹';
+      }
+      this.renderMissionExamRankingsPopupList(list, filterText);
+      return;
+    }
+
+    if (modalTitle) {
+      modalTitle.innerHTML = '<span class="material-icons-round" style="color: #f59e0b;">military_tech</span>전체 랭킹';
+    }
 
     // Sort all users by points descending
     const sortedUsers = [...this.users].sort((a, b) => this.getRankingXp(b) - this.getRankingXp(a));
@@ -3765,7 +4153,7 @@ class SimonEduApp {
     // Filter users by search term
     const cleanFilter = filterText.trim().toLowerCase();
     const filteredUsers = sortedUsers.filter(user => 
-      user.name.toLowerCase().includes(cleanFilter)
+      this.getUserDisplayName(user).toLowerCase().includes(cleanFilter)
     );
 
     // Update current user's summary inside popup if found
@@ -3810,10 +4198,12 @@ class SimonEduApp {
       else if (rank === 2) rankBadgeClass += ' rank-2';
       else if (rank === 3) rankBadgeClass += ' rank-3';
 
+      const rankBadgeStyle = rank === 1 ? 'style="font-size: 1rem; background: linear-gradient(135deg, #ffd700, #ffa500); border: none; box-shadow: 0 0 6px rgba(255, 215, 0, 0.5);"' : '';
+
       item.innerHTML = `
-        <div class="${rankBadgeClass}">${rank}</div>
-        <div class="all-ranking-avatar">${user.name.charAt(0)}</div>
-        <div class="all-ranking-name">${user.username || user.name} ${isMe ? '<span style="color:var(--text-muted); font-size:0.75rem; font-weight:normal;">(나)</span>' : ''}<span class="rank-item-badge">${this.getUserTitle(user)}</span></div>
+        <div class="${rankBadgeClass}" ${rankBadgeStyle}>${rank === 1 ? '👑' : rank}</div>
+        <div class="all-ranking-avatar">${this.escapeHtml(this.getUserInitial(user))}</div>
+        <div class="all-ranking-name">${this.escapeHtml(this.getUserDisplayName(user))} ${isMe ? '<span style="color:var(--text-muted); font-size:0.75rem; font-weight:normal;">(나)</span>' : ''}</div>
         <div class="all-ranking-points">${this.getRankingXp(user).toLocaleString()}</div>
         ${!isMe && !this.hideBattleMode ? `
         <button class="btn-mini" onclick="app.requestOneOnOneBattle('${user.id}', '${user.name}')" style="margin-left: 0.75rem;" title="1대1 대결 신청">
@@ -3834,6 +4224,66 @@ class SimonEduApp {
         }
       }, 100);
     }
+  }
+
+  renderMissionExamRankingsPopupList(list, filterText = '') {
+    const sortedRows = this.getMissionExamRankedRows();
+    const cleanFilter = filterText.trim().toLowerCase();
+    const filteredRows = sortedRows.filter(row => {
+      const haystack = `${row.applicantName || ''} ${row.region || ''}`.toLowerCase();
+      return haystack.includes(cleanFilter);
+    });
+    const myRow = this.currentUser
+      ? sortedRows.find(row => row.userId === this.currentUser.id || row.lastUserId === this.currentUser.id)
+      : null;
+
+    const popupMyRankText = document.getElementById('popupMyRankText');
+    const popupMyPointsText = document.getElementById('popupMyPointsText');
+    const popupMyPctText = document.getElementById('popupMyPctText');
+    if (myRow) {
+      const rankPercentage = sortedRows.length > 0 ? Math.round((myRow.rank / sortedRows.length) * 100) : 0;
+      if (popupMyRankText) popupMyRankText.textContent = `${myRow.rank} 위`;
+      if (popupMyPointsText) popupMyPointsText.textContent = `${Number(myRow.score || 0).toLocaleString()} 점`;
+      if (popupMyPctText) popupMyPctText.textContent = `전체 중 상위 ${rankPercentage}%`;
+    } else {
+      if (popupMyRankText) popupMyRankText.textContent = '- 위';
+      if (popupMyPointsText) popupMyPointsText.textContent = '- 점';
+      if (popupMyPctText) popupMyPctText.textContent = '응시 내역 없음';
+    }
+
+    if (filteredRows.length === 0) {
+      const emptyItem = document.createElement('div');
+      emptyItem.style.padding = '2rem';
+      emptyItem.style.textAlign = 'center';
+      emptyItem.style.color = 'var(--text-muted)';
+      emptyItem.style.fontSize = '0.9rem';
+      emptyItem.textContent = '검색 결과가 없습니다.';
+      list.appendChild(emptyItem);
+      return;
+    }
+
+    filteredRows.forEach(row => {
+      const isMe = this.currentUser && (row.userId === this.currentUser.id || row.lastUserId === this.currentUser.id);
+      const item = document.createElement('div');
+      item.className = `all-ranking-item ${isMe ? 'me' : ''}`;
+      let rankBadgeClass = 'rank-badge';
+      if (row.rank === 1) rankBadgeClass += ' rank-1';
+      else if (row.rank === 2) rankBadgeClass += ' rank-2';
+      else if (row.rank === 3) rankBadgeClass += ' rank-3';
+
+      const rankBadgeStyle = row.rank === 1 ? 'style="font-size: 1rem; background: linear-gradient(135deg, #ffd700, #ffa500); border: none; box-shadow: 0 0 6px rgba(255, 215, 0, 0.5);"' : '';
+
+      item.innerHTML = `
+        <div class="${rankBadgeClass}" ${rankBadgeStyle}>${row.rank === 1 ? '👑' : row.rank}</div>
+        <div class="all-ranking-avatar">${this.escapeHtml((row.applicantName || '응').charAt(0))}</div>
+        <div class="all-ranking-name">
+          ${this.escapeHtml(row.applicantName || '응시자')} ${isMe ? '<span style="color:var(--text-muted); font-size:0.75rem; font-weight:normal;">(나)</span>' : ''}
+          ${row.region ? `<span style="display:block; color:var(--text-muted); font-size:0.72rem; font-weight:600;">${this.escapeHtml(row.region)}</span>` : ''}
+        </div>
+        <div class="all-ranking-points">${Number(row.score || 0).toLocaleString()}점</div>
+      `;
+      list.appendChild(item);
+    });
   }
 
   filterAllRankings() {
@@ -3934,19 +4384,76 @@ class SimonEduApp {
   }
 
   maybeShowEventAnnouncement() {
-    if (!this.currentUser || this.currentUser.isTrial || !Array.isArray(this.activeEvents)) return;
+    const isDebug = window.location.search.includes('debug_popup=true');
+    if (isDebug) {
+      console.log("[DEBUG POPUP] maybeShowEventAnnouncement called.");
+      console.log("[DEBUG POPUP] currentUser:", this.currentUser);
+      console.log("[DEBUG POPUP] activeEvents:", this.activeEvents);
+      // Clear event-related keys to force popup to show
+      this.shownEventAnnouncementIds = [];
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('simon_event_seen_') || key.startsWith('simon_event_hide_')) {
+          console.log(`[DEBUG POPUP] Clearing key from localStorage: ${key}`);
+          localStorage.removeItem(key);
+        }
+      });
+    }
+
+    if (!this.currentUser || this.currentUser.isTrial || !Array.isArray(this.activeEvents)) {
+      if (isDebug) {
+        if (!this.currentUser) console.log("[DEBUG POPUP] Returned early: currentUser is null");
+        else if (this.currentUser.isTrial) console.log("[DEBUG POPUP] Returned early: currentUser is a trial user");
+        else if (!Array.isArray(this.activeEvents)) console.log("[DEBUG POPUP] Returned early: activeEvents is not an array");
+      }
+      return;
+    }
+
     const today = this.getRelativeDateStr(0);
     const eventItem = this.activeEvents.find(evt => {
-      if (!this._eventTargetsCurrentUser(evt)) return false;
-      if (evt.popup !== true) return false;
+      const targetsUser = this._eventTargetsCurrentUser(evt);
       const todayHideKey = `simon_event_hide_today_${evt.id}_${this.getRelativeDateStr(0)}`;
-      if (localStorage.getItem(todayHideKey) === '1') return false;
-      return localStorage.getItem(`simon_event_seen_${evt.id}_${today}`) !== '1';
+      const isHiddenToday = localStorage.getItem(todayHideKey) === '1';
+      
+      const isSeen = this.shownEventAnnouncementIds.includes(evt.id);
+
+      if (isDebug) {
+        console.log(`[DEBUG POPUP] Checking event "${evt.title || 'No Title'}" (id: ${evt.id}):`);
+        console.log(`  - Targets user: ${targetsUser}`);
+        console.log(`  - popup configured: ${evt.popup}`);
+        console.log(`  - isHiddenToday (${todayHideKey}): ${isHiddenToday}`);
+        console.log(`  - isSeen (in-memory): ${isSeen}`);
+      }
+
+      if (!targetsUser) return false;
+      if (evt.popup !== true) return false;
+      if (isHiddenToday) return false;
+      return !isSeen;
     });
+
+    if (isDebug) {
+      console.log("[DEBUG POPUP] Selected eventItem to show:", eventItem);
+    }
+
     if (!eventItem) return;
 
     this.currentEvent = eventItem;
-    localStorage.setItem(`simon_event_seen_${eventItem.id}_${today}`, '1');
+    if (!this.shownEventAnnouncementIds.includes(eventItem.id)) {
+      this.shownEventAnnouncementIds.push(eventItem.id);
+    }
+
+    const modalEl = document.getElementById('modalEventAnnouncement');
+    if (isDebug) {
+      console.log("[DEBUG POPUP] modalEventAnnouncement element in DOM:", modalEl);
+      if (modalEl) {
+        console.log("[DEBUG POPUP] Before openModal - display style:", modalEl.style.display);
+        console.log("[DEBUG POPUP] Before openModal - classes:", modalEl.className);
+        console.log("[DEBUG POPUP] Before openModal - computed display:", window.getComputedStyle(modalEl).display);
+        console.log("[DEBUG POPUP] Before openModal - computed opacity:", window.getComputedStyle(modalEl).opacity);
+      }
+    }
+    if (!modalEl) {
+      console.warn("[DEBUG POPUP] WARNING: modalEventAnnouncement element was NOT found in the DOM. This usually means the browser is loading a cached old version of index.html. Please clear your browser cache or force-reload the page (Ctrl+F5 / Cmd+Shift+R).");
+    }
 
     const kickerEl = document.getElementById('eventAnnounceKicker');
     const titleEl = document.getElementById('eventAnnounceTitle');
@@ -3983,6 +4490,12 @@ class SimonEduApp {
     }
 
     this.openModal('modalEventAnnouncement');
+    if (isDebug && modalEl) {
+      console.log("[DEBUG POPUP] After openModal - display style:", modalEl.style.display);
+      console.log("[DEBUG POPUP] After openModal - classes:", modalEl.className);
+      console.log("[DEBUG POPUP] After openModal - computed display:", window.getComputedStyle(modalEl).display);
+      console.log("[DEBUG POPUP] After openModal - computed opacity:", window.getComputedStyle(modalEl).opacity);
+    }
   }
 
   clickEventAnnounceJoin() {
@@ -7675,8 +8188,11 @@ class SimonEduApp {
     } else if (view === 'eventDetail') {
       this.switchView('events');
       return 'navigated';
+    } else if (view === 'events') {
+      this.switchView(this.eventsPrevView || 'dashboard');
+      return 'navigated';
     } else if (view === 'notices') {
-      this.switchView('dashboard');
+      this.switchView(this.noticesPrevView || 'dashboard');
       return 'navigated';
     } else if (view === 'exam' && !this.isExamMode) {
       this.switchView('events');
