@@ -35,6 +35,7 @@ class _WebViewScreenState extends State<WebViewScreen>
   int _unreadNotificationsCount = 0;
   bool _isLoggedIn = false;
   bool _hideBottomNav = false;
+  bool _eventPopupOpen = false;
   String _appVersion = '';
   String? _fcmToken;
   DateTime? _lastPressedAt;
@@ -43,6 +44,7 @@ class _WebViewScreenState extends State<WebViewScreen>
   final ValueNotifier<bool> _nativeRouteChromeHidden =
       ValueNotifier<bool>(false);
   int _nativeRouteCounter = 0;
+  String? _currentView;
 
   // Native Settings Profile State
   String _userName = '';
@@ -54,7 +56,7 @@ class _WebViewScreenState extends State<WebViewScreen>
   bool _isProfileLoading = true;
   List<dynamic> _pointsHistory = [];
 
-  static const String _appWebVersion = '1.5.31';
+  static const String _appWebVersion = '1.5.37';
   final String _targetUrl = 'https://simon-edu-bible-game.firebaseapp.com?platform=app&app_v=$_appWebVersion';
 
   @override
@@ -343,16 +345,29 @@ class _WebViewScreenState extends State<WebViewScreen>
           _isLoggedIn = false;
           _currentIndex = 0;
           _hideBottomNav = false;
+          _eventPopupOpen = false;
         });
       } else if (event == 'hide_bottom_nav') {
         final hidden = data['hidden'] == true;
-        if (hidden != _hideBottomNav) {
-          setState(() {
-            _hideBottomNav = hidden;
-          });
-        }
+        setState(() {
+          _eventPopupOpen = hidden;
+          _hideBottomNav = hidden;
+        });
       } else if (event == 'view_changed') {
         final view = data['view'] as String?;
+        _currentView = view;
+
+        final isRootTab = view == 'dashboard' ||
+            view == 'journey' ||
+            view == 'ranking' ||
+            view == 'notifications' ||
+            view == 'settings' ||
+            view == 'attendance' ||
+            view == 'crew';
+        if (isRootTab && _webViewInNativeRoute) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+
         int newIndex = _currentIndex;
         final shouldHideBottomNav = view == 'game' ||
             view == 'exam' ||
@@ -381,11 +396,12 @@ class _WebViewScreenState extends State<WebViewScreen>
         } else if (view == 'settings') {
           newIndex = 4;
         }
+        final effectiveHideBottomNav = _eventPopupOpen || shouldHideBottomNav;
         if (newIndex != _currentIndex ||
-            shouldHideBottomNav != _hideBottomNav) {
+            effectiveHideBottomNav != _hideBottomNav) {
           setState(() {
             _currentIndex = newIndex;
-            _hideBottomNav = shouldHideBottomNav;
+            _hideBottomNav = effectiveHideBottomNav;
             if (newIndex == 4) {
               _isProfileLoading = true;
             }
@@ -517,9 +533,20 @@ class _WebViewScreenState extends State<WebViewScreen>
           ? 'document.body.classList.add("native-route-active");'
           : 'document.body.classList.remove("native-route-active");',
     );
-    await _controller!.runJavaScript(
-      'if (window.app && window.app.switchView) { window.app.switchView(${jsonEncode(previousView)}); }',
-    );
+
+    final isCurrentViewMainTab = _currentView == 'dashboard' ||
+        _currentView == 'journey' ||
+        _currentView == 'ranking' ||
+        _currentView == 'notifications' ||
+        _currentView == 'settings' ||
+        _currentView == 'attendance' ||
+        _currentView == 'crew';
+
+    if (!isCurrentViewMainTab) {
+      await _controller!.runJavaScript(
+        'if (window.app && window.app.switchView) { window.app.switchView(${jsonEncode(previousView)}); }',
+      );
+    }
   }
 
   String _nativeTitleForView(String view) {

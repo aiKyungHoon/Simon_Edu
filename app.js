@@ -6099,6 +6099,7 @@ class SimonEduApp {
     if (!container) return;
 
     if (!this.currentUser) return;
+    this.stopExamCharacterCountWatcher();
 
     if (this.examStep === 'info') {
       container.innerHTML = `
@@ -6230,11 +6231,10 @@ class SimonEduApp {
           </div>
         </div>
       `;
-      this.updateExamCharacterCount();
+      this.bindExamAnswerInput();
       const textarea = document.getElementById('examVerseAnswerTextarea');
       if (textarea) {
         textarea.focus();
-        setTimeout(() => this.updateExamCharacterCount(), 0);
       }
     } else if (this.examStep === 'review') {
       const answeredCount = this.examAnswers.filter(a => (a?.userTypedText || '').trim().length > 0).length;
@@ -6459,8 +6459,7 @@ class SimonEduApp {
   }
 
   saveAndNextMissionExamVerse() {
-    const textarea = document.getElementById('examVerseAnswerTextarea');
-    const typedText = textarea ? textarea.value.trim() : '';
+    const typedText = this.getCurrentExamAnswerText().trim();
     
     // Grade the active verse and save
     const currentVerse = this.examVerses[this.examCurrentIndex];
@@ -6483,8 +6482,7 @@ class SimonEduApp {
 
   prevMissionExamVerse() {
     if (this.examCurrentIndex > 0) {
-      const textarea = document.getElementById('examVerseAnswerTextarea');
-      const typedText = textarea ? textarea.value.trim() : '';
+      const typedText = this.getCurrentExamAnswerText().trim();
       
       // Save current progress before navigating back
       const currentVerse = this.examVerses[this.examCurrentIndex];
@@ -6511,17 +6509,58 @@ class SimonEduApp {
   }
 
   updateExamCharacterCount() {
-    const textarea = document.getElementById('examVerseAnswerTextarea');
     const charCountSpan = document.getElementById('examCharCount');
-    if (textarea && charCountSpan) {
-      const text = textarea.value || '';
+    const text = this.getCurrentExamAnswerText();
+    if (this.examAnswers?.[this.examCurrentIndex]) {
+      this.examAnswers[this.examCurrentIndex].userTypedText = text;
+    }
+    if (charCountSpan) {
       charCountSpan.textContent = Array.from(text.trim()).length;
     }
   }
 
-  saveAndReturnToReview() {
+  getCurrentExamAnswerText() {
     const textarea = document.getElementById('examVerseAnswerTextarea');
-    const typedText = textarea ? textarea.value.trim() : '';
+    if (!textarea) return this.examAnswers?.[this.examCurrentIndex]?.userTypedText || '';
+    return textarea.value || textarea.textContent || '';
+  }
+
+  bindExamAnswerInput() {
+    const textarea = document.getElementById('examVerseAnswerTextarea');
+    if (!textarea) return;
+
+    const sync = () => requestAnimationFrame(() => this.updateExamCharacterCount());
+    ['beforeinput', 'input', 'keyup', 'change', 'compositionupdate', 'compositionend', 'paste', 'focus', 'blur'].forEach((eventName) => {
+      textarea.addEventListener(eventName, sync);
+    });
+
+    this.updateExamCharacterCount();
+    setTimeout(() => this.updateExamCharacterCount(), 0);
+    setTimeout(() => this.updateExamCharacterCount(), 120);
+    this.startExamCharacterCountWatcher();
+  }
+
+  startExamCharacterCountWatcher() {
+    this.stopExamCharacterCountWatcher();
+    this._examCharCountWatcher = setInterval(() => {
+      const textarea = document.getElementById('examVerseAnswerTextarea');
+      if (this.examStep !== 'test' || !textarea) {
+        this.stopExamCharacterCountWatcher();
+        return;
+      }
+      this.updateExamCharacterCount();
+    }, 250);
+  }
+
+  stopExamCharacterCountWatcher() {
+    if (this._examCharCountWatcher) {
+      clearInterval(this._examCharCountWatcher);
+      this._examCharCountWatcher = null;
+    }
+  }
+
+  saveAndReturnToReview() {
+    const typedText = this.getCurrentExamAnswerText().trim();
     
     // Grade the active verse and save
     const currentVerse = this.examVerses[this.examCurrentIndex];
@@ -6557,6 +6596,67 @@ class SimonEduApp {
     }
   }
 
+  completeExamAndGoHome() {
+    this.isExamMode = false;
+    this.examStep = 'info';
+    this.examCurrentIndex = 0;
+    this.examVerses = [];
+    this.examAnswers = [];
+    this.examScore = null;
+    this.examCameFromReview = false;
+    this.switchView('dashboard');
+  }
+
+  restartExamFromResult() {
+    this.startMissionExamFlow();
+  }
+
+  backToEventDetailFromResult() {
+    this.isExamMode = false;
+    this.examStep = 'info';
+    this.examCurrentIndex = 0;
+    this.examVerses = [];
+    this.examAnswers = [];
+    this.examScore = null;
+    this.examCameFromReview = false;
+    this.switchView('eventDetail');
+  }
+
+  triggerExamRetake() {
+    this.examStep = 'retake';
+    this.renderExamView();
+  }
+
+  confirmExamRetake() {
+    const hasSavedInfo = (this.currentUser.examRegion || '').trim() && (this.currentUser.examApplicantName || '').trim();
+    if (hasSavedInfo) {
+      this.examStep = 'confirm_info';
+      this.examRegion = this.currentUser.examRegion.trim();
+      this.examName = this.currentUser.examApplicantName.trim();
+    } else {
+      this.examStep = 'info';
+      this.examRegion = (this.currentUser.examRegion || '').trim();
+      this.examName = (this.currentUser.examApplicantName || this.currentUser.name || '').trim();
+    }
+    this.renderExamView();
+  }
+
+  cancelRetake() {
+    if (this.examScore !== undefined && this.examScore !== null) {
+      this.examStep = 'result';
+      this.renderExamView();
+    } else {
+      this.completeExamAndGoHome();
+    }
+  }
+
+  _getMissionExamSubmissionKey(region, name) {
+    const cleanRegion = String(region || '').trim().replace(/\s+/g, ' ');
+    const cleanName = String(name || '').trim().replace(/\s+/g, ' ');
+    if (!cleanRegion || !cleanName) return '';
+    return `${cleanRegion}__${cleanName}`.toLowerCase().replace(/[\/#?\[\]]/g, '_');
+  }
+
   async submitMissionExam() {
     // Check if any verse is unwritten
     const unwrittenCount = this.examAnswers.filter(a => (a?.userTypedText || '').trim().length === 0).length;
@@ -6569,6 +6669,7 @@ class SimonEduApp {
     const total = this.examAnswers.length;
     const totalAccuracySum = this.examAnswers.reduce((sum, a) => sum + (a?.accuracy || 0), 0);
     const score = Math.round(totalAccuracySum / total);
+    const correct = this.examAnswers.filter(a => Number(a?.accuracy || 0) >= 80).length;
     
     const applicantRegion = this.examRegion.trim();
     const applicantName = this.examName.trim();
@@ -6624,11 +6725,11 @@ class SimonEduApp {
     // 정답 요약 HTML
     const answerHtml = this.examAnswers.map((a, i) => `
       <div style="display:flex;gap:0.5rem;align-items:flex-start;padding:0.5rem 0;border-bottom:1px solid var(--glass-border);">
-        <span style="font-size:1rem;">${a.isCorrect ? '✅' : '❌'}</span>
+        <span style="font-size:1rem;">${Number(a?.accuracy || 0) >= 80 ? '✅' : '❌'}</span>
         <div style="flex:1;font-size:0.85rem;">
-          <div style="font-weight:600;">${i+1}. ${a.question}</div>
-          <div style="color:var(--text-secondary);">내 답: ${a.userAnswer || '(미입력)'}</div>
-          ${!a.isCorrect ? `<div style="color:var(--accent-emerald);">정답: ${a.correct}</div>` : ''}
+          <div style="font-weight:600;">${i+1}. 요한계시록 ${a.verse.chapter}장 ${a.verse.verse}절 · ${a.accuracy}% 일치</div>
+          <div style="color:var(--text-secondary);">내 답: ${this.escapeHtml(a.userTypedText || '(미입력)')}</div>
+          <div style="color:var(--accent-emerald);">정답: ${this.escapeHtml(a.verse.text || '')}</div>
         </div>
       </div>
     `).join('');

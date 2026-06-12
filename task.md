@@ -1,0 +1,9 @@
+- [x] Fix character counter not updating by defining `updateExamCharacterCount` in `app.js`.
+- [x] Fix TypeError on submit by implementing `_getMissionExamSubmissionKey` in `app.js`.
+- [x] Support single verse editing and returning directly to the review screen using `examCameFromReview` flag and custom navigation actions.
+- [x] Restyle review step grid into a wrapped flexbox layout to prevent clipping on mobile screens.
+- [x] Implement missing navigation methods in results page: `completeExamAndGoHome()`, `restartExamFromResult()`, and `backToEventDetailFromResult()`.
+- [x] Implement missing retake flow methods: `triggerExamRetake()`, `confirmExamRetake()`, and `cancelRetake()`.
+- [x] Bump all versions and cache-busters to `1.5.36`.
+- [x] Verify Dart compilation soundness with `flutter analyze`.
+- [x] Deploy Firebase Hosting version 1.5.36.
