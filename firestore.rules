@@ -76,5 +76,9 @@ service cloud.firestore {
       );
       allow delete: if canPublish();
     }
+    match /password_resets/{resetId} {
+      allow create: if true;
+      allow read: if canOpenAdmin();
+    }
   }
 }

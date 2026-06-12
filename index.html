@@ -8,7 +8,7 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.5.24">
+  <link rel="stylesheet" href="style.css?v=1.5.27">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
@@ -199,6 +199,11 @@
         
         <div class="auth-footer" id="authFooterText">
           아직 계정이 없으신가요? <a href="#" onclick="app.setAuthTab('signup'); return false;">회원가입</a>
+          <div style="margin-top: 0.75rem; font-size: 0.85rem; display: flex; justify-content: center; gap: 1rem;">
+            <a href="#" onclick="app.openModal('modalFindId'); return false;" style="color: var(--text-secondary); text-decoration: underline;">아이디 찾기</a>
+            <span style="color: var(--text-muted);">|</span>
+            <a href="#" onclick="app.openModal('modalFindPassword'); return false;" style="color: var(--text-secondary); text-decoration: underline;">비밀번호 찾기</a>
+          </div>
         </div>
         
         <div class="auth-terms-footer" style="margin-top: 1.5rem; text-align: center; font-size: 0.8rem; opacity: 0.7; border-top: 1px dashed var(--glass-border); padding-top: 1rem;">
@@ -630,7 +635,7 @@
             <div class="chapter-recitation-card glass-panel" style="padding: 1.25rem; border-radius: 18px; background: white; border: 1px solid #f2e7d5; margin-bottom: 1.25rem; box-shadow: 0 4px 12px rgba(61, 52, 28, 0.02);">
               <h3 style="font-size: 0.9rem; font-weight: 800; color: var(--text-primary); text-align: left; margin: 0 0 1rem 0;">암송 진행률</h3>
               
-              <div style="display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1.25rem;">
+              <div style="display: flex; align-items: center; gap: 1.25rem;">
                 <!-- Circular Progress -->
                 <div class="journey-circle-progress-wrapper" style="width: 76px; height: 76px; flex-shrink: 0; position: relative; display: flex; align-items: center; justify-content: center;">
                   <svg width="76" height="76" viewBox="0 0 76 76" style="transform: rotate(-90deg);">
@@ -648,14 +653,10 @@
                     <span id="chapterDetailCompletedCount">4</span> <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">/ <span id="chapterDetailTotalCount">10</span>절 완료</span>
                   </div>
                   <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">다음 목표</div>
-                  <strong id="chapterDetailNextTargetText" style="font-size: 0.82rem; color: #b8860b; font-weight: bold;">10절 암송하기</strong>
+                  <strong id="chapterDetailNextTargetText" style="font-size: 0.82rem; color: #b8860b; font-weight: bold; margin-bottom: 0.25rem;">10절 암송하기</strong>
+                  <a href="#" onclick="app.openChapterVersesModal(); return false;" style="font-size: 0.75rem; color: #b8860b; text-decoration: underline; font-weight: 600;">진행률 자세히 보기 ></a>
                 </div>
               </div>
-              
-              <!-- Recitation Action Button -->
-              <button class="btn-primary" onclick="app.openChapterVersesModal()" style="width: 100%; padding: 0.8rem; border-radius: 12px; background: #b8860b; border: none; color: white; font-weight: 800; font-size: 0.95rem; cursor: pointer; transition: background 0.2s; box-shadow: 0 4px 12px rgba(184, 134, 11, 0.15);">
-                암송 연습하기
-              </button>
             </div>
 
             <!-- 3. Study Menu Section -->
@@ -664,43 +665,71 @@
               
               <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                 
-                <!-- 테스트 모드 -->
-                <div class="menu-item-row" onclick="app.startChapterTestFromDetail()" style="display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 1.1rem; background: white; border: 1px solid #f2e7d5; border-radius: 16px; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(61, 52, 28, 0.01);">
-                  <div style="display: flex; align-items: center; gap: 0.9rem;">
-                    <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(16, 185, 129, 0.08); display: flex; align-items: center; justify-content: center; color: #10b981; flex-shrink: 0;">
-                      <span class="material-icons-round" style="font-size: 1.25rem;">fact_check</span>
+                <!-- 쉬움 모드 -->
+                <div class="mode-card easy" onclick="app.openVerseSelect('easy')">
+                  <div class="mode-card-left">
+                    <div class="mode-card-icon-badge">
+                      <span class="material-icons-round" style="font-size: 1.25rem;">sentiment_satisfied_alt</span>
                     </div>
                     <div>
-                      <h4 style="font-size: 0.9rem; font-weight: bold; color: var(--text-primary); margin: 0 0 0.15rem 0;">테스트 모드</h4>
-                      <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0;">암송한 내용을 테스트해보세요.</p>
+                      <h4 class="mode-card-title">쉬움 모드</h4>
+                      <p class="mode-card-desc">말씀을 보면서 학습해요.</p>
                     </div>
                   </div>
-                  <span class="material-icons-round" style="color: #cbd5e1;">chevron_right</span>
+                  <button class="btn-mode-start">시작하기</button>
+                </div>
+
+                <!-- 어려움 모드 -->
+                <div class="mode-card hard" onclick="app.openVerseSelect('hard')">
+                  <div class="mode-card-left">
+                    <div class="mode-card-icon-badge">
+                      <span class="material-icons-round" style="font-size: 1.25rem;">sentiment_neutral</span>
+                    </div>
+                    <div>
+                      <h4 class="mode-card-title">어려움 모드</h4>
+                      <p class="mode-card-desc">핵심 단어를 빈칸에 채워요.</p>
+                    </div>
+                  </div>
+                  <button class="btn-mode-start">시작하기</button>
+                </div>
+
+                <!-- 전문 모드 -->
+                <div class="mode-card expert" onclick="app.openVerseSelect('expert')">
+                  <div class="mode-card-left">
+                    <div class="mode-card-icon-badge">
+                      <span class="material-icons-round" style="font-size: 1.25rem;">sentiment_very_dissatisfied</span>
+                    </div>
+                    <div>
+                      <h4 class="mode-card-title">전문 모드</h4>
+                      <p class="mode-card-desc">말씀을 가리고 직접 암송해요.</p>
+                    </div>
+                  </div>
+                  <button class="btn-mode-start">시작하기</button>
                 </div>
 
                 <!-- 예상 문제 -->
-                <div class="menu-item-row" onclick="app.openExpectedProblemsModal()" style="display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 1.1rem; background: white; border: 1px solid #f2e7d5; border-radius: 16px; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(61, 52, 28, 0.01);">
-                  <div style="display: flex; align-items: center; gap: 0.9rem;">
-                    <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(245, 158, 11, 0.08); display: flex; align-items: center; justify-content: center; color: #f59e0b; flex-shrink: 0;">
-                      <span class="material-icons-round" style="font-size: 1.25rem;">assignment</span>
+                <div class="mode-card exam" onclick="app.startStudyMode('exam')">
+                  <div class="mode-card-left">
+                    <div class="mode-card-icon-badge">
+                      <span class="material-icons-round" style="font-size: 1.25rem;">quiz</span>
                     </div>
                     <div>
-                      <h4 style="font-size: 0.9rem; font-weight: bold; color: var(--text-primary); margin: 0 0 0.15rem 0;">예상 문제</h4>
-                      <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0;">시험에 자주 나오는 문제를 풀어보세요.</p>
+                      <h4 class="mode-card-title">예상 문제</h4>
+                      <p class="mode-card-desc">사명자 시험 대비 문제를 풀어요.</p>
                     </div>
                   </div>
-                  <span class="material-icons-round" style="color: #cbd5e1;">chevron_right</span>
+                  <button class="btn-mode-start" style="padding: 0.25rem 0.5rem;">문제 풀기</button>
                 </div>
 
                 <!-- 복습 기록 -->
-                <div class="menu-item-row" onclick="app.openReviewHistoryModal()" style="display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 1.1rem; background: white; border: 1px solid #f2e7d5; border-radius: 16px; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(61, 52, 28, 0.01);">
-                  <div style="display: flex; align-items: center; gap: 0.9rem;">
-                    <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(59, 130, 246, 0.08); display: flex; align-items: center; justify-content: center; color: #3b82f6; flex-shrink: 0;">
+                <div class="mode-card history" onclick="app.openReviewHistoryModal()">
+                  <div class="mode-card-left">
+                    <div class="mode-card-icon-badge">
                       <span class="material-icons-round" style="font-size: 1.25rem;">history</span>
                     </div>
                     <div>
-                      <h4 style="font-size: 0.9rem; font-weight: bold; color: var(--text-primary); margin: 0 0 0.15rem 0;">복습 기록</h4>
-                      <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0;">이전 학습 기록을 확인하고 복습하세요.</p>
+                      <h4 class="mode-card-title">복습 기록</h4>
+                      <p class="mode-card-desc">이전 학습 기록을 확인해요.</p>
                     </div>
                   </div>
                   <span class="material-icons-round" style="color: #cbd5e1;">chevron_right</span>
@@ -712,60 +741,88 @@
           </div>
         </div>
 
-        <!-- Bible Verse Study View -->
-        <div id="journeyVerseStudyView" class="view-container">
-          <div class="dashboard-single-container journey-verse-page">
+        <!-- Bible Verse Selection View -->
+        <div id="journeyVerseSelectView" class="view-container">
+          <div class="dashboard-single-container journey-select-page" style="padding-bottom: 2rem;">
             <!-- Page Header Bar -->
-            <div class="page-header-bar">
+            <div class="page-header-bar" style="display: flex; align-items: center; justify-content: space-between;">
               <button class="btn-header-back" onclick="app.goBackToChapter()" aria-label="뒤로가기">
                 <span class="material-icons-round">chevron_left</span>
               </button>
-              <h1 id="verseStudyTitle">요한계시록 4장 6절</h1>
-              <div class="verse-header-actions">
-                <button class="btn-header-action" onclick="app.toggleVerseBookmark()" aria-label="북마크">
-                  <span class="material-icons-round" id="btnVerseBookmark">bookmark_border</span>
-                </button>
-                <button class="btn-header-action" onclick="app.changeVerseTextSize()" aria-label="글자 크기">
-                  <span class="material-icons-round">format_size</span>
-                </button>
+              <h1 id="verseSelectHeaderTitle" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0; flex-grow: 1; text-align: center; margin-right: 32px;">쉬움 모드</h1>
+            </div>
+
+            <!-- Mode Info Banner (centered / subtitle style) -->
+            <div style="text-align: center; margin: 0.5rem 0 1.5rem 0;">
+              <span id="verseSelectModeDesc" style="font-size: 0.88rem; font-weight: 700; color: #16a34a;">말씀을 보면서 학습해요.</span>
+            </div>
+
+            <!-- Verse Grid Card -->
+            <div class="glass-panel" style="padding: 1.25rem; border-radius: 18px; background: white; border: 1px solid #f2e7d5; margin-bottom: 1.25rem; box-shadow: 0 4px 12px rgba(61, 52, 28, 0.02); text-align: left;">
+              <h3 style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary); margin: 0 0 0.25rem 0;">절 선택</h3>
+              <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0 0 1.25rem 0; font-weight: 500;">학습할 절을 선택하세요.</p>
+              
+              <div id="verseSelectGrid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.6rem; margin-bottom: 1rem;">
+                <!-- Dynamic verse numbers rendered here -->
               </div>
             </div>
 
-            <!-- Verse Study Box -->
-            <div class="verse-study-container">
-              <div class="verse-study-card glass-panel" id="verseStudyCard">
-                <div class="quote-icon-top">“</div>
-                <div class="verse-study-text" id="verseStudyText">
-                  보좌 앞에 수정과 같은 유리 바다가 있고 보좌 가운데와 보좌 둘레에 네 생물이 있는데 앞뒤에 눈이 가득하더라
-                </div>
-                <div class="quote-icon-bottom">”</div>
-              </div>
+            <!-- Selection Summary Card -->
+            <div class="glass-panel" style="padding: 1.25rem; border-radius: 18px; background: white; border: 1px solid #f2e7d5; margin-bottom: 1.25rem; box-shadow: 0 4px 12px rgba(61, 52, 28, 0.02); text-align: left;">
+              <div style="font-size: 0.78rem; color: var(--text-muted); font-weight: 500; margin-bottom: 0.25rem;">선택한 절</div>
+              <div id="verseSelectSelectedRef" style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary);">요한계시록 1장 1절</div>
             </div>
 
-            <!-- Action Buttons -->
-            <div class="verse-action-buttons">
-              <button class="btn-verse-quiz-start" onclick="app.startJourneyQuizFromStudy()">
-                <span class="material-icons-round">emoji_events</span>
-                암송 완료 (퀴즈 시작)
-              </button>
-              <button class="btn-verse-review-study" onclick="app.reviewVerseStudy()">
-                <span class="material-icons-round">menu_book</span>
-                다시 학습하기
-              </button>
-            </div>
+            <!-- CTA Button -->
+            <button id="btnVerseSelectStart" onclick="app.startStudyFromSelectedVerse()" style="width: 100%; border: none; border-radius: 14px; height: 52px; display: inline-flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 0.98rem; cursor: pointer; transition: background-color 0.2s ease;">선택한 절로 시작하기</button>
+          </div>
+        </div>
 
-            <!-- Footer Verse Pagination -->
-            <div class="verse-pagination-footer">
-              <button class="btn-pagination-nav" id="btnPrevVerse" onclick="app.navigateVerse(-1)">
+        <!-- Bible Verse Study View -->
+        <div id="journeyVerseStudyView" class="view-container">
+          <div class="dashboard-single-container journey-verse-page" style="padding-bottom: 2rem;">
+            <!-- Page Header Bar -->
+            <div class="page-header-bar" style="display: flex; justify-content: space-between; align-items: center;">
+              <button class="btn-header-back" onclick="app.goBackToChapter()" aria-label="뒤로가기">
                 <span class="material-icons-round">chevron_left</span>
-                이전 절
               </button>
-              <div class="pagination-divider"></div>
-              <button class="btn-pagination-nav" id="btnNextVerse" onclick="app.navigateVerse(1)">
-                다음 절
-                <span class="material-icons-round">chevron_right</span>
-              </button>
+              <h1 id="studyModeHeaderTitle" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">쉬움 모드</h1>
+              <div id="studyModeHeaderProgress" style="font-size: 0.9rem; font-weight: bold; color: var(--text-muted); font-family: var(--font-en);">1/20절</div>
             </div>
+
+            <!-- Mode Info Banner -->
+            <div id="studyModeInfoBanner" class="mode-info-banner easy">
+              <span class="material-icons-round" id="studyModeBannerIcon" style="font-size: 1.2rem;">sentiment_satisfied_alt</span>
+              <span id="studyModeBannerDesc">말씀을 보면서 학습해요.</span>
+            </div>
+
+            <!-- Verse Card Container -->
+            <div class="verse-study-container" style="margin-bottom: 1rem;">
+              <div class="verse-study-card glass-panel" id="studyVerseCard" style="padding: 1.5rem 1.25rem; border-radius: 18px; background: white; border: 1px solid #f2e7d5; position: relative;">
+                <h4 id="studyVerseRef" style="font-size: 0.9rem; font-weight: 800; color: var(--text-secondary); margin: 0 0 0.75rem 0; text-align: left;">요한계시록 1장 3절</h4>
+                <div class="verse-study-text" id="studyVerseText" style="font-size: 1.1rem; color: #3d341c; line-height: 1.75; font-weight: 600; text-align: left; word-break: keep-all; white-space: pre-line;">
+                  이 예언의 말씀을 읽는 자와
+                  듣는 자들과
+                  그 가운데 기록한 것을
+                  지키는 자들이 복이 있나니
+                  때가 가까움이라
+                </div>
+              </div>
+            </div>
+
+            <!-- Dynamic Controls -->
+            <div id="studyModeControls" style="margin-top: 1rem;">
+              <!-- Easy mode controls, Hard mode options list, Expert dictation input, or Exam options will be rendered here dynamically -->
+            </div>
+
+            <!-- Bottom Progress Bar -->
+            <div class="study-progress-bar-wrapper">
+              <div class="study-progress-bar-fill" id="studyProgressBarFill"></div>
+            </div>
+            <div id="studyProgressBarText" style="font-size: 0.75rem; color: var(--text-muted); text-align: left; font-weight: bold; margin-top: -0.25rem;">1 / 20절</div>
+
+          </div>
+        </div>
 
           </div>
         </div>
@@ -1312,7 +1369,7 @@
           </div>
 
           <div class="app-version" style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-en); font-weight: 500; letter-spacing: 0.5px; opacity: 0.7;">
-            Version 1.5.24
+            Version 1.5.27
           </div>
         </div>
 
@@ -2825,6 +2882,79 @@
     </div>
   </div>
 
+  <!-- Modal: Find ID -->
+  <div class="modal-overlay" id="modalFindId">
+    <div class="modal-content glass-panel" style="border-color: var(--accent-purple); max-width: 400px; display: flex; flex-direction: column; padding: 2rem; max-height: 85vh; font-family: var(--font-kr);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; width: 100%;">
+        <div class="modal-title" style="color: var(--accent-purple); margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.3rem;">
+          <span class="material-icons-round">person_search</span>
+          아이디 찾기
+        </div>
+        <button onclick="app.closeModal('modalFindId')" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; padding: 4px; border-radius: 50%;">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; width: 100%;">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0; line-height: 1.5; word-break: keep-all;">
+          가입 시 등록한 이름(실명)과 이메일 주소를 입력하시면 아이디를 찾으실 수 있습니다.
+        </p>
+        <div class="form-group" style="margin: 0; text-align: left;">
+          <label for="findIdName" style="font-size: 0.8rem; font-weight: bold; color: var(--text-primary); display: block; margin-bottom: 0.4rem;">이름 (실명)</label>
+          <input type="text" id="findIdName" class="input-field" placeholder="이름을 입력하세요" required style="margin: 0;">
+        </div>
+        <div class="form-group" style="margin: 0; text-align: left;">
+          <label for="findIdEmail" style="font-size: 0.8rem; font-weight: bold; color: var(--text-primary); display: block; margin-bottom: 0.4rem;">이메일 주소</label>
+          <input type="email" id="findIdEmail" class="input-field" placeholder="example@email.com" required style="margin: 0;">
+        </div>
+        
+        <div id="findIdResult" style="display: none; background: rgba(139, 92, 246, 0.1); border: 1px dashed rgba(139, 92, 246, 0.3); border-radius: 8px; padding: 1rem; margin-top: 0.5rem; text-align: center; font-size: 0.9rem; color: var(--text-primary); word-break: keep-all; line-height: 1.5;">
+        </div>
+      </div>
+      <div class="modal-btn-container" style="display: flex; gap: 0.75rem; justify-content: center; width: 100%; margin-top: 1.5rem;">
+        <button class="btn-primary" style="margin: 0; background: var(--accent-purple); flex: 1; height: 44px;" onclick="app.findUserUsername()">아이디 찾기</button>
+        <button class="btn-game secondary" style="margin: 0; color: var(--text-muted); border-color: var(--glass-border); flex: 1; height: 44px;" onclick="app.closeModal('modalFindId')">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Find Password -->
+  <div class="modal-overlay" id="modalFindPassword">
+    <div class="modal-content glass-panel" style="border-color: var(--accent-purple); max-width: 400px; display: flex; flex-direction: column; padding: 2rem; max-height: 85vh; font-family: var(--font-kr);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; width: 100%;">
+        <div class="modal-title" style="color: var(--accent-purple); margin: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.3rem;">
+          <span class="material-icons-round">lock_reset</span>
+          비밀번호 찾기
+        </div>
+        <button onclick="app.closeModal('modalFindPassword')" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; padding: 4px; border-radius: 50%;">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+      <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; width: 100%;">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0; line-height: 1.5; word-break: keep-all;">
+          가입 시 등록한 아이디, 이름(실명), 이메일 주소를 입력하시면 비밀번호 재설정 요청이 접수됩니다. (관리자가 확인 후 재설정합니다)
+        </p>
+        <div class="form-group" style="margin: 0; text-align: left;">
+          <label for="findPwUsername" style="font-size: 0.8rem; font-weight: bold; color: var(--text-primary); display: block; margin-bottom: 0.4rem;">아이디</label>
+          <input type="text" id="findPwUsername" class="input-field" placeholder="아이디를 입력하세요" required style="margin: 0;">
+        </div>
+        <div class="form-group" style="margin: 0; text-align: left;">
+          <label for="findPwName" style="font-size: 0.8rem; font-weight: bold; color: var(--text-primary); display: block; margin-bottom: 0.4rem;">이름 (실명)</label>
+          <input type="text" id="findPwName" class="input-field" placeholder="이름을 입력하세요" required style="margin: 0;">
+        </div>
+        <div class="form-group" style="margin: 0; text-align: left;">
+          <label for="findPwEmail" style="font-size: 0.8rem; font-weight: bold; color: var(--text-primary); display: block; margin-bottom: 0.4rem;">이메일 주소</label>
+          <input type="email" id="findPwEmail" class="input-field" placeholder="example@email.com" required style="margin: 0;">
+        </div>
+        
+        <div id="findPwResult" style="display: none; background: rgba(16, 185, 129, 0.1); border: 1px dashed rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 1rem; margin-top: 0.5rem; text-align: center; font-size: 0.9rem; color: var(--text-primary); word-break: keep-all; line-height: 1.5;">
+        </div>
+      </div>
+      <div class="modal-btn-container" style="display: flex; gap: 0.75rem; justify-content: center; width: 100%; margin-top: 1.5rem;">
+        <button class="btn-primary" style="margin: 0; background: var(--accent-purple); flex: 1; height: 44px;" onclick="app.findUserPassword()">재설정 요청</button>
+        <button class="btn-game secondary" style="margin: 0; color: var(--text-muted); border-color: var(--glass-border); flex: 1; height: 44px;" onclick="app.closeModal('modalFindPassword')">닫기</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Floating point system container -->
   <div class="floating-point-container" id="floatingPointContainer"></div>
@@ -2846,6 +2976,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <script src="bible_data.js?v=1.5.2"></script>
-  <script src="app.js?v=1.5.24"></script>
+  <script src="app.js?v=1.5.27"></script>
 </body>
 </html>

@@ -85,6 +85,19 @@ class SimonEduApp {
     this.chapterDetailTab = 'verses';
     this.verseTextSize = 'normal';
 
+    // Interactive Study States
+    this.studyMode = null;
+    this.studyVerses = [];
+    this.studyCurrentIndex = 0;
+    this.studySelectedOptionIndex = null;
+    this.studyExamQuestions = [];
+    this.studyExamCurrentIndex = 0;
+    this.studyAnswered = false;
+    this.studyShowExplanation = false;
+    this.studyCurrentOptions = [];
+    this.studyCorrectOptionIndex = null;
+    this.studyDictationAccuracy = 0;
+
     // Crew & Battle Arena states (Battle mode hidden)
     this.hideBattleMode = true;
     this.isExamMode = false;
@@ -571,7 +584,14 @@ class SimonEduApp {
       btnAuthSubmit.style.opacity = '1';
       if (idMsg) idMsg.textContent = '';
       if (nameMsg) nameMsg.textContent = '';
-      authFooterText.innerHTML = `아직 계정이 없으신가요? <a href="#" onclick="app.setAuthTab('signup'); return false;">회원가입</a>`;
+      authFooterText.innerHTML = `
+        아직 계정이 없으신가요? <a href="#" onclick="app.setAuthTab('signup'); return false;">회원가입</a>
+        <div style="margin-top: 0.75rem; font-size: 0.85rem; display: flex; justify-content: center; gap: 1rem;">
+          <a href="#" onclick="app.openModal('modalFindId'); return false;" style="color: var(--text-secondary); text-decoration: underline;">아이디 찾기</a>
+          <span style="color: var(--text-muted);">|</span>
+          <a href="#" onclick="app.openModal('modalFindPassword'); return false;" style="color: var(--text-secondary); text-decoration: underline;">비밀번호 찾기</a>
+        </div>
+      `;
     } else {
       tabLogin.classList.remove('active');
       tabSignup.classList.add('active');
@@ -840,9 +860,7 @@ class SimonEduApp {
         return;
       }
 
-      const virtualEmail = `${usernameId.toLowerCase()}@simon.edu`;
-
-      auth.createUserWithEmailAndPassword(virtualEmail, password)
+      auth.createUserWithEmailAndPassword(email, password)
         .then((userCredential) => {
           this.playConfetti('signup');
           const newUser = {
@@ -885,17 +903,42 @@ class SimonEduApp {
         });
     } else {
       // Login Flow
-      const virtualEmail = `${usernameId.toLowerCase()}@simon.edu`;
+      const idLower = usernameId.toLowerCase();
+      const dbUser = this.users.find(u => u.username && u.username.toLowerCase() === idLower);
+      const realEmail = dbUser ? dbUser.email : null;
+      const seedInfo = SEED_USERS[idLower];
 
-      auth.signInWithEmailAndPassword(virtualEmail, password)
+      // Try real email first. If not found, use virtual email.
+      const firstEmailToTry = realEmail || (seedInfo ? seedInfo.email : null) || `${idLower}@simon.edu`;
+
+      auth.signInWithEmailAndPassword(firstEmailToTry, password)
         .then(() => {
           // Success handled by Auth state listener
         })
         .catch(err => {
+          // If we tried realEmail but it failed, try the legacy virtual email in case they aren't migrated in Auth yet
+          if (realEmail && firstEmailToTry === realEmail && 
+              (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
+            const virtualEmail = `${idLower}@simon.edu`;
+            return auth.signInWithEmailAndPassword(virtualEmail, password)
+              .then(() => {
+                // Success with legacy virtual email! Update Auth email to their real email for future logins.
+                return auth.currentUser.updateEmail(realEmail)
+                  .catch(updateErr => {
+                    console.warn("Auth email migration failed on login:", updateErr);
+                  });
+              })
+              .catch(err2 => {
+                // Wrong password for the virtual email account
+                alert('pwd 가 다릅니다');
+              });
+          }
+
+          // If it failed and we haven't logged in yet, check for seed user migration
           if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-            const seedInfo = SEED_USERS[usernameId.toLowerCase()];
             if (seedInfo && password === seedInfo.password) {
-              auth.createUserWithEmailAndPassword(virtualEmail, password)
+              // Migrate seed user directly using their real email
+              auth.createUserWithEmailAndPassword(seedInfo.email, password)
                 .then(userCredential => {
                   const seedData = this.getSeedUserData(usernameId);
                   seedData.id = userCredential.user.uid;
@@ -903,13 +946,20 @@ class SimonEduApp {
                 })
                 .catch(signUpErr => {
                   console.error("Seed user migration failure:", signUpErr);
-                  alert('아이디 또는 비밀번호가 일치하지 않습니다.');
+                  alert('pwd 가 다릅니다');
                 });
               return;
             }
           }
+
           console.error(err);
-          alert('아이디 또는 비밀번호가 일치하지 않습니다.');
+          // Check if ID exists in users collection or SEED_USERS
+          const idExists = dbUser || seedInfo;
+          if (!idExists) {
+            alert('ID 가 다릅니다');
+          } else {
+            alert('pwd 가 다릅니다');
+          }
         });
     }
   }
@@ -960,9 +1010,9 @@ class SimonEduApp {
       viewName = 'dashboard';
     }
 
-    const singleDashboardViews = ['game', 'exam', 'settings', 'events', 'eventDetail', 'notices', 'journey', 'journeyChapterDetail', 'journeyVerseStudy', 'journeyResult', 'noticeDetail', 'notifications'];
+    const singleDashboardViews = ['game', 'exam', 'settings', 'events', 'eventDetail', 'notices', 'journey', 'journeyChapterDetail', 'journeyVerseSelect', 'journeyVerseStudy', 'journeyResult', 'noticeDetail', 'notifications'];
     document.body.classList.toggle('single-dashboard-view', singleDashboardViews.includes(viewName));
-    document.body.classList.toggle('hide-bottom-nav', ['game', 'exam', 'auth', 'journeyChapterDetail', 'journeyVerseStudy', 'journeyResult', 'eventDetail', 'noticeDetail'].includes(viewName));
+    document.body.classList.toggle('hide-bottom-nav', ['game', 'exam', 'auth', 'journeyChapterDetail', 'journeyVerseSelect', 'journeyVerseStudy', 'journeyResult', 'eventDetail', 'noticeDetail'].includes(viewName));
 
     if (this.currentUser && this.currentUser.isTrial) {
       if (viewName === 'ranking' || viewName === 'crew') {
@@ -991,7 +1041,7 @@ class SimonEduApp {
 
     const gridContainer = document.querySelector('.dashboard-grid-container');
     if (gridContainer) {
-      if (['dashboard', 'attendance', 'ranking', 'crew', 'events', 'eventDetail', 'notices', 'journey', 'game', 'exam', 'settings', 'journeyChapterDetail', 'journeyVerseStudy', 'journeyResult', 'noticeDetail', 'notifications'].includes(viewName)) {
+      if (['dashboard', 'attendance', 'ranking', 'crew', 'events', 'eventDetail', 'notices', 'journey', 'game', 'exam', 'settings', 'journeyChapterDetail', 'journeyVerseSelect', 'journeyVerseStudy', 'journeyResult', 'noticeDetail', 'notifications'].includes(viewName)) {
         gridContainer.style.display = '';
       } else {
         gridContainer.style.display = 'none';
@@ -1082,6 +1132,8 @@ class SimonEduApp {
       this.renderJourneyView();
     } else if (viewName === 'journeyChapterDetail') {
       this.renderChapterDetail();
+    } else if (viewName === 'journeyVerseSelect') {
+      this.renderVerseSelect();
     } else if (viewName === 'journeyVerseStudy') {
       this.renderVerseStudy();
     } else if (viewName === 'journeyResult') {
@@ -1705,7 +1757,6 @@ class SimonEduApp {
     if (!this.currentUser || !window.BIBLE_DATA) return;
 
     const bibleData = window.BIBLE_DATA || [];
-    const curIdx = Math.min(this.currentUser.currentVerseIndex || 0, bibleData.length);
     const journeyTotalChapters = 22;
     const completedChapterCount = this.getCompletedChapterCount(this.currentUser);
     const progressPercent = Math.min(Math.round((completedChapterCount / journeyTotalChapters) * 100), 100);
@@ -1725,18 +1776,13 @@ class SimonEduApp {
       for (let ch = 1; ch <= journeyTotalChapters; ch++) {
         const chVerses = bibleData.filter(v => v.chapter === ch);
         if (chVerses.length === 0) continue;
-        const firstIdx = bibleData.findIndex(v => v.chapter === ch);
-        const lastIdx = firstIdx + chVerses.length - 1;
-
-        const isCompleted = curIdx > lastIdx;
-        const isOngoing = !isCompleted && curIdx >= firstIdx;
-        const isLocked = curIdx < firstIdx;
+        const progress = this.getChapterProgress(ch);
 
         chapterList.push({
           chapter: ch,
-          isCompleted,
-          isOngoing,
-          isLocked
+          isCompleted: progress.status === 'completed',
+          isOngoing: progress.status === 'ongoing',
+          pct: progress.pct
         });
       }
 
@@ -1752,11 +1798,11 @@ class SimonEduApp {
         } else if (item.isOngoing) {
           circleClass = 'ongoing';
           iconHtml = '<span class="material-icons-round">menu_book</span>';
-          statusText = '진행중';
+          statusText = `진행중 ${item.pct}%`;
         } else {
-          circleClass = 'locked';
-          iconHtml = '<span class="material-icons-round">lock</span>';
-          statusText = '대기중';
+          circleClass = 'waiting';
+          iconHtml = '<span class="material-icons-round">radio_button_unchecked</span>';
+          statusText = '미시작';
         }
 
         return `
@@ -1971,12 +2017,13 @@ class SimonEduApp {
 
         const chVerses = bibleData.filter(v => v.chapter === ch);
         if (chVerses.length === 0) continue;
-        const firstIdx = bibleData.findIndex(v => v.chapter === ch);
-        const lastIdx = firstIdx + chVerses.length - 1;
+        const progress = this.getChapterProgress(ch);
+        const firstIdx = progress.firstIndex;
+        const lastIdx = progress.lastIndex;
         
-        const isCompleted = curIdx > lastIdx;
-        const isOngoing = !isCompleted && curIdx >= firstIdx;
-        const isLocked = curIdx < firstIdx;
+        const isCompleted = progress.status === 'completed';
+        const isOngoing = progress.status === 'ongoing';
+        const isNotStarted = progress.status === 'not-started';
         
         // If "완독한 장" tab is active, filter out non-completed chapters
         if (this.journeyTab === 'completed' && !isCompleted) continue;
@@ -1985,10 +2032,12 @@ class SimonEduApp {
           chapter: ch,
           isCompleted,
           isOngoing,
-          isLocked,
+          isNotStarted,
           firstIdx,
           lastIdx,
-          versesCount: chVerses.length
+          versesCount: chVerses.length,
+          completedVerses: progress.completedCount,
+          pct: progress.pct
         });
       }
 
@@ -2036,15 +2085,10 @@ class SimonEduApp {
           // Normal Tabs: Render Vertical Timeline
           chaptersGrid.className = 'journey-timeline-container';
           
-          // Determine the first uncompleted chapter (ongoing or waiting) to highlight
-          const nextTargetCh = chapterList.find(item => !item.isCompleted)?.chapter || 999;
-          
           const timelineItemsHtml = chapterList.map(item => {
-            const isNextTarget = item.chapter === nextTargetCh;
-            
             // Classes
-            const timelineCircleClass = item.isCompleted ? 'completed' : (item.isOngoing ? 'ongoing' : (isNextTarget ? 'waiting-highlight' : 'waiting'));
-            const timelineCardClass = item.isCompleted ? 'completed' : (item.isOngoing ? 'ongoing' : (isNextTarget ? 'waiting-highlight' : 'waiting'));
+            const timelineCircleClass = item.isCompleted ? 'completed' : (item.isOngoing ? 'ongoing' : 'waiting');
+            const timelineCardClass = item.isCompleted ? 'completed' : (item.isOngoing ? 'ongoing' : 'waiting');
             
             // Get first verse text of this chapter for subtitle snippet
             const firstVerseObj = bibleData.find(v => v.chapter === item.chapter);
@@ -2084,27 +2128,22 @@ class SimonEduApp {
             if (item.isCompleted) {
               cardSideHtml = `
                 <div class="timeline-card-side">
-                  <span class="timeline-status-badge completed">완료</span>
+                  <span class="timeline-status-badge completed">🟢 완료</span>
                   <span class="material-icons-round" style="color: #10b981; font-size: 1.3rem;">check_circle</span>
                 </div>
               `;
             } else if (item.isOngoing) {
-              let completedVerses = 0;
-              for (let i = item.firstIdx; i <= item.lastIdx; i++) {
-                if (i < curIdx) completedVerses++;
-              }
-              const pct = Math.round((completedVerses / item.versesCount) * 100);
               cardSideHtml = `
                 <div class="timeline-card-side">
-                  <span class="timeline-status-badge ongoing">진행중 ${pct}%</span>
-                  <button class="btn-timeline-continue" onclick="event.stopPropagation(); app.clickChapterCard(${item.chapter}, false)">이어하기</button>
+                  <span class="timeline-status-badge ongoing">🟡 진행중 ${item.pct}%</span>
+                  <button class="btn-timeline-continue" onclick="event.stopPropagation(); app.clickChapterCard(${item.chapter}, false)">풀기</button>
                 </div>
               `;
             } else {
               cardSideHtml = `
                 <div class="timeline-card-side">
-                  <span class="timeline-status-badge waiting">대기중</span>
-                  <span class="material-icons-round" style="color: #cbd5e1; font-size: 1.15rem;">lock</span>
+                  <span class="timeline-status-badge waiting">○ 미시작</span>
+                  <button class="btn-timeline-continue" onclick="event.stopPropagation(); app.clickChapterCard(${item.chapter}, false)">시작하기</button>
                 </div>
               `;
             }
@@ -2112,14 +2151,9 @@ class SimonEduApp {
             // Ongoing Progress Bar inside card
             let ongoingProgressBar = '';
             if (item.isOngoing) {
-              let completedVerses = 0;
-              for (let i = item.firstIdx; i <= item.lastIdx; i++) {
-                if (i < curIdx) completedVerses++;
-              }
-              const pct = Math.round((completedVerses / item.versesCount) * 100);
               ongoingProgressBar = `
                 <div class="timeline-card-progress-bar-wrapper">
-                  <div class="timeline-card-progress-bar-fill" style="width: ${pct}%"></div>
+                  <div class="timeline-card-progress-bar-fill" style="width: ${item.pct}%"></div>
                 </div>
               `;
             }
@@ -2313,11 +2347,12 @@ class SimonEduApp {
     }
     
     // 4. Progress Stats
+    const completedSet = this.getCompletedVerseIndexSet(this.currentUser);
     let completedCount = 0;
     let nextTargetVerse = null;
     chapterVerses.forEach((v, i) => {
       const idx = firstIndex + i;
-      if (idx < curIdx) {
+      if (completedSet.has(idx)) {
         completedCount++;
       } else if (nextTargetVerse === null) {
         nextTargetVerse = v.verse;
@@ -2358,11 +2393,11 @@ class SimonEduApp {
     }
     
     // Update Old Layout stats too
-    const statusText = curIdx > lastIndex ? '완료' : (curIdx >= firstIndex ? '진행 중' : '대기중');
+    const statusText = completedCount >= chapterVerses.length ? '완료' : (completedCount > 0 ? '진행 중' : '미시작');
     const statusPill = document.getElementById('chapterStatusPill');
     if (statusPill) {
       statusPill.textContent = statusText;
-      statusPill.className = 'chapter-status-pill ' + (curIdx > lastIndex ? 'completed' : (curIdx >= firstIndex ? 'ongoing' : 'waiting'));
+      statusPill.className = 'chapter-status-pill ' + (completedCount >= chapterVerses.length ? 'completed' : (completedCount > 0 ? 'ongoing' : 'waiting'));
     }
     
     const oldProgress = document.getElementById('chapterProgressPercent');
@@ -2385,8 +2420,8 @@ class SimonEduApp {
     if (verseListEl) {
       verseListEl.innerHTML = chapterVerses.map((v, i) => {
         const idx = firstIndex + i;
-        const isCompleted = idx < curIdx;
-        const isOngoing = idx === curIdx;
+        const isCompleted = completedSet.has(idx);
+        const isOngoing = !isCompleted && idx === curIdx;
         const isExamPractice = this.journeyTab === 'exam';
         const statusClass = isCompleted ? 'completed' : (isOngoing ? 'ongoing' : (isExamPractice ? 'practice' : 'ready'));
         
@@ -2398,7 +2433,7 @@ class SimonEduApp {
         } else if (isExamPractice) {
           statusBadge = '<span class="verse-badge practice">연습</span>';
         } else {
-          statusBadge = '<span class="verse-badge ready" style="background:#fafaf8; color:#94a3b8; border:1px solid #ebebe9; padding: 2px 6px; border-radius:4px; font-size: 0.75rem; font-weight:bold;">대기중</span>';
+          statusBadge = '<span class="verse-badge ready" style="background:#fafaf8; color:#94a3b8; border:1px solid #ebebe9; padding: 2px 6px; border-radius:4px; font-size: 0.75rem; font-weight:bold;">미시작</span>';
         }
         
         return `
@@ -2491,6 +2526,7 @@ class SimonEduApp {
     const bibleData = window.BIBLE_DATA || [];
     const chapter = this.activeJourneyChapter;
     const curIdx = this.currentUser.currentVerseIndex || 0;
+    const completedSet = this.getCompletedVerseIndexSet(this.currentUser);
     
     const chapterVerses = bibleData.filter(v => v.chapter === chapter);
     const firstIndex = bibleData.findIndex(v => v.chapter === chapter);
@@ -2504,8 +2540,8 @@ class SimonEduApp {
     if (verseListEl) {
       verseListEl.innerHTML = chapterVerses.map((v, i) => {
         const idx = firstIndex + i;
-        const isCompleted = idx < curIdx;
-        const isOngoing = idx === curIdx;
+        const isCompleted = completedSet.has(idx);
+        const isOngoing = !isCompleted && idx === curIdx;
         const isExamPractice = this.journeyTab === 'exam';
         
         let statusBadge = '';
@@ -2520,7 +2556,7 @@ class SimonEduApp {
           statusBadge = '<span class="verse-badge practice" style="background:#e0f2fe; color:#0369a1; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight:bold;">연습</span>';
           rowClass += ' practice';
         } else {
-          statusBadge = '<span class="verse-badge ready" style="background:#fafaf8; color:#94a3b8; border:1px solid #ebebe9; padding:2px 6px; border-radius:4px; font-size: 0.75rem; font-weight:bold;">대기중</span>';
+          statusBadge = '<span class="verse-badge ready" style="background:#fafaf8; color:#94a3b8; border:1px solid #ebebe9; padding:2px 6px; border-radius:4px; font-size: 0.75rem; font-weight:bold;">미시작</span>';
           rowClass += ' ready';
         }
         
@@ -2660,10 +2696,23 @@ class SimonEduApp {
     if (verseIndex < 0 || verseIndex >= bibleData.length) return;
     
     this.activeJourneyVerseIndex = verseIndex;
+    
+    // Auto-align study variables
+    const v = bibleData[verseIndex];
+    this.activeJourneyChapter = v.chapter;
+    this.studyMode = this.studyMode || 'easy';
+    this.studyVerses = bibleData.filter(val => val.chapter === v.chapter);
+    this.studyCurrentIndex = this.studyVerses.findIndex(val => val.verse === v.verse);
+    if (this.studyCurrentIndex === -1) this.studyCurrentIndex = 0;
+    
     this.switchView('journeyVerseStudy');
   }
 
   renderVerseStudy() {
+    if (this.studyMode) {
+      this.renderStudyMode();
+      return;
+    }
     const bibleData = window.BIBLE_DATA || [];
     const curIdx = this.currentUser.currentVerseIndex || 0;
     const idx = this.activeJourneyVerseIndex;
@@ -2988,12 +3037,42 @@ class SimonEduApp {
 
   getCompletedChapterCount(user) {
     const bibleData = window.BIBLE_DATA || [];
-    const curIdx = user.currentVerseIndex || 0;
+    const completedSet = this.getCompletedVerseIndexSet(user);
     const completed = new Set();
     bibleData.forEach((verse, index) => {
-      if (verse.chapter <= 22 && index < curIdx) completed.add(verse.chapter);
+      if (verse.chapter <= 22) {
+        const chapterVerses = bibleData.filter(v => v.chapter === verse.chapter);
+        const firstIndex = bibleData.findIndex(v => v.chapter === verse.chapter);
+        const chapterCompleted = chapterVerses.length > 0 && chapterVerses.every((_, i) => completedSet.has(firstIndex + i));
+        if (chapterCompleted) completed.add(verse.chapter);
+      }
     });
     return completed.size;
+  }
+
+  getCompletedVerseIndexSet(user = this.currentUser) {
+    const completed = new Set();
+    const legacyCount = Math.max(0, Number(user?.currentVerseIndex || 0));
+    for (let i = 0; i < legacyCount; i++) {
+      completed.add(i);
+    }
+    (user?.completedVerseIndices || []).forEach(idx => {
+      const n = Number(idx);
+      if (Number.isInteger(n) && n >= 0) completed.add(n);
+    });
+    return completed;
+  }
+
+  getChapterProgress(chapter, user = this.currentUser) {
+    const bibleData = window.BIBLE_DATA || [];
+    const chapterVerses = bibleData.filter(v => v.chapter === chapter);
+    const firstIndex = bibleData.findIndex(v => v.chapter === chapter);
+    const completedSet = this.getCompletedVerseIndexSet(user);
+    const completedCount = chapterVerses.reduce((count, _, i) => count + (completedSet.has(firstIndex + i) ? 1 : 0), 0);
+    const totalCount = chapterVerses.length;
+    const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+    const status = completedCount >= totalCount && totalCount > 0 ? 'completed' : (completedCount > 0 ? 'ongoing' : 'not-started');
+    return { completedCount, totalCount, pct, status, firstIndex, lastIndex: firstIndex + totalCount - 1 };
   }
 
   getRankingXp(user) {
@@ -3207,11 +3286,7 @@ class SimonEduApp {
     if (!window.BIBLE_DATA) return;
     const idx = window.BIBLE_DATA.findIndex(v => v.chapter === chapter);
     if (idx < 0) return;
-    if ((this.currentUser.currentVerseIndex || 0) < idx) {
-      alert('아직 도달하지 않은 장입니다.');
-      return;
-    }
-    this.currentUser.currentVerseIndex = idx;
+    this.activeJourneyChapter = chapter;
     this.switchView('dashboard');
     this.renderDashboard();
   }
@@ -5609,7 +5684,8 @@ class SimonEduApp {
     this.clearIntervals();
     this.gameActive = false;
 
-    const isLockedPractice = this.isJourneyQuiz && this.journeyTab === 'exam' && this.currentUser && this.activeJourneyVerseIndex > (this.currentUser.currentVerseIndex || 0);
+    const completedBeforeQuiz = this.isJourneyQuiz ? this.getCompletedVerseIndexSet(this.currentUser).has(this.activeJourneyVerseIndex) : false;
+    const isLockedPractice = false;
 
     // 시간 차감 포인트 계산: 5초당 10P 차감, 최저 10P 보장
     const basePoints = this._quizBasePoints || 100;
@@ -5619,7 +5695,7 @@ class SimonEduApp {
     if (hasCustomBonus) {
       totalAward += 20;
     }
-    if (isLockedPractice) {
+    if (isLockedPractice || completedBeforeQuiz) {
       totalAward = 0;
     }
 
@@ -5628,16 +5704,25 @@ class SimonEduApp {
       const bibleData = window.BIBLE_DATA || [];
       const currentVerseObj = this.currentQuizVerse;
       
-      const isAdvancing = !isLockedPractice && ((this.isJourneyQuiz && this.activeJourneyVerseIndex === this.currentUser.currentVerseIndex) || (!this.isJourneyQuiz));
+      const isAdvancing = !completedBeforeQuiz && ((this.isJourneyQuiz && this.activeJourneyVerseIndex === this.currentUser.currentVerseIndex) || (!this.isJourneyQuiz));
       const nextVerseIndex = isAdvancing ? this.currentUser.currentVerseIndex + 1 : this.currentUser.currentVerseIndex;
       
       this.currentUser.currentVerseIndex = nextVerseIndex; // 체험 유저 진도 임시 진행
+      if (this.isJourneyQuiz && !completedBeforeQuiz) {
+        this.currentUser.completedVerseIndices = Array.from(new Set([...(this.currentUser.completedVerseIndices || []), this.activeJourneyVerseIndex]));
+      }
       
       if (this.isJourneyQuiz) {
         const chapterVerses = bibleData.filter(val => val.chapter === currentVerseObj.chapter);
         const firstIndex = bibleData.findIndex(val => val.chapter === currentVerseObj.chapter);
         const lastIndex = firstIndex + chapterVerses.length - 1;
-        const justCompletedChapter = isAdvancing && (nextVerseIndex > lastIndex);
+        const trialCompletedSet = this.getCompletedVerseIndexSet(this.currentUser);
+        const trialCompletedBeforeSet = this.getCompletedVerseIndexSet({
+          ...this.currentUser,
+          completedVerseIndices: (this.currentUser.completedVerseIndices || []).filter(idx => idx !== this.activeJourneyVerseIndex)
+        });
+        const chapterWasCompletedBefore = chapterVerses.length > 0 && chapterVerses.every((_, i) => trialCompletedBeforeSet.has(firstIndex + i));
+        const justCompletedChapter = !chapterWasCompletedBefore && chapterVerses.length > 0 && chapterVerses.every((_, i) => trialCompletedSet.has(firstIndex + i));
         
         this.journeyResultData = {
           chapter: currentVerseObj.chapter,
@@ -5693,7 +5778,7 @@ class SimonEduApp {
     let isAdvancing = false;
     let nextVerseIndex = this.currentUser.currentVerseIndex;
     if (this.isJourneyQuiz) {
-      if (!isLockedPractice && this.activeJourneyVerseIndex === this.currentUser.currentVerseIndex) {
+      if (!completedBeforeQuiz && this.activeJourneyVerseIndex === this.currentUser.currentVerseIndex) {
         nextVerseIndex = this.currentUser.currentVerseIndex + 1;
         isAdvancing = true;
       }
@@ -5707,7 +5792,18 @@ class SimonEduApp {
     const chapterVerses = bibleData.filter(val => val.chapter === currentVerseObj.chapter);
     const firstIndex = bibleData.findIndex(val => val.chapter === currentVerseObj.chapter);
     const lastIndex = firstIndex + chapterVerses.length - 1;
-    const justCompletedChapter = isAdvancing && (nextVerseIndex > lastIndex);
+    const completedSetBeforeQuiz = this.getCompletedVerseIndexSet(this.currentUser);
+    const chapterWasCompletedBefore = chapterVerses.length > 0 && chapterVerses.every((_, i) => completedSetBeforeQuiz.has(firstIndex + i));
+    const completedSetAfterQuiz = this.getCompletedVerseIndexSet({
+      ...this.currentUser,
+      currentVerseIndex: nextVerseIndex,
+      completedVerseIndices: this.isJourneyQuiz && !completedBeforeQuiz
+        ? [...(this.currentUser.completedVerseIndices || []), this.activeJourneyVerseIndex]
+        : (this.currentUser.completedVerseIndices || [])
+    });
+    const justCompletedChapter = this.isJourneyQuiz
+      ? !chapterWasCompletedBefore && chapterVerses.length > 0 && chapterVerses.every((_, i) => completedSetAfterQuiz.has(firstIndex + i))
+      : isAdvancing && (nextVerseIndex > lastIndex);
 
     if (this.isJourneyQuiz) {
       this.journeyResultData = {
@@ -5750,6 +5846,10 @@ class SimonEduApp {
       notifications: firebase.firestore.FieldValue.arrayUnion(newNotification),
       pointsHistory: firebase.firestore.FieldValue.arrayUnion(quizHistory)
     };
+
+    if (this.isJourneyQuiz && !completedBeforeQuiz) {
+      updateData.completedVerseIndices = firebase.firestore.FieldValue.arrayUnion(this.activeJourneyVerseIndex);
+    }
 
     let isChallengeCompletedThisTurn = false;
     let challengeBonusPointsValue = 0;
@@ -6487,6 +6587,20 @@ class SimonEduApp {
   openModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
+      if (modalId === 'modalFindId') {
+        document.getElementById('findIdName').value = '';
+        document.getElementById('findIdEmail').value = '';
+        const resultEl = document.getElementById('findIdResult');
+        resultEl.style.display = 'none';
+        resultEl.innerHTML = '';
+      } else if (modalId === 'modalFindPassword') {
+        document.getElementById('findPwUsername').value = '';
+        document.getElementById('findPwName').value = '';
+        document.getElementById('findPwEmail').value = '';
+        const resultEl = document.getElementById('findPwResult');
+        resultEl.style.display = 'none';
+        resultEl.innerHTML = '';
+      }
       modal.style.display = 'flex';
       // Trigger CSS reflow
       modal.offsetHeight;
@@ -6514,6 +6628,118 @@ class SimonEduApp {
       event: 'native_route_chrome',
       hidden
     }));
+  }
+
+  findUserUsername() {
+    const nameVal = document.getElementById('findIdName').value.trim();
+    const emailVal = document.getElementById('findIdEmail').value.trim();
+    const resultEl = document.getElementById('findIdResult');
+
+    if (!nameVal || !emailVal) {
+      alert('이름과 이메일 주소를 모두 입력해주세요.');
+      return;
+    }
+
+    // Search in local users cache
+    let matchedUser = this.users.find(u => 
+      u.name && u.name.trim() === nameVal && 
+      u.email && u.email.trim().toLowerCase() === emailVal.toLowerCase()
+    );
+
+    let foundUsername = null;
+    if (matchedUser) {
+      foundUsername = matchedUser.username;
+    } else {
+      // Search in SEED_USERS
+      for (const [key, val] of Object.entries(SEED_USERS)) {
+        if (val.name && val.name.trim() === nameVal && 
+            val.email && val.email.trim().toLowerCase() === emailVal.toLowerCase()) {
+          foundUsername = key;
+          break;
+        }
+      }
+    }
+
+    resultEl.style.display = 'block';
+    if (foundUsername) {
+      resultEl.style.color = 'var(--text-primary)';
+      resultEl.style.backgroundColor = 'rgba(139, 92, 246, 0.1)';
+      resultEl.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+      resultEl.innerHTML = `입력하신 정보와 일치하는 아이디는<br><strong style="font-size: 1.15rem; color: var(--accent-purple);">${foundUsername}</strong> 입니다.`;
+    } else {
+      resultEl.style.color = 'var(--accent-rose)';
+      resultEl.style.backgroundColor = 'rgba(244, 63, 94, 0.1)';
+      resultEl.style.borderColor = 'rgba(244, 63, 94, 0.3)';
+      resultEl.innerHTML = `입력하신 정보와 일치하는 아이디를 찾을 수 없습니다.`;
+    }
+  }
+
+  findUserPassword() {
+    const usernameVal = document.getElementById('findPwUsername').value.trim();
+    const nameVal = document.getElementById('findPwName').value.trim();
+    const emailVal = document.getElementById('findPwEmail').value.trim();
+    const resultEl = document.getElementById('findPwResult');
+
+    if (!usernameVal || !nameVal || !emailVal) {
+      alert('아이디, 이름, 이메일 주소를 모두 입력해주세요.');
+      return;
+    }
+
+    resultEl.style.display = 'block';
+    resultEl.style.color = 'var(--text-primary)';
+    resultEl.style.backgroundColor = 'rgba(139, 92, 246, 0.1)';
+    resultEl.style.borderColor = 'rgba(139, 92, 246, 0.3)';
+    resultEl.innerHTML = `정보를 확인하고 있습니다. 잠시만 기다려주세요...`;
+
+    // Submit password reset request to Firestore
+    db.collection('password_resets').add({
+      username: usernameVal,
+      name: nameVal,
+      email: emailVal.toLowerCase(),
+      status: 'pending',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    })
+    .then(docRef => {
+      // Listen to status changes on the request document
+      const unsubscribe = docRef.onSnapshot(doc => {
+        if (!doc.exists) return;
+        const data = doc.data();
+        
+        if (data.status === 'email_updated') {
+          unsubscribe();
+          // Now that Auth email is updated to real email, trigger sendPasswordResetEmail client-side!
+          auth.sendPasswordResetEmail(emailVal.toLowerCase())
+            .then(() => {
+              resultEl.style.color = 'var(--accent-emerald)';
+              resultEl.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
+              resultEl.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+              resultEl.innerHTML = `비밀번호 재설정 이메일이 발송되었습니다.<br><strong style="color: var(--accent-emerald);">${emailVal}</strong> 이메일 수신함을 확인해주세요.`;
+              docRef.update({ status: 'sent' }).catch(console.error);
+            })
+            .catch(authErr => {
+              console.error("Auth sendPasswordResetEmail error:", authErr);
+              resultEl.style.color = 'var(--accent-rose)';
+              resultEl.style.backgroundColor = 'rgba(244, 63, 94, 0.1)';
+              resultEl.style.borderColor = 'rgba(244, 63, 94, 0.3)';
+              resultEl.innerHTML = `이메일 발송에 실패했습니다: ${authErr.message}`;
+              docRef.update({ status: 'failed', error: authErr.message }).catch(console.error);
+            });
+        } else if (data.status === 'failed') {
+          unsubscribe();
+          resultEl.style.color = 'var(--accent-rose)';
+          resultEl.style.backgroundColor = 'rgba(244, 63, 94, 0.1)';
+          resultEl.style.borderColor = 'rgba(244, 63, 94, 0.3)';
+          resultEl.innerHTML = data.error || '입력하신 정보와 일치하는 계정을 찾을 수 없습니다.';
+        }
+      });
+    })
+    .catch(err => {
+      console.error("Password reset request error:", err);
+      resultEl.style.color = 'var(--accent-rose)';
+      resultEl.style.backgroundColor = 'rgba(244, 63, 94, 0.1)';
+      resultEl.style.borderColor = 'rgba(244, 63, 94, 0.3)';
+      resultEl.innerHTML = `요청 처리 중 오류가 발생했습니다.<br>잠시 후 다시 시도해주세요.`;
+    });
   }
 
   confirmResetAndReview() {
@@ -8247,6 +8473,13 @@ class SimonEduApp {
 
     // 3. Detail Views: Back Navigation
     if (view === 'journeyVerseStudy') {
+      if (this.studyMode === 'exam') {
+        this.switchView('journeyChapterDetail');
+      } else {
+        this.switchView('journeyVerseSelect');
+      }
+      return 'navigated';
+    } else if (view === 'journeyVerseSelect') {
       this.switchView('journeyChapterDetail');
       return 'navigated';
     } else if (view === 'journeyChapterDetail') {
@@ -8280,6 +8513,893 @@ class SimonEduApp {
     
     // 5. If it's a tab screen or anything else, let Flutter handle it (e.g. exit toast)
     return 'tab_screen';
+  }
+
+  // Interactive Chapter Study Methods
+  openVerseSelect(mode) {
+    if (!window.BIBLE_DATA) return;
+    this.studyMode = mode;
+    this.studyVerses = window.BIBLE_DATA.filter(v => v.chapter === this.activeJourneyChapter);
+    
+    // Choose first uncompleted verse as default
+    const completedSet = this.getCompletedVerseIndexSet(this.currentUser);
+    const firstIndex = window.BIBLE_DATA.findIndex(v => v.chapter === this.activeJourneyChapter);
+    
+    let startIdx = 0;
+    for (let i = 0; i < this.studyVerses.length; i++) {
+      if (!completedSet.has(firstIndex + i)) {
+        startIdx = i;
+        break;
+      }
+    }
+    this.studyCurrentIndex = startIdx;
+    
+    this.switchView('journeyVerseSelect');
+  }
+
+  renderVerseSelect() {
+    if (!window.BIBLE_DATA) return;
+    const mode = this.studyMode;
+    const chapter = this.activeJourneyChapter;
+    
+    const headerTitle = document.getElementById('verseSelectHeaderTitle');
+    const modeDesc = document.getElementById('verseSelectModeDesc');
+    const btnStart = document.getElementById('btnVerseSelectStart');
+    
+    const modeNames = {
+      'easy': '쉬움 모드',
+      'hard': '어려움 모드',
+      'expert': '전문 모드'
+    };
+    
+    const modeDescs = {
+      'easy': '말씀을 보면서 학습해요.',
+      'hard': '핵심 단어를 빈칸에 채워요.',
+      'expert': '말씀을 가리고 직접 암송해요.'
+    };
+    
+    const modeColors = {
+      'easy': '#16a34a',
+      'hard': '#d97706',
+      'expert': '#dc2626'
+    };
+    
+    if (headerTitle) headerTitle.textContent = modeNames[mode] || '';
+    if (modeDesc) {
+      modeDesc.textContent = modeDescs[mode] || '';
+      modeDesc.style.color = modeColors[mode] || '#16a34a';
+    }
+    
+    // Render verse grid numbers
+    const gridEl = document.getElementById('verseSelectGrid');
+    if (gridEl) {
+      gridEl.innerHTML = this.studyVerses.map((v, i) => {
+        const isActive = i === this.studyCurrentIndex ? `active ${mode}` : '';
+        return `
+          <button class="verse-select-btn ${isActive}" onclick="app.selectVerseInGrid(${i})">
+            ${v.verse}
+          </button>
+        `;
+      }).join('');
+    }
+    
+    // Selection Summary
+    const refEl = document.getElementById('verseSelectSelectedRef');
+    const selectedVerse = this.studyVerses[this.studyCurrentIndex];
+    if (refEl && selectedVerse) {
+      refEl.textContent = `요한계시록 ${chapter}장 ${selectedVerse.verse}절`;
+    }
+    
+    // CTA Button
+    if (btnStart) {
+      btnStart.style.backgroundColor = modeColors[mode] || '#16a34a';
+    }
+  }
+
+  selectVerseInGrid(idx) {
+    if (idx < 0 || idx >= this.studyVerses.length) return;
+    this.studyCurrentIndex = idx;
+    this.renderVerseSelect();
+  }
+
+  startStudyFromSelectedVerse() {
+    const firstIndex = window.BIBLE_DATA.findIndex(v => v.chapter === this.activeJourneyChapter);
+    this.activeJourneyVerseIndex = firstIndex + this.studyCurrentIndex;
+    
+    this.studyAnswered = false;
+    this.studySelectedOptionIndex = null;
+    this.studyShowExplanation = false;
+    this.studyDictationAccuracy = 0;
+    
+    if (this.studyMode === 'hard') {
+      this.generateHardModeOptions();
+    }
+    
+    this.switchView('journeyVerseStudy');
+  }
+
+  startStudyMode(mode) {
+    if (!window.BIBLE_DATA) return;
+    this.studyMode = mode;
+    this.studyVerses = window.BIBLE_DATA.filter(v => v.chapter === this.activeJourneyChapter);
+    
+    const completedSet = this.getCompletedVerseIndexSet(this.currentUser);
+    const firstIndex = window.BIBLE_DATA.findIndex(v => v.chapter === this.activeJourneyChapter);
+    
+    let startIdx = 0;
+    for (let i = 0; i < this.studyVerses.length; i++) {
+      if (!completedSet.has(firstIndex + i)) {
+        startIdx = i;
+        break;
+      }
+    }
+    this.studyCurrentIndex = startIdx;
+    
+    this.studyAnswered = false;
+    this.studySelectedOptionIndex = null;
+    this.studyShowExplanation = false;
+    this.studyDictationAccuracy = 0;
+    
+    if (mode === 'exam') {
+      this.studyExamCorrectCount = 0;
+      this.studyExamCurrentIndex = 0;
+      this.generateStudyExamQuestions();
+    } else {
+      this.activeJourneyVerseIndex = firstIndex + this.studyCurrentIndex;
+      if (mode === 'hard') {
+        this.generateHardModeOptions();
+      }
+    }
+    
+    this.switchView('journeyVerseStudy');
+  }
+
+  generateHardModeOptions() {
+    const v = this.studyVerses[this.studyCurrentIndex];
+    if (!v) return;
+    
+    let correctKeyword = "";
+    if (v.keywords && v.keywords.length > 0) {
+      correctKeyword = v.keywords[0];
+    } else {
+      const words = v.text.split(/[\s,.\r\n\t]+/).filter(w => w.length >= 2);
+      correctKeyword = words[0] || "지키는 자";
+    }
+    
+    const distractors = this.generateDistractors(correctKeyword, 3);
+    const options = [correctKeyword, ...distractors];
+    
+    const shuffledOptions = options.map((opt, idx) => ({ text: opt, isCorrect: idx === 0 }));
+    shuffledOptions.sort(() => 0.5 - Math.random());
+    
+    this.studyCurrentOptions = shuffledOptions;
+    this.studyCorrectOptionIndex = shuffledOptions.findIndex(o => o.isCorrect);
+    this.studySelectedOptionIndex = null;
+    this.studyAnswered = false;
+  }
+
+  generateDistractors(correctAnswer, count = 3) {
+    const bibleData = window.BIBLE_DATA || [];
+    const allKeywords = [];
+    bibleData.forEach(v => {
+      if (v.keywords) {
+        v.keywords.forEach(kw => {
+          if (kw && kw.trim()) allKeywords.push(kw.trim());
+        });
+      }
+    });
+    
+    const filtered = Array.from(new Set(allKeywords)).filter(kw => kw !== correctAnswer && kw.length > 0);
+    const shuffled = filtered.sort(() => 0.5 - Math.random());
+    const result = shuffled.slice(0, count);
+    
+    const fallbacks = ["예언의 말씀", "지키는 자", "보좌 앞에", "어린 양", "흰 옷", "하늘과 땅", "일곱 천사", "성령", "새 예루살렘", "구원"];
+    while (result.length < count) {
+      const fb = fallbacks[Math.floor(Math.random() * fallbacks.length)];
+      if (fb !== correctAnswer && !result.includes(fb)) {
+        result.push(fb);
+      }
+    }
+    return result;
+  }
+
+  generateStudyExamQuestions() {
+    const chapter = this.activeJourneyChapter;
+    const chapterVerses = window.BIBLE_DATA.filter(v => v.chapter === chapter);
+    const questions = [];
+    
+    if (chapter === 1) {
+      const v1_3 = chapterVerses.find(v => v.verse === 3);
+      if (v1_3) {
+        questions.push({
+          questionText: `요한계시록 1장 3절\n"이 예언의 말씀을 읽는 자와 듣는 자들과 그 가운데 기록한 것을 지키는 자들이 복이 있나니 때가 가까움이라"\n\n본문에서 복이 있다고 한 사람은 누구입니까?`,
+          options: ["읽는 자, 듣는 자들, 지키는 자들", "목회자와 전도사", "이단과 서기관", "바리새인과 사두개인"],
+          correctIndex: 0,
+          explanation: "요한계시록 1장 3절에 기록된 바와 같이, 예언의 말씀을 읽는 자, 듣는 자들, 그리고 그 가운데 기록한 것을 지키는 자들이 복이 있습니다.",
+          chapter: 1,
+          verse: 3
+        });
+      }
+    }
+    
+    const shuffledVerses = [...chapterVerses].sort(() => 0.5 - Math.random());
+    for (let i = 0; i < shuffledVerses.length; i++) {
+      const v = shuffledVerses[i];
+      if (chapter === 1 && v.verse === 3) continue;
+      
+      let correctKeyword = "";
+      if (v.keywords && v.keywords.length > 0) {
+        correctKeyword = v.keywords[0];
+      } else {
+        const words = v.text.split(/[\s,.\r\n\t]+/).filter(w => w.length >= 2);
+        correctKeyword = words[0];
+      }
+      
+      if (!correctKeyword) continue;
+      
+      const escapedKeyword = correctKeyword.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const textWithBlank = v.text.replace(new RegExp(escapedKeyword, 'g'), ' (       ) ');
+      
+      const distractors = this.generateDistractors(correctKeyword, 3);
+      const opts = [correctKeyword, ...distractors];
+      const shuffledOpts = opts.map((opt, idx) => ({ text: opt, isCorrect: idx === 0 }));
+      shuffledOpts.sort(() => 0.5 - Math.random());
+      
+      const correctIdx = shuffledOpts.findIndex(o => o.isCorrect);
+      
+      questions.push({
+        questionText: `[구절 빈칸 채우기] 요한계시록 ${v.chapter}장 ${v.verse}절\n\n"${textWithBlank}"\n\n위 말씀의 빈칸에 들어갈 알맞은 단어는?`,
+        options: shuffledOpts.map(o => o.text),
+        correctIndex: correctIdx,
+        explanation: `정답은 "${correctKeyword}"입니다.\n\n[요한계시록 ${v.chapter}장 ${v.verse}절 본문]\n${v.text}`,
+        chapter: v.chapter,
+        verse: v.verse
+      });
+      
+      if (questions.length >= 10) break;
+    }
+    
+    let idx = 0;
+    while (questions.length < 10 && chapterVerses.length > 0) {
+      const v = chapterVerses[idx % chapterVerses.length];
+      idx++;
+      
+      let keyword = "";
+      if (v.keywords && v.keywords.length > 0) {
+        keyword = v.keywords[questions.length % v.keywords.length] || v.keywords[0];
+      } else {
+        continue;
+      }
+      
+      const escapedKeyword = keyword.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const textWithBlank = v.text.replace(new RegExp(escapedKeyword, 'g'), ' (       ) ');
+      const distractors = this.generateDistractors(keyword, 3);
+      const opts = [keyword, ...distractors];
+      const shuffledOpts = opts.map((opt, idx) => ({ text: opt, isCorrect: idx === 0 }));
+      shuffledOpts.sort(() => 0.5 - Math.random());
+      
+      const correctIdx = shuffledOpts.findIndex(o => o.isCorrect);
+      
+      questions.push({
+        questionText: `[구절 빈칸 채우기] 요한계시록 ${v.chapter}장 ${v.verse}절\n\n"${textWithBlank}"\n\n위 말씀의 빈칸에 들어갈 알맞은 단어는?`,
+        options: shuffledOpts.map(o => o.text),
+        correctIndex: correctIdx,
+        explanation: `정답은 "${keyword}"입니다.\n\n[요한계시록 ${v.chapter}장 ${v.verse}절 본문]\n${v.text}`,
+        chapter: v.chapter,
+        verse: v.verse
+      });
+    }
+    
+    if (chapter === 1 && questions.length > 0) {
+      const first = questions[0];
+      const rest = questions.slice(1).sort(() => 0.5 - Math.random());
+      this.studyExamQuestions = [first, ...rest];
+    } else {
+      this.studyExamQuestions = questions.sort(() => 0.5 - Math.random());
+    }
+  }
+
+  renderStudyMode() {
+    if (!window.BIBLE_DATA) return;
+    
+    const mode = this.studyMode;
+    const chapter = this.activeJourneyChapter;
+    
+    const headerTitle = document.getElementById('studyModeHeaderTitle');
+    const headerProgress = document.getElementById('studyModeHeaderProgress');
+    const infoBanner = document.getElementById('studyModeInfoBanner');
+    const bannerIcon = document.getElementById('studyModeBannerIcon');
+    const bannerDesc = document.getElementById('studyModeBannerDesc');
+    
+    const modeNames = {
+      'easy': '쉬움 모드',
+      'hard': '어려움 모드',
+      'expert': '전문 모드',
+      'exam': '예상 문제'
+    };
+    
+    const modeIcons = {
+      'easy': 'sentiment_satisfied_alt',
+      'hard': 'sentiment_neutral',
+      'expert': 'sentiment_very_dissatisfied',
+      'exam': 'quiz'
+    };
+    
+    const modeDescs = {
+      'easy': '말씀을 보면서 학습해요.',
+      'hard': '핵심 단어를 빈칸에 채워요.',
+      'expert': '말씀을 가리고 직접 암송해요.',
+      'exam': '사명자 시험 대비 문제를 풀어요.'
+    };
+    
+    if (headerTitle) {
+      if (mode === 'exam') {
+        headerTitle.textContent = modeNames[mode] || '';
+      } else {
+        const v = this.studyVerses[this.studyCurrentIndex];
+        headerTitle.textContent = v ? `${modeNames[mode]} - ${v.verse}절` : (modeNames[mode] || '');
+      }
+    }
+    if (infoBanner) {
+      infoBanner.className = `mode-info-banner ${mode}`;
+    }
+    if (bannerIcon) bannerIcon.textContent = modeIcons[mode] || '';
+    if (bannerDesc) bannerDesc.textContent = modeDescs[mode] || '';
+    
+    const progressBarFill = document.getElementById('studyProgressBarFill');
+    const progressBarText = document.getElementById('studyProgressBarText');
+    
+    let currentNum = 0;
+    let totalNum = 0;
+    let progressPct = 0;
+    
+    if (mode === 'exam') {
+      currentNum = this.studyExamCurrentIndex + 1;
+      totalNum = 10;
+      progressPct = (currentNum / totalNum) * 100;
+      if (headerProgress) headerProgress.textContent = `${currentNum}/${totalNum}문제`;
+      if (progressBarText) progressBarText.textContent = `${currentNum} / ${totalNum}문제`;
+    } else {
+      currentNum = this.studyCurrentIndex + 1;
+      totalNum = this.studyVerses.length;
+      progressPct = (currentNum / totalNum) * 100;
+      if (headerProgress) headerProgress.textContent = `${currentNum}/${totalNum}절`;
+      if (progressBarText) progressBarText.textContent = `${currentNum} / ${totalNum}절`;
+    }
+    
+    if (progressBarFill) {
+      progressBarFill.style.width = `${progressPct}%`;
+      const colorMap = {
+        'easy': '#16a34a',
+        'hard': '#d97706',
+        'expert': '#dc2626',
+        'exam': '#7c3aed'
+      };
+      progressBarFill.style.backgroundColor = colorMap[mode] || '#16a34a';
+    }
+    
+    const cardEl = document.getElementById('studyVerseCard');
+    const refEl = document.getElementById('studyVerseRef');
+    const textEl = document.getElementById('studyVerseText');
+    
+    if (cardEl) {
+      cardEl.className = `verse-study-card glass-panel text-size-${this.verseTextSize}`;
+    }
+    
+    const controlsEl = document.getElementById('studyModeControls');
+    
+    if (mode === 'exam') {
+      const q = this.studyExamQuestions[this.studyExamCurrentIndex];
+      if (!q) return;
+      
+      if (refEl) refEl.textContent = `요한계시록 ${q.chapter}장 ${q.verse}절 예상 문제`;
+      if (textEl) textEl.innerHTML = q.questionText.replace(/\n/g, '<br>');
+      
+      let optionsHtml = '';
+      if (this.studyAnswered) {
+        optionsHtml = q.options.map((opt, idx) => {
+          let extraClass = '';
+          if (idx === q.correctIndex) extraClass = 'correct';
+          else if (idx === this.studySelectedOptionIndex) extraClass = 'incorrect';
+          
+          return `
+            <button class="study-option-row exam ${extraClass}" disabled>
+              <span class="option-num">${idx + 1}</span>
+              <span class="option-text">${this.escapeHtml(opt)}</span>
+            </button>
+          `;
+        }).join('');
+      } else {
+        optionsHtml = q.options.map((opt, idx) => {
+          const selectedClass = idx === this.studySelectedOptionIndex ? 'selected' : '';
+          return `
+            <button class="study-option-row exam ${selectedClass}" onclick="app.selectStudyOption(${idx})">
+              <span class="option-num">${idx + 1}</span>
+              <span class="option-text">${this.escapeHtml(opt)}</span>
+            </button>
+          `;
+        }).join('');
+      }
+      
+      const isLast = this.studyExamCurrentIndex === 9;
+      const btnText = this.studyAnswered ? (isLast ? "결과 보기" : "다음 문제") : "정답 확인";
+      const btnClick = this.studyAnswered ? (isLast ? "app.showStudyExamResult()" : "app.nextStudyVerse()") : "app.checkStudyAnswer()";
+      const btnDisabled = !this.studyAnswered && this.studySelectedOptionIndex === null ? 'disabled' : '';
+      
+      let explanationHtml = '';
+      if (this.studyAnswered) {
+        explanationHtml = `
+          <div class="explanation-card glass-panel animate-fade-in" style="padding: 1.25rem; border-radius: 14px; background: #faf5ff; border: 1px solid #e9d5ff; margin-top: 1rem; text-align: left; box-shadow: 0 4px 12px rgba(107, 33, 168, 0.03);">
+            <h5 style="color: #6b21a8; font-size: 0.88rem; font-weight: bold; margin: 0 0 0.5rem 0; display: flex; align-items: center; gap: 0.25rem;">
+              <span class="material-icons-round" style="font-size: 1.1rem;">info</span> 해설
+            </h5>
+            <p style="font-size: 0.82rem; color: #581c87; line-height: 1.5; margin: 0; white-space: pre-line; word-break: keep-all;">${this.escapeHtml(q.explanation)}</p>
+          </div>
+        `;
+      }
+      
+      controlsEl.innerHTML = `
+        <div class="study-options-container" style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem;">
+          ${optionsHtml}
+        </div>
+        ${explanationHtml}
+        <div class="study-action-row" style="display: flex; gap: 0.75rem; margin-top: 1.25rem;">
+          <button class="btn-study-primary exam" id="btnStudyAction" onclick="${btnClick}" ${btnDisabled}>${btnText}</button>
+        </div>
+      `;
+      
+    } else {
+      const v = this.studyVerses[this.studyCurrentIndex];
+      if (!v) return;
+      
+      const firstIndex = window.BIBLE_DATA.findIndex(val => val.chapter === chapter);
+      this.activeJourneyVerseIndex = firstIndex + this.studyCurrentIndex;
+      
+      if (refEl) refEl.textContent = `요한계시록 ${v.chapter}장 ${v.verse}절`;
+      
+      const completedSet = this.getCompletedVerseIndexSet(this.currentUser);
+      const isCompleted = completedSet.has(this.activeJourneyVerseIndex);
+      
+      if (mode === 'easy') {
+        if (textEl) textEl.textContent = v.text;
+        
+        const isBookmarked = (this.currentUser.bookmarks || []).includes(this.activeJourneyVerseIndex);
+        const bookmarkIcon = isBookmarked ? 'bookmark' : 'bookmark_border';
+        const bookmarkColor = isBookmarked ? '#d97706' : '#94a3b8';
+        const completedBtnText = isCompleted ? '✓ 암송 완료됨' : '✓ 암송 완료';
+        const completedBtnDisabled = isCompleted ? 'disabled style="background: #e6f4ea; color: #137333; border: 1px solid #c2e7c9;"' : '';
+        
+        controlsEl.innerHTML = `
+          <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1.25rem;">
+            <button onclick="app.toggleStudyBookmark()" style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; height: 50px; width: 50px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
+              <span class="material-icons-round" style="color: ${bookmarkColor}; font-size: 1.4rem;">${bookmarkIcon}</span>
+            </button>
+            
+            <button onclick="app.speakText(window.BIBLE_DATA[${this.activeJourneyVerseIndex}].text)" style="flex: 1; background: white; border: 1px solid #e2e8f0; border-radius: 12px; height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; color: var(--text-primary); font-weight: 700; font-size: 0.92rem; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.02);">
+              <span class="material-icons-round" style="color: #16a34a; font-size: 1.25rem;">volume_up</span>
+              본문 듣기
+            </button>
+            
+            <button onclick="app.markVerseAsCompleted()" ${completedBtnDisabled} style="flex: 1.2; background: #16a34a; border: none; border-radius: 12px; height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; color: white; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 4px 10px rgba(22, 163, 74, 0.2);">
+              ${completedBtnText}
+            </button>
+          </div>
+          
+          <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+            <button class="btn-study-secondary" id="btnPrevVerse" onclick="app.prevStudyVerse()" ${this.studyCurrentIndex === 0 ? 'disabled style="opacity:0.3;"' : ''}>이전 절</button>
+            <button class="btn-study-secondary" id="btnNextVerse" onclick="app.nextStudyVerse()" ${this.studyCurrentIndex === this.studyVerses.length - 1 ? 'disabled style="opacity:0.3;"' : ''}>다음 절</button>
+          </div>
+        `;
+        
+      } else if (mode === 'hard') {
+        let correctKeyword = "";
+        if (v.keywords && v.keywords.length > 0) {
+          correctKeyword = v.keywords[0];
+        } else {
+          const words = v.text.split(/[\s,.\r\n\t]+/).filter(w => w.length >= 2);
+          correctKeyword = words[0] || "지키는 자";
+        }
+        
+        const escapedKeyword = correctKeyword.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const textWithBlank = v.text.replace(new RegExp(escapedKeyword, 'g'), ' (       ) ');
+        if (textEl) textEl.textContent = textWithBlank;
+        
+        let optionsHtml = '';
+        if (this.studyAnswered) {
+          optionsHtml = this.studyCurrentOptions.map((opt, idx) => {
+            let extraClass = '';
+            if (idx === this.studyCorrectOptionIndex) extraClass = 'correct';
+            else if (idx === this.studySelectedOptionIndex) extraClass = 'incorrect';
+            
+            return `
+              <button class="study-option-row hard ${extraClass}" disabled>
+                <span class="option-num">${idx + 1}</span>
+                <span class="option-text">${this.escapeHtml(opt.text)}</span>
+              </button>
+            `;
+          }).join('');
+        } else {
+          optionsHtml = this.studyCurrentOptions.map((opt, idx) => {
+            const selectedClass = idx === this.studySelectedOptionIndex ? 'selected' : '';
+            return `
+              <button class="study-option-row hard ${selectedClass}" onclick="app.selectStudyOption(${idx})">
+                <span class="option-num">${idx + 1}</span>
+                <span class="option-text">${this.escapeHtml(opt.text)}</span>
+              </button>
+            `;
+          }).join('');
+        }
+        
+        const btnText = this.studyAnswered ? "다음 절" : "정답 확인";
+        const btnClick = this.studyAnswered ? "app.nextStudyVerse()" : "app.checkStudyAnswer()";
+        const btnDisabled = !this.studyAnswered && this.studySelectedOptionIndex === null ? 'disabled' : '';
+        
+        controlsEl.innerHTML = `
+          <div class="study-options-container" style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem;">
+            ${optionsHtml}
+          </div>
+          <div class="study-action-row" style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+            <button class="btn-study-primary hard" id="btnStudyAction" onclick="${btnClick}" ${btnDisabled}>${btnText}</button>
+          </div>
+        `;
+        
+      } else if (mode === 'expert') {
+        const underlines = v.text.split(/\s+/).map(w => '_'.repeat(Math.max(2, w.length))).join(' ');
+        if (textEl) textEl.textContent = underlines;
+        
+        if (this.studyAnswered) {
+          const actualText = v.text;
+          const userText = document.getElementById('expertRecitationInput')?.value || '';
+          const comparison = this.compareTextWords(actualText, userText);
+          
+          controlsEl.innerHTML = `
+            <div class="dictation-diff-box glass-panel animate-fade-in" style="padding: 1.25rem; border-radius: 14px; background: #fafafa; border: 1px solid #e2e8f0; text-align: left; line-height: 1.8; margin-bottom: 1.25rem;">
+              <h5 style="font-size: 0.85rem; font-weight: 800; color: var(--text-secondary); margin: 0 0 0.75rem 0; display: flex; justify-content: space-between; align-items: center;">
+                <span>암송 일치율</span>
+                <span style="font-size: 1.15rem; font-weight: 900; color: ${comparison.accuracy >= 90 ? '#16a34a' : (comparison.accuracy >= 70 ? '#d97706' : '#dc2626')};">${comparison.accuracy}%</span>
+              </h5>
+              <div style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); word-break: keep-all;">
+                ${comparison.html}
+              </div>
+            </div>
+            
+            <div class="study-action-row" style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+              <button class="btn-study-primary expert" id="btnStudyAction" onclick="app.nextStudyVerse()">다음 절</button>
+            </div>
+          `;
+        } else {
+          controlsEl.innerHTML = `
+            <div style="margin-bottom: 1.25rem;">
+              <textarea id="expertRecitationInput" placeholder="이곳에 구절을 타이핑하여 암송해 보세요." style="width: 100%; height: 100px; padding: 0.88rem 1rem; border-radius: 14px; border: 1px solid #cbd5e1; outline: none; font-size: 0.95rem; line-height: 1.6; resize: none; font-weight: 500; font-family: inherit; box-shadow: inset 0 2px 4px rgba(0,0,0,0.01); transition: border-color 0.2s ease;" oninput="document.getElementById('btnStudyAction').disabled = this.value.trim().length === 0;"></textarea>
+            </div>
+            
+            <div class="study-action-row" style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+              <button class="btn-study-primary expert" id="btnStudyAction" onclick="app.checkStudyAnswer()" disabled>정답 확인</button>
+            </div>
+          `;
+        }
+      }
+    }
+  }
+
+  selectStudyOption(idx) {
+    if (this.studyAnswered) return;
+    this.studySelectedOptionIndex = idx;
+    
+    const container = document.querySelector('.study-options-container');
+    if (container) {
+      const options = container.querySelectorAll('.study-option-row');
+      options.forEach((opt, index) => {
+        opt.classList.toggle('selected', index === idx);
+      });
+    }
+    
+    const btnAction = document.getElementById('btnStudyAction');
+    if (btnAction) {
+      btnAction.disabled = false;
+    }
+  }
+
+  checkStudyAnswer() {
+    if (this.studyMode === 'hard') {
+      this.studyAnswered = true;
+      const correctIdx = this.studyCorrectOptionIndex;
+      const selectedIdx = this.studySelectedOptionIndex;
+      
+      const container = document.querySelector('.study-options-container');
+      if (container) {
+        const options = container.querySelectorAll('.study-option-row');
+        options.forEach((opt, index) => {
+          if (index === correctIdx) {
+            opt.classList.add('correct');
+          } else if (index === selectedIdx) {
+            opt.classList.add('incorrect');
+          }
+          opt.disabled = true;
+        });
+      }
+      
+      if (selectedIdx === correctIdx) {
+        this.markVerseAsCompleted(true);
+        this.showToast('정답입니다! 👏');
+      } else {
+        this.showToast('오답입니다. 😢');
+      }
+      
+      const btnAction = document.getElementById('btnStudyAction');
+      if (btnAction) {
+        btnAction.textContent = "다음 절";
+        btnAction.disabled = false;
+        btnAction.setAttribute('onclick', 'app.nextStudyVerse()');
+      }
+      
+    } else if (this.studyMode === 'expert') {
+      const v = this.studyVerses[this.studyCurrentIndex];
+      if (!v) return;
+      
+      const userText = document.getElementById('expertRecitationInput')?.value || '';
+      const comparison = this.compareTextWords(v.text, userText);
+      this.studyDictationAccuracy = comparison.accuracy;
+      this.studyAnswered = true;
+      
+      if (comparison.accuracy >= 80) {
+        this.markVerseAsCompleted(true);
+        this.showToast('암송 완료! 👏');
+      } else {
+        this.showToast(`일치율 ${comparison.accuracy}%로 암송 기준(80%)에 미달했습니다.`);
+      }
+      
+      this.renderStudyMode();
+      
+    } else if (this.studyMode === 'exam') {
+      this.studyAnswered = true;
+      const q = this.studyExamQuestions[this.studyExamCurrentIndex];
+      const correctIdx = q.correctIndex;
+      const selectedIdx = this.studySelectedOptionIndex;
+      
+      const container = document.querySelector('.study-options-container');
+      if (container) {
+        const options = container.querySelectorAll('.study-option-row');
+        options.forEach((opt, index) => {
+          if (index === correctIdx) {
+            opt.classList.add('correct');
+          } else if (index === selectedIdx) {
+            opt.classList.add('incorrect');
+          }
+          opt.disabled = true;
+        });
+      }
+      
+      if (selectedIdx === correctIdx) {
+        if (!this.studyExamCorrectCount) this.studyExamCorrectCount = 0;
+        this.studyExamCorrectCount++;
+        this.showToast('정답입니다! 👏');
+      } else {
+        this.showToast('오답입니다. 😢');
+      }
+      
+      this.renderStudyMode();
+    }
+  }
+
+  nextStudyVerse() {
+    if (this.studyMode === 'exam') {
+      if (this.studyExamCurrentIndex >= 9) {
+        this.showStudyExamResult();
+        return;
+      }
+      this.studyExamCurrentIndex++;
+      this.studySelectedOptionIndex = null;
+      this.studyAnswered = false;
+      this.studyShowExplanation = false;
+      this.renderStudyMode();
+    } else {
+      if (this.studyCurrentIndex >= this.studyVerses.length - 1) {
+        this.showToast('🎉 해당 장의 모든 구절 학습을 완료했습니다!');
+        this.switchView('journeyChapterDetail');
+        return;
+      }
+      this.studyCurrentIndex++;
+      this.studySelectedOptionIndex = null;
+      this.studyAnswered = false;
+      
+      const firstIndex = window.BIBLE_DATA.findIndex(v => v.chapter === this.activeJourneyChapter);
+      this.activeJourneyVerseIndex = firstIndex + this.studyCurrentIndex;
+      
+      if (this.studyMode === 'hard') {
+        this.generateHardModeOptions();
+      }
+      this.renderStudyMode();
+    }
+  }
+
+  prevStudyVerse() {
+    if (this.studyMode === 'exam') {
+      if (this.studyExamCurrentIndex > 0) {
+        this.studyExamCurrentIndex--;
+        this.studySelectedOptionIndex = null;
+        this.studyAnswered = false;
+        this.studyShowExplanation = false;
+        this.renderStudyMode();
+      }
+    } else {
+      if (this.studyCurrentIndex > 0) {
+        this.studyCurrentIndex--;
+        this.studySelectedOptionIndex = null;
+        this.studyAnswered = false;
+        
+        const firstIndex = window.BIBLE_DATA.findIndex(v => v.chapter === this.activeJourneyChapter);
+        this.activeJourneyVerseIndex = firstIndex + this.studyCurrentIndex;
+        
+        if (this.studyMode === 'hard') {
+          this.generateHardModeOptions();
+        }
+        this.renderStudyMode();
+      }
+    }
+  }
+
+  toggleStudyBookmark() {
+    if (!this.currentUser) return;
+    const idx = this.activeJourneyVerseIndex;
+    const bookmarks = this.currentUser.bookmarks || [];
+    const indexInBookmarks = bookmarks.indexOf(idx);
+    let updateData = {};
+    if (indexInBookmarks >= 0) {
+      updateData.bookmarks = firebase.firestore.FieldValue.arrayRemove(idx);
+      this.currentUser.bookmarks = bookmarks.filter(b => b !== idx);
+      this.showToast('북마크가 해제되었습니다.');
+    } else {
+      updateData.bookmarks = firebase.firestore.FieldValue.arrayUnion(idx);
+      this.currentUser.bookmarks = [...bookmarks, idx];
+      this.showToast('북마크에 추가되었습니다.');
+    }
+    
+    if (!this.currentUser.isTrial) {
+      db.collection('users').doc(this.currentUser.id).update(updateData).then(() => {
+        this.renderStudyMode();
+      });
+    } else {
+      this.renderStudyMode();
+    }
+  }
+
+  markVerseAsCompleted(silent = false) {
+    if (!this.currentUser) return;
+    const idx = this.activeJourneyVerseIndex;
+    const completedSet = this.getCompletedVerseIndexSet(this.currentUser);
+    if (completedSet.has(idx)) {
+      if (!silent) this.showToast('이미 완료된 구절입니다.');
+      return;
+    }
+    
+    this.currentUser.completedVerseIndices = Array.from(new Set([...(this.currentUser.completedVerseIndices || []), idx]));
+    
+    let updateData = {
+      completedVerseIndices: firebase.firestore.FieldValue.arrayUnion(idx)
+    };
+    
+    if (!silent) {
+      this.showToast('✓ 암송이 완료되었습니다!');
+    }
+    
+    if (!this.currentUser.isTrial) {
+      db.collection('users').doc(this.currentUser.id).update(updateData).then(() => {
+        this.renderStudyMode();
+        this.renderChapterDetail();
+      });
+    } else {
+      this.renderStudyMode();
+      this.renderChapterDetail();
+    }
+  }
+
+  speakText(text) {
+    if (!window.speechSynthesis) {
+      this.showToast('이 기기에서는 음성 합성을 지원하지 않습니다.');
+      return;
+    }
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ko-KR';
+    utterance.rate = 1.0;
+    
+    const voices = window.speechSynthesis.getVoices();
+    const koVoice = voices.find(v => v.lang.startsWith('ko'));
+    if (koVoice) utterance.voice = koVoice;
+    
+    window.speechSynthesis.speak(utterance);
+  }
+
+  showStudyExamResult() {
+    const controlsEl = document.getElementById('studyModeControls');
+    if (!controlsEl) return;
+    
+    const refEl = document.getElementById('studyVerseRef');
+    if (refEl) refEl.textContent = `요한계시록 ${this.activeJourneyChapter}장 예상 문제 완료`;
+    
+    const textEl = document.getElementById('studyVerseText');
+    if (textEl) textEl.textContent = '수고하셨습니다! 모든 예상 문제를 풀었습니다.';
+    
+    controlsEl.innerHTML = `
+      <div class="result-celebration-container animate-fade-in" style="text-align: center; padding: 2rem 1.25rem;">
+        <div class="celebration-trophy" style="margin-bottom: 1.5rem;">
+          <span class="material-icons-round" style="font-size: 4.5rem; color: #fbbf24;">military_tech</span>
+        </div>
+        <h3 style="font-size: 1.35rem; font-weight: 800; color: var(--text-primary); margin: 0 0 0.5rem 0;">예상 문제 완료!</h3>
+        <div style="font-size: 2rem; font-weight: 900; color: #7c3aed; margin-bottom: 1.25rem;">
+          ${this.studyExamCorrectCount * 10}점 <span style="font-size: 1rem; color: var(--text-muted); font-weight: normal;">/ 100점</span>
+        </div>
+        <div class="result-reward-card glass-panel" style="padding: 1.25rem; border-radius: 18px; background: white; border: 1px solid #e2e8f0; margin-bottom: 1.5rem; text-align: left; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+          <div class="reward-row" style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.5rem;">
+            <span class="reward-label" style="color: var(--text-secondary); font-weight: 600;">맞힌 문제</span>
+            <span class="reward-value" style="font-weight: 800; color: var(--text-primary);">${this.studyExamCorrectCount} / 10문제</span>
+          </div>
+          <div class="reward-row" style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+            <span class="reward-label" style="color: var(--text-secondary); font-weight: 600;">학습 성과</span>
+            <span class="reward-value" style="font-weight: 800; color: #16a34a;">${this.studyExamCorrectCount >= 8 ? '훌륭합니다!' : (this.studyExamCorrectCount >= 5 ? '잘하셨습니다!' : '조금 더 노력해봐요!')}</span>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <button class="btn-study-primary exam" onclick="app.startStudyMode('exam')" style="width: 100%;">다시 풀기</button>
+          <button class="btn-study-secondary" onclick="app.goBackToChapter()" style="width: 100%;">장 목록으로 이동</button>
+        </div>
+      </div>
+    `;
+  }
+
+  compareTextWords(actualText, userText) {
+    const cleanActual = actualText.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "").replace(/\s+/g, " ").trim();
+    const cleanUser = userText.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "").replace(/\s+/g, " ").trim();
+    
+    const actualWords = cleanActual.split(" ").filter(w => w.length > 0);
+    const userWords = cleanUser.split(" ").filter(w => w.length > 0);
+    
+    const distance = this.levenshteinDistance(cleanActual, cleanUser);
+    const maxLength = Math.max(cleanActual.length, cleanUser.length);
+    const accuracy = maxLength > 0 ? Math.round(((maxLength - distance) / maxLength) * 100) : 0;
+    
+    const diffHtmls = [];
+    const originalWords = actualText.split(/\s+/).filter(w => w.length > 0);
+    
+    for (let i = 0; i < originalWords.length; i++) {
+      const origWord = originalWords[i];
+      const cleanOrig = origWord.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "").trim();
+      
+      if (i < userWords.length) {
+        const userW = userWords[i];
+        if (cleanOrig === userW) {
+          diffHtmls.push(`<span style="color: #16a34a; font-weight: bold; margin-right: 0.25rem;">${this.escapeHtml(origWord)}</span>`);
+        } else {
+          diffHtmls.push(`<span style="color: #dc2626; font-weight: bold; text-decoration: line-through; margin-right: 0.25rem;">${this.escapeHtml(origWord)}</span>`);
+        }
+      } else {
+        diffHtmls.push(`<span style="color: #94a3b8; margin-right: 0.25rem;">${this.escapeHtml(origWord)}</span>`);
+      }
+    }
+    
+    return { accuracy, html: diffHtmls.join(" ") };
+  }
+
+  levenshteinDistance(a, b) {
+    const matrix = [];
+    for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    return matrix[b.length][a.length];
   }
 }
 

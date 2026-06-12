@@ -6924,15 +6924,15 @@ body.mobile-app.logged-in #dashboardView .event-banner-dots span.active {
   font-weight: 800;
 }
 
-/* Locked State */
-.home-journey-chapter-item.locked .chapter-circle {
+/* Waiting State */
+.home-journey-chapter-item.waiting .chapter-circle {
   background: #f2efe4;
   border-color: transparent;
 }
-.home-journey-chapter-item.locked .chapter-circle span {
+.home-journey-chapter-item.waiting .chapter-circle span {
   color: #a8a29e;
 }
-.home-journey-chapter-item.locked .chapter-status {
+.home-journey-chapter-item.waiting .chapter-status {
   color: #a8a29e;
 }
 
@@ -7397,8 +7397,8 @@ body.mobile-app.logged-in #dashboardView .event-banner-dots span.active {
 }
 
 .timeline-circle.ongoing {
-  background: #10b981;
-  border-color: #10b981;
+  background: #f59e0b;
+  border-color: #fbbf24;
 }
 
 .timeline-circle.waiting {
@@ -7500,7 +7500,7 @@ body.mobile-app.logged-in #dashboardView .event-banner-dots span.active {
 
 .timeline-card-progress-bar-fill {
   height: 100%;
-  background: #10b981;
+  background: #f59e0b;
   border-radius: 3px;
 }
 
@@ -7531,8 +7531,8 @@ body.mobile-app.logged-in #dashboardView .event-banner-dots span.active {
 }
 
 .timeline-status-badge.ongoing {
-  background: #e6f4ea;
-  color: #137333;
+  background: #fff7df;
+  color: #b8860b;
 }
 
 .timeline-status-badge.waiting {
@@ -7651,3 +7651,282 @@ body.mobile-app.logged-in #dashboardView .event-banner-dots span.active {
   background: #059669;
 }
 
+/* ==========================================================================
+   Chapter Study Modes & Renewed Chapter Detail Cards
+   ========================================================================== */
+.mode-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.9rem 1.1rem;
+  background: white;
+  border: 1px solid #f2e7d5;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(61, 52, 28, 0.01);
+  text-align: left;
+}
+
+.mode-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(61, 52, 28, 0.03);
+}
+
+.mode-card-left {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.mode-card-icon-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mode-card-title {
+  font-size: 0.92rem;
+  font-weight: bold;
+  color: var(--text-primary);
+  margin: 0 0 0.15rem 0;
+}
+
+.mode-card-desc {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.btn-mode-start {
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+}
+
+/* Mode-specific Badge & Button styles */
+.mode-card.easy .mode-card-icon-badge {
+  background: rgba(16, 185, 129, 0.08);
+  color: #10b981;
+}
+.mode-card.easy .btn-mode-start {
+  background: #10b981;
+  color: white;
+}
+.mode-card.easy:hover {
+  border-color: #10b981;
+}
+
+.mode-card.hard .mode-card-icon-badge {
+  background: rgba(245, 158, 11, 0.08);
+  color: #f59e0b;
+}
+.mode-card.hard .btn-mode-start {
+  background: #f59e0b;
+  color: white;
+}
+.mode-card.hard:hover {
+  border-color: #f59e0b;
+}
+
+.mode-card.expert .mode-card-icon-badge {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+}
+.mode-card.expert .btn-mode-start {
+  background: #ef4444;
+  color: white;
+}
+.mode-card.expert:hover {
+  border-color: #ef4444;
+}
+
+.mode-card.exam .mode-card-icon-badge {
+  background: rgba(139, 92, 246, 0.08);
+  color: #8b5cf6;
+}
+.mode-card.exam .btn-mode-start {
+  background: #8b5cf6;
+  color: white;
+}
+.mode-card.exam:hover {
+  border-color: #8b5cf6;
+}
+
+.mode-card.history .mode-card-icon-badge {
+  background: rgba(100, 116, 139, 0.08);
+  color: #64748b;
+}
+.mode-card.history:hover {
+  border-color: #cbd5e1;
+}
+
+/* Mode Info Banner */
+.mode-info-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+.mode-info-banner.easy {
+  background: #ecfdf5;
+  color: #065f46;
+  border-left: 4px solid #10b981;
+}
+.mode-info-banner.hard {
+  background: #fffbeb;
+  color: #92400e;
+  border-left: 4px solid #f59e0b;
+}
+.mode-info-banner.expert {
+  background: #fef2f2;
+  color: #991b1b;
+  border-left: 4px solid #ef4444;
+}
+.mode-info-banner.exam {
+  background: #f5f3ff;
+  color: #5b21b6;
+  border-left: 4px solid #8b5cf6;
+}
+
+/* Option Rows for Quizzes */
+.study-options-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.study-option-row {
+  display: flex;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  border: 1px solid #f2e7d5;
+  border-radius: 12px;
+  background: white;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.study-option-row:hover {
+  background: #fffdf9;
+  border-color: #d4c5a9;
+}
+
+.study-option-row.selected {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  font-weight: 600;
+}
+
+.study-option-row.correct {
+  border-color: #10b981;
+  background: #ecfdf5;
+  color: #065f46;
+  font-weight: bold;
+}
+
+.study-option-row.incorrect {
+  border-color: #ef4444;
+  background: #fef2f2;
+  color: #991b1b;
+  font-weight: bold;
+}
+
+/* Expert Mode Dictation Diffs */
+.dictation-diff-box {
+  padding: 1.15rem;
+  border-radius: 14px;
+  background: white;
+  border: 1px solid #cbd5e1;
+  font-size: 0.98rem;
+  line-height: 1.7;
+  word-break: keep-all;
+  text-align: left;
+  margin-top: 0.5rem;
+  min-height: 80px;
+}
+
+.dictation-result-score {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #ef4444;
+  margin: 0.5rem 0;
+}
+
+/* Study Bottom Progress Bar */
+.study-progress-bar-wrapper {
+  width: 100%;
+  height: 6px;
+  background: #f1ebd9;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.study-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #059669);
+  transition: width 0.3s ease;
+  width: 0%;
+}
+.study-progress-bar-fill.hard {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+.study-progress-bar-fill.expert {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+.study-progress-bar-fill.exam {
+  background: linear-gradient(90deg, #8b5cf6, #7c3aed);
+}
+
+/* Verse Grid Selection Button Styles */
+.verse-select-btn {
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  border-radius: 12px;
+  height: 48px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.verse-select-btn:hover {
+  border-color: #cbd5e1;
+  background-color: #f8fafc;
+}
+.verse-select-btn.active.easy {
+  background-color: #16a34a !important;
+  color: white !important;
+  border-color: #16a34a !important;
+}
+.verse-select-btn.active.hard {
+  background-color: #d97706 !important;
+  color: white !important;
+  border-color: #d97706 !important;
+}
+.verse-select-btn.active.expert {
+  background-color: #dc2626 !important;
+  color: white !important;
+  border-color: #dc2626 !important;
+}

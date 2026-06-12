@@ -234,3 +234,82 @@ exports.processPushQueue = onDocumentCreated("push_queue/{pushId}", async (event
 
   return null;
 });
+
+exports.processPasswordReset = onDocumentCreated("password_resets/{resetId}", async (event) => {
+  const snapshot = event.data;
+  if (!snapshot) return null;
+
+  const data = snapshot.data();
+  if (data.status !== "pending") return null;
+
+  const { username, name, email } = data;
+  if (!username || !name || !email) {
+    await snapshot.ref.update({
+      status: "failed",
+      error: "필수 정보가 누락되었습니다."
+    });
+    return null;
+  }
+
+  try {
+    // Look up user in Firestore
+    let matchedDoc = null;
+    const allUsersSnap = await db.collection("users").get();
+    allUsersSnap.forEach(doc => {
+      const u = doc.data();
+      if (u.username && u.username.toLowerCase() === username.toLowerCase()) {
+        matchedDoc = doc;
+      }
+    });
+
+    if (!matchedDoc) {
+      throw new Error("일치하는 계정을 찾을 수 없습니다.");
+    }
+    
+    const uData = matchedDoc.data();
+    if (uData.name !== name || uData.email.toLowerCase() !== email.toLowerCase()) {
+      throw new Error("입력하신 정보가 회원 정보와 일치하지 않습니다.");
+    }
+    
+    const uid = matchedDoc.id;
+
+    // Check if user exists in Firebase Auth
+    let authUser = null;
+    try {
+      authUser = await admin.auth().getUser(uid);
+    } catch (authGetErr) {
+      if (authGetErr.code !== 'auth/user-not-found') {
+        throw authGetErr;
+      }
+    }
+
+    if (!authUser) {
+      // User exists in Firestore but not in Firebase Auth (unmigrated seed user)
+      // Create them in Firebase Auth on the fly with their real email and a random/temporary password
+      const tempPassword = "Temp" + Math.random().toString(36).substring(2, 10) + "!";
+      await admin.auth().createUser({
+        uid: uid,
+        email: email.toLowerCase(),
+        password: tempPassword
+      });
+    } else {
+      // Update email in Auth to the real email
+      await admin.auth().updateUser(uid, { email: email.toLowerCase() });
+    }
+
+    await snapshot.ref.update({
+      status: "email_updated",
+      uid: uid,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (error) {
+    console.error("Password reset function error:", error);
+    await snapshot.ref.update({
+      status: "failed",
+      error: error.message || String(error),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+  }
+
+  return null;
+});

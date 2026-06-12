@@ -54,7 +54,7 @@ class _WebViewScreenState extends State<WebViewScreen>
   bool _isProfileLoading = true;
   List<dynamic> _pointsHistory = [];
 
-  static const String _appWebVersion = '1.5.24';
+  static const String _appWebVersion = '1.5.27';
   final String _targetUrl = 'https://simon-edu-bible-game.firebaseapp.com?platform=app&app_v=$_appWebVersion';
 
   @override
@@ -70,6 +70,7 @@ class _WebViewScreenState extends State<WebViewScreen>
       _controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setBackgroundColor(const Color(0xFFFDF8E6))
+        ..clearCache()
         ..setNavigationDelegate(
           NavigationDelegate(
             onProgress: (int progress) {
@@ -349,6 +350,7 @@ class _WebViewScreenState extends State<WebViewScreen>
         final shouldHideBottomNav = view == 'game' ||
             view == 'exam' ||
             view == 'journeyChapterDetail' ||
+            view == 'journeyVerseSelect' ||
             view == 'journeyVerseStudy' ||
             view == 'journeyResult' ||
             view == 'eventDetail' ||
@@ -361,6 +363,7 @@ class _WebViewScreenState extends State<WebViewScreen>
           newIndex = 0;
         } else if (view == 'journey' ||
             view == 'journeyChapterDetail' ||
+            view == 'journeyVerseSelect' ||
             view == 'journeyVerseStudy' ||
             view == 'journeyResult') {
           newIndex = 1;
