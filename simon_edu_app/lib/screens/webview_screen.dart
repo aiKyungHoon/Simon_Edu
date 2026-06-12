@@ -56,7 +56,7 @@ class _WebViewScreenState extends State<WebViewScreen>
   bool _isProfileLoading = true;
   List<dynamic> _pointsHistory = [];
 
-  static const String _appWebVersion = '1.5.37';
+  static const String _appWebVersion = '1.5.39';
   final String _targetUrl = 'https://simon-edu-bible-game.firebaseapp.com?platform=app&app_v=$_appWebVersion';
 
   @override

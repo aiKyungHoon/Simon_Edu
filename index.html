@@ -8,7 +8,7 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.5.37">
+  <link rel="stylesheet" href="style.css?v=1.5.39">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
@@ -16,8 +16,8 @@
     (function() {
       const params = new URLSearchParams(window.location.search);
       const IS_APP_WEBVIEW = params.get('platform') === 'app';
-      const WEB_VER = '1.5.37';
-      const APP_WEB_VER = '1.5.37';
+      const WEB_VER = '1.5.39';
+      const APP_WEB_VER = '1.5.39';
       const VERSION_KEY = IS_APP_WEBVIEW ? 'simon_app_web_version' : 'simon_web_version';
       const ACTIVE_VER = IS_APP_WEBVIEW ? APP_WEB_VER : WEB_VER;
       window.SIMON_CLIENT_TYPE = IS_APP_WEBVIEW ? 'app' : 'web';
@@ -164,6 +164,11 @@
           <div class="form-group">
             <label for="authPassword">비밀번호</label>
             <input type="password" id="authPassword" class="input-field" placeholder="비밀번호를 입력하세요" required>
+          </div>
+          
+          <div class="form-group" id="autoLoginGroup" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; margin-bottom: 1rem; text-align: left;">
+            <input type="checkbox" id="authAutoLogin" style="width: 18px; height: 18px; cursor: pointer;">
+            <label for="authAutoLogin" style="font-size: 0.88rem; cursor: pointer; margin: 0; display: inline; color: var(--text-secondary); font-weight: 600;">자동 로그인</label>
           </div>
           
           <div class="form-group" id="termsConsentGroup" style="display: none; margin-top: 1rem; border-top: 1px dashed var(--glass-border); padding-top: 1rem;">
@@ -1313,7 +1318,7 @@
           </div>
 
           <div class="app-version" style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-en); font-weight: 500; letter-spacing: 0.5px; opacity: 0.7;">
-            Version 1.5.37
+            Version 1.5.39
           </div>
         </div>
 
@@ -1447,6 +1452,61 @@
       <div class="modal-body" style="max-height: 320px; overflow-y: auto; padding-right: 2px;">
         <div class="verse-status-list" id="modalChapterVerseList" style="display: flex; flex-direction: column; gap: 0.5rem;">
           <!-- Dynamically populated list of verses -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Select Study Mode -->
+  <div class="modal-overlay" id="modalSelectStudyMode">
+    <div class="modal-content glass-panel" style="max-width: 400px; padding: 2rem; border-radius: 24px; text-align: center; font-family: var(--font-kr);">
+      <button type="button" class="modal-close-x" aria-label="닫기" onclick="app.closeModal('modalSelectStudyMode')">
+        <span class="material-icons-round">close</span>
+      </button>
+      <div class="modal-title" style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.25rem; font-family: var(--font-kr);">학습 모드 선택</div>
+      <div id="selectStudyModeSubtitle" style="font-size: 0.9rem; color: var(--text-muted); font-weight: bold; margin-bottom: 1.5rem; font-family: var(--font-kr);">요한계시록 1장 5절</div>
+      
+      <div style="display: flex; flex-direction: column; gap: 0.75rem; text-align: left;">
+        <!-- Easy Mode Option -->
+        <div class="mode-card easy" onclick="app.startStudyModeForVerse('easy')">
+          <div class="mode-card-left">
+            <div class="mode-card-icon-badge">
+              <span class="material-icons-round" style="font-size: 1.25rem;">sentiment_satisfied_alt</span>
+            </div>
+            <div>
+              <h4 class="mode-card-title" style="font-family: var(--font-kr);">쉬움 모드</h4>
+              <p class="mode-card-desc" style="font-family: var(--font-kr);">말씀을 보면서 학습해요.</p>
+            </div>
+          </div>
+          <button class="btn-mode-start" style="pointer-events: none;">시작하기</button>
+        </div>
+
+        <!-- Hard Mode Option -->
+        <div class="mode-card hard" onclick="app.startStudyModeForVerse('hard')">
+          <div class="mode-card-left">
+            <div class="mode-card-icon-badge">
+              <span class="material-icons-round" style="font-size: 1.25rem;">sentiment_neutral</span>
+            </div>
+            <div>
+              <h4 class="mode-card-title" style="font-family: var(--font-kr);">어려움 모드</h4>
+              <p class="mode-card-desc" style="font-family: var(--font-kr);">핵심 단어를 빈칸에 채워요.</p>
+            </div>
+          </div>
+          <button class="btn-mode-start" style="pointer-events: none;">시작하기</button>
+        </div>
+
+        <!-- Expert Mode Option -->
+        <div class="mode-card expert" onclick="app.startStudyModeForVerse('expert')">
+          <div class="mode-card-left">
+            <div class="mode-card-icon-badge">
+              <span class="material-icons-round" style="font-size: 1.25rem;">sentiment_very_dissatisfied</span>
+            </div>
+            <div>
+              <h4 class="mode-card-title" style="font-family: var(--font-kr);">전문 모드</h4>
+              <p class="mode-card-desc" style="font-family: var(--font-kr);">말씀을 가리고 직접 암송해요.</p>
+            </div>
+          </div>
+          <button class="btn-mode-start" style="pointer-events: none;">시작하기</button>
         </div>
       </div>
     </div>
@@ -2920,6 +2980,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <script src="bible_data.js?v=1.5.2"></script>
-  <script src="app.js?v=1.5.37"></script>
+  <script src="app.js?v=1.5.39"></script>
 </body>
 </html>

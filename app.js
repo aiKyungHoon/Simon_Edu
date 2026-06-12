@@ -219,11 +219,34 @@ class SimonEduApp {
           }));
         }
         
+        const autoLogin = localStorage.getItem('simon_auto_login') === 'true';
+        const savedUser = localStorage.getItem('simon_saved_username');
+        const savedPass = localStorage.getItem('simon_saved_password');
+        
+        if (autoLogin && savedUser && savedPass) {
+          console.log("Attempting automatic login for:", savedUser);
+          this.performAutoLogin(savedUser, savedPass);
+          return;
+        }
+
         if (!document.body.classList.contains('single-path-route')) {
           this.switchView('auth');
         }
       }
     });
+
+    // Pre-fill saved username and auto-login checkbox
+    const savedUser = localStorage.getItem('simon_saved_username');
+    if (savedUser) {
+      const idInput = document.getElementById('authUsernameId');
+      if (idInput) idInput.value = savedUser;
+    }
+    const autoLogin = localStorage.getItem('simon_auto_login') === 'true';
+    if (autoLogin) {
+      const autoChk = document.getElementById('authAutoLogin');
+      if (autoChk) autoChk.checked = true;
+    }
+
     this.handleDirectPathRouting();
   }
 
@@ -584,6 +607,8 @@ class SimonEduApp {
       btnAuthSubmit.style.opacity = '1';
       if (idMsg) idMsg.textContent = '';
       if (nameMsg) nameMsg.textContent = '';
+      const autoLoginGroup = document.getElementById('autoLoginGroup');
+      if (autoLoginGroup) autoLoginGroup.style.display = 'flex';
       authFooterText.innerHTML = `
         아직 계정이 없으신가요? <a href="#" onclick="app.setAuthTab('signup'); return false;">회원가입</a>
         <div style="margin-top: 0.75rem; font-size: 0.85rem; display: flex; justify-content: center; gap: 1rem;">
@@ -603,6 +628,8 @@ class SimonEduApp {
       document.getElementById('authEmail').setAttribute('required', 'true');
       btnAuthSubmit.textContent = '회원가입';
       this.validateSignup();
+      const autoLoginGroup = document.getElementById('autoLoginGroup');
+      if (autoLoginGroup) autoLoginGroup.style.display = 'none';
       authFooterText.innerHTML = `이미 계정이 있으신가요? <a href="#" onclick="app.setAuthTab('login'); return false;">로그인</a>`;
     }
   }
@@ -911,9 +938,21 @@ class SimonEduApp {
       // Try real email first. If not found, use virtual email.
       const firstEmailToTry = realEmail || (seedInfo ? seedInfo.email : null) || `${idLower}@simon.edu`;
 
+      const autoLoginChk = document.getElementById('authAutoLogin');
+      const shouldSaveAutoLogin = autoLoginChk && autoLoginChk.checked;
+
       auth.signInWithEmailAndPassword(firstEmailToTry, password)
         .then(() => {
           // Success handled by Auth state listener
+          if (shouldSaveAutoLogin) {
+            localStorage.setItem('simon_auto_login', 'true');
+            localStorage.setItem('simon_saved_username', usernameId);
+            localStorage.setItem('simon_saved_password', password);
+          } else {
+            localStorage.removeItem('simon_auto_login');
+            localStorage.removeItem('simon_saved_username');
+            localStorage.removeItem('simon_saved_password');
+          }
         })
         .catch(err => {
           // If we tried realEmail but it failed, try the legacy virtual email in case they aren't migrated in Auth yet
@@ -922,6 +961,15 @@ class SimonEduApp {
             const virtualEmail = `${idLower}@simon.edu`;
             return auth.signInWithEmailAndPassword(virtualEmail, password)
               .then(() => {
+                if (shouldSaveAutoLogin) {
+                  localStorage.setItem('simon_auto_login', 'true');
+                  localStorage.setItem('simon_saved_username', usernameId);
+                  localStorage.setItem('simon_saved_password', password);
+                } else {
+                  localStorage.removeItem('simon_auto_login');
+                  localStorage.removeItem('simon_saved_username');
+                  localStorage.removeItem('simon_saved_password');
+                }
                 // Success with legacy virtual email! Update Auth email to their real email for future logins.
                 return auth.currentUser.updateEmail(realEmail)
                   .catch(updateErr => {
@@ -940,6 +988,11 @@ class SimonEduApp {
               // Migrate seed user directly using their real email
               auth.createUserWithEmailAndPassword(seedInfo.email, password)
                 .then(userCredential => {
+                  if (shouldSaveAutoLogin) {
+                    localStorage.setItem('simon_auto_login', 'true');
+                    localStorage.setItem('simon_saved_username', usernameId);
+                    localStorage.setItem('simon_saved_password', password);
+                  }
                   const seedData = this.getSeedUserData(usernameId);
                   seedData.id = userCredential.user.uid;
                   return db.collection('users').doc(seedData.id).set(seedData);
@@ -965,6 +1018,9 @@ class SimonEduApp {
   }
 
   logout() {
+    localStorage.removeItem('simon_auto_login');
+    localStorage.removeItem('simon_saved_password');
+
     if (this.currentUser && this.currentUser.isTrial) {
       this.currentUser = null;
       this.isTrialMode = false;
@@ -972,7 +1028,12 @@ class SimonEduApp {
       this.missionExamSubmissions = [];
       document.body.classList.remove('logged-in');
       const authForm = document.getElementById('authForm');
-      if (authForm) authForm.reset();
+      if (authForm) {
+        authForm.reset();
+        const idInput = document.getElementById('authUsernameId');
+        const savedUser = localStorage.getItem('simon_saved_username');
+        if (idInput && savedUser) idInput.value = savedUser;
+      }
       const userNav = document.getElementById('userNav');
       if (userNav) userNav.style.display = 'none';
       const btnNavAdmin = document.getElementById('btnNavAdmin');
@@ -987,7 +1048,12 @@ class SimonEduApp {
         this.stopMissionExamRankingListener();
         this.missionExamSubmissions = [];
         const authForm = document.getElementById('authForm');
-        if (authForm) authForm.reset();
+        if (authForm) {
+          authForm.reset();
+          const idInput = document.getElementById('authUsernameId');
+          const savedUser = localStorage.getItem('simon_saved_username');
+          if (idInput && savedUser) idInput.value = savedUser;
+        }
         const userNav = document.getElementById('userNav');
         if (userNav) userNav.style.display = 'none';
         const btnNavAdmin = document.getElementById('btnNavAdmin');
@@ -997,6 +1063,57 @@ class SimonEduApp {
       .catch(err => {
         console.error("Sign out error:", err);
       });
+  }
+
+  performAutoLogin(usernameId, password) {
+    const idLower = usernameId.toLowerCase();
+    
+    db.collection('users').where('username', '==', usernameId).get()
+      .then(querySnapshot => {
+        let realEmail = null;
+        if (!querySnapshot.empty) {
+          realEmail = querySnapshot.docs[0].data().email;
+        }
+        
+        const seedInfo = SEED_USERS[idLower];
+        const firstEmailToTry = realEmail || (seedInfo ? seedInfo.email : null) || `${idLower}@simon.edu`;
+
+        auth.signInWithEmailAndPassword(firstEmailToTry, password)
+          .then(() => {
+            console.log("Automatic login successful.");
+          })
+          .catch(err => {
+            console.error("Auto login failed:", err);
+            if (realEmail && firstEmailToTry === realEmail && 
+                (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
+              const virtualEmail = `${idLower}@simon.edu`;
+              auth.signInWithEmailAndPassword(virtualEmail, password)
+                .then(() => {
+                  console.log("Automatic login successful with legacy email.");
+                  return auth.currentUser.updateEmail(realEmail).catch(updateErr => {
+                    console.warn("Auth email migration failed on auto login:", updateErr);
+                  });
+                })
+                .catch(err2 => {
+                  console.error("Auto login legacy email failed:", err2);
+                  this.clearAutoLoginAndGoToAuth();
+                });
+            } else {
+              this.clearAutoLoginAndGoToAuth();
+            }
+          });
+      })
+      .catch(err => {
+        console.error("Error querying user for auto login:", err);
+        this.clearAutoLoginAndGoToAuth();
+      });
+  }
+
+  clearAutoLoginAndGoToAuth() {
+    localStorage.removeItem('simon_auto_login');
+    localStorage.removeItem('simon_saved_username');
+    localStorage.removeItem('simon_saved_password');
+    this.switchView('auth');
   }
 
   // 4. View Router & Screen Renders
@@ -2437,7 +2554,7 @@ class SimonEduApp {
         }
         
         return `
-          <button class="verse-list-row ${statusClass}" onclick="app.openVerseStudy(${idx})">
+          <button class="verse-list-row ${statusClass}" onclick="app.promptStudyModeForVerse(${idx})">
             <div class="verse-row-left">
               <span class="verse-num">${v.verse}절</span>
               <span class="verse-snippet">${this.escapeHtml(v.text.substring(0, 25))}...</span>
@@ -2560,7 +2677,7 @@ class SimonEduApp {
           rowClass += ' ready';
         }
         
-        const onClickAttr = `onclick="app.closeModal('modalChapterVerses'); app.openVerseStudy(${idx});"`;
+        const onClickAttr = `onclick="app.promptStudyModeForVerse(${idx});"`;
         const disabledAttr = '';
         
         return `
@@ -2578,6 +2695,51 @@ class SimonEduApp {
     }
     
     this.openModal('modalChapterVerses');
+  }
+
+  promptStudyModeForVerse(verseIndex) {
+    if (!window.BIBLE_DATA) return;
+    const bibleData = window.BIBLE_DATA || [];
+    const v = bibleData[verseIndex];
+    if (!v) return;
+
+    this.closeModal('modalChapterVerses');
+    this.pendingStudyVerseIndex = verseIndex;
+
+    const subtitleEl = document.getElementById('selectStudyModeSubtitle');
+    if (subtitleEl) {
+      subtitleEl.textContent = `요한계시록 ${v.chapter}장 ${v.verse}절`;
+    }
+
+    this.openModal('modalSelectStudyMode');
+  }
+
+  startStudyModeForVerse(mode) {
+    if (!window.BIBLE_DATA) return;
+    const verseIndex = this.pendingStudyVerseIndex;
+    if (verseIndex === undefined || verseIndex === null) return;
+
+    const bibleData = window.BIBLE_DATA || [];
+    const v = bibleData[verseIndex];
+    if (!v) return;
+
+    this.closeModal('modalSelectStudyMode');
+    this.studyMode = mode;
+    this.activeJourneyChapter = v.chapter;
+    this.studyVerses = bibleData.filter(val => val.chapter === v.chapter);
+    this.studyCurrentIndex = this.studyVerses.findIndex(val => val.verse === v.verse);
+    if (this.studyCurrentIndex === -1) this.studyCurrentIndex = 0;
+
+    this.studyAnswered = false;
+    this.studySelectedOptionIndex = null;
+    this.studyShowExplanation = false;
+    this.studyDictationAccuracy = 0;
+
+    if (this.studyMode === 'hard') {
+      this.generateHardModeOptions();
+    }
+
+    this.switchView('journeyVerseStudy');
   }
 
   startChapterTestFromDetail() {
