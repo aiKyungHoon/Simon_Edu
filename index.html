@@ -8,7 +8,7 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.5.27">
+  <link rel="stylesheet" href="style.css?v=1.5.31">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
@@ -16,8 +16,8 @@
     (function() {
       const params = new URLSearchParams(window.location.search);
       const IS_APP_WEBVIEW = params.get('platform') === 'app';
-      const WEB_VER = '1.5.23';
-      const APP_WEB_VER = '1.5.23';
+      const WEB_VER = '1.5.31';
+      const APP_WEB_VER = '1.5.31';
       const VERSION_KEY = IS_APP_WEBVIEW ? 'simon_app_web_version' : 'simon_web_version';
       const ACTIVE_VER = IS_APP_WEBVIEW ? APP_WEB_VER : WEB_VER;
       window.SIMON_CLIENT_TYPE = IS_APP_WEBVIEW ? 'app' : 'web';
@@ -1020,64 +1020,8 @@
 
     <!-- 3.5. Simon Exam View -->
     <div id="examView" class="view-container">
-      <div class="dashboard-single-container">
-        <div class="page-header-bar">
-          <button class="btn-header-back" onclick="app.switchView('events')" aria-label="뒤로가기">
-            <span class="material-icons-round">arrow_back</span>
-          </button>
-          <h1>사명자 시험 안내</h1>
-          <div style="width: 40px;"></div>
-        </div>
-        <div class="dashboard-card glass-panel" style="padding: 2rem; text-align: center; max-width: 600px; margin: 0 auto;">
-          <span class="material-icons-round" style="font-size: 4.5rem; color: var(--accent-blue); margin-bottom: 1rem; display: block; filter: drop-shadow(0 0 10px rgba(59,130,246,0.3));">assignment_turned_in</span>
-          
-          <h2 style="font-size: 1.6rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem; font-family: var(--font-kr);">시몬에듀 사명자 시험</h2>
-          <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; margin-bottom: 1.5rem; word-break: keep-all; font-family: var(--font-kr);">
-            요한계시록 전체 구절 중 무작위 10개의 말씀이 출제되며,<br>
-            각 말씀의 띄어쓰기 기준 단어 빈칸을 채우는 주관식 시험입니다.<br>
-            틀린 문항이 있어도 10문항을 모두 완주할 때까지 시험이 진행됩니다.
-          </p>
-
-          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 12px; padding: 1.25rem; display: flex; justify-content: space-around; align-items: center; margin-bottom: 2rem; font-family: var(--font-kr);">
-            <div>
-              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">내 최고 점수</div>
-              <div style="font-size: 1.8rem; font-weight: bold; color: var(--accent-amber);"><span id="examHighestScore">0</span>점</div>
-            </div>
-            <div style="width: 1px; height: 40px; background: var(--glass-border);"></div>
-            <div>
-              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">총 응시 횟수</div>
-              <div style="font-size: 1.8rem; font-weight: bold; color: var(--accent-blue);"><span id="examAttemptsCount">0</span>회</div>
-            </div>
-          </div>
-
-          <div class="glass-panel" style="text-align: left; padding: 1.25rem; border-radius: 10px; background: rgba(0,0,0,0.15); margin-bottom: 2rem; border-color: rgba(245,158,11,0.25); font-family: var(--font-kr);">
-            <div style="font-size: 0.85rem; font-weight: bold; color: var(--accent-amber); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.25rem;">
-              <span class="material-icons-round" style="font-size: 1rem;">info</span> 시험 요강 및 포인트 보상 기준
-            </div>
-            <ul style="font-size: 0.775rem; color: var(--text-secondary); line-height: 1.6; padding-left: 1.25rem; margin: 0; display: flex; flex-direction: column; gap: 0.25rem;">
-              <li><strong>100점</strong> (만점): 500P 지급</li>
-              <li><strong>90점</strong>: 450P 지급 | <strong>80점</strong>: 400P 지급</li>
-              <li><strong>70점</strong>: 350P 지급 | <strong>60점</strong>: 300P 지급 (60점 미만 무지급)</li>
-              <li>중복 지급 어뷰징 방지를 위해, <strong>최고 점수 갱신 시 기존 포인트와의 차액만 정산되어 적립</strong>됩니다.</li>
-            </ul>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; text-align: left;">
-            <div class="form-group" style="margin: 0;">
-              <label for="examInlineRegion" style="font-size: 0.8rem; font-weight: bold; color: var(--text-primary); display: block; margin-bottom: 0.4rem;">소속 지역</label>
-              <input type="text" id="examInlineRegion" class="input-field" placeholder="예: 서울 강남" autocomplete="organization" style="margin: 0;">
-            </div>
-            <div class="form-group" style="margin: 0;">
-              <label for="examInlineName" style="font-size: 0.8rem; font-weight: bold; color: var(--text-primary); display: block; margin-bottom: 0.4rem;">이름</label>
-              <input type="text" id="examInlineName" class="input-field" placeholder="실명을 입력하세요" autocomplete="name" style="margin: 0;">
-            </div>
-          </div>
-
-          <button class="btn-primary" id="btnOpenExamJoin" type="button" onclick="window.app && window.app.submitExamJoinForm()" style="background: linear-gradient(135deg, var(--accent-blue), var(--accent-emerald)); border: none; box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4); width: 100%; height: 50px; display: flex; justify-content: center; align-items: center; gap: 0.5rem; font-weight: bold; color: white; border-radius: 10px; cursor: pointer; font-size: 1.05rem; font-family: var(--font-kr);">
-            시험 시작하기
-            <span class="material-icons-round">play_arrow</span>
-          </button>
-        </div>
+      <div class="dashboard-single-container" id="examViewDynamicContainer">
+        <!-- Rendered dynamically by renderExamView() -->
       </div>
     </div>
 
@@ -1369,7 +1313,7 @@
           </div>
 
           <div class="app-version" style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-en); font-weight: 500; letter-spacing: 0.5px; opacity: 0.7;">
-            Version 1.5.27
+            Version 1.5.31
           </div>
         </div>
 
@@ -2976,6 +2920,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <script src="bible_data.js?v=1.5.2"></script>
-  <script src="app.js?v=1.5.27"></script>
+  <script src="app.js?v=1.5.31"></script>
 </body>
 </html>

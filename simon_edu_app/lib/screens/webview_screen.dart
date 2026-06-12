@@ -54,7 +54,7 @@ class _WebViewScreenState extends State<WebViewScreen>
   bool _isProfileLoading = true;
   List<dynamic> _pointsHistory = [];
 
-  static const String _appWebVersion = '1.5.27';
+  static const String _appWebVersion = '1.5.31';
   final String _targetUrl = 'https://simon-edu-bible-game.firebaseapp.com?platform=app&app_v=$_appWebVersion';
 
   @override
@@ -344,6 +344,13 @@ class _WebViewScreenState extends State<WebViewScreen>
           _currentIndex = 0;
           _hideBottomNav = false;
         });
+      } else if (event == 'hide_bottom_nav') {
+        final hidden = data['hidden'] == true;
+        if (hidden != _hideBottomNav) {
+          setState(() {
+            _hideBottomNav = hidden;
+          });
+        }
       } else if (event == 'view_changed') {
         final view = data['view'] as String?;
         int newIndex = _currentIndex;

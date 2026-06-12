@@ -3363,11 +3363,39 @@ class SimonEduApp {
 
     const status = this.getEventParticipationStatus(eventItem);
     const targetLabel = this.getEventTargetLabel(eventItem);
-    const buttonLabel = status === 'completed' ? '결과 보기' : status === 'in_progress' ? '이어하기' : '정보 입력 후 시험 시작하기';
+    const isMissionExam = eventItem.eventType === 'mission_exam';
+    
+    let buttonLabel = '';
+    let onclickHandler = '';
+    let guideHtml = '';
+    let infoSectionHtml = '';
+
+    if (isMissionExam) {
+      buttonLabel = status === 'completed' ? '결과 보기' : '시험 시작하기';
+      onclickHandler = 'app.startMissionExamFlow()';
+      guideHtml = `
+        <li>목적: ${this.escapeHtml(eventItem.purpose || '사명자 자격 점검 및 말씀 암송 검증')}</li>
+        <li>참여 방법: 시작 버튼을 누르고 응시자 정보를 입력한 후 시험에 응시합니다.</li>
+        <li>유의사항: 입력된 정보는 공식 결과 및 관리자 확인용으로 저장됩니다.</li>
+        <li>지급 보상: +${Number(eventItem.rewardPoints || eventItem.examMaxPoints || 500).toLocaleString()}P</li>
+        <li>합격 기준: 80점 이상 합격 시 특별 칭호 지급</li>
+      `;
+    } else {
+      buttonLabel = status === 'completed' ? '이벤트 결과 보기' : status === 'in_progress' ? '이어하기' : '이벤트 시작하기';
+      onclickHandler = 'app.startEventFromDetail()';
+      guideHtml = `
+        <li>목적: ${this.escapeHtml(eventItem.purpose || '대상자 참여 및 학습 점검')}</li>
+        <li>참여 방법: 시작 버튼을 눌러 이벤트 암송/출석 미션을 완료합니다.</li>
+        <li>유의사항: 이벤트 마감 시간까지 미션을 완수하셔야 포인트가 지급됩니다.</li>
+        <li>지급 보상: +${Number(eventItem.rewardPoints || 500).toLocaleString()}P</li>
+      `;
+    }
+
     const bannerUrl = this.getEventBannerUrl(eventItem);
     const imageHtml = bannerUrl
       ? `<div class="event-detail-banner"><img src="${this.escapeHtml(bannerUrl)}" alt="이벤트 배너"></div>`
       : `<div class="event-detail-banner no-image"><span class="material-icons-round">${this.getEventIcon(eventItem)}</span></div>`;
+    
     container.innerHTML = `
       ${imageHtml}
       <div class="event-detail-card glass-panel">
@@ -3386,28 +3414,10 @@ class SimonEduApp {
           <h3>이벤트 안내</h3>
           <div class="event-detail-content">${this.escapeHtml(eventItem.description || '이벤트 안내가 등록되지 않았습니다.')}</div>
           <ul class="event-guide-list">
-            <li>목적: ${this.escapeHtml(eventItem.purpose || '대상자 참여 및 학습 점검')}</li>
-            <li>참여 방법: 정보를 입력한 후 시작 버튼을 눌러 진행합니다.</li>
-            <li>유의사항: 입력된 정보는 결과 및 관리자 확인용으로 저장됩니다.</li>
-            <li>지급 보상: +${Number(eventItem.rewardPoints || eventItem.examMaxPoints || 500).toLocaleString()}P</li>
-            <li>합격 시 특별 칭호 지급 가능</li>
+            ${guideHtml}
           </ul>
         </div>
-        <div class="examinee-info-section">
-          <h3>응시자 정보 입력</h3>
-          <p>시험 시작 전 필수 입력 항목입니다.</p>
-          <div class="event-form-grid">
-            <div class="form-group" style="margin:0;">
-              <label for="eventDetailRegion">지역 (필수)</label>
-              <input type="text" id="eventDetailRegion" class="input-field" placeholder="예: 서울 강남교회" value="${this.escapeHtml(this.currentUser?.examRegion || '')}">
-            </div>
-            <div class="form-group" style="margin:0;">
-              <label for="eventDetailName">이름 (필수)</label>
-              <input type="text" id="eventDetailName" class="input-field" placeholder="예: 홍길동" value="${this.escapeHtml(this.currentUser?.examApplicantName || this.currentUser?.name || '')}">
-            </div>
-          </div>
-        </div>
-        <button class="btn-primary event-detail-start-btn" onclick="app.startEventFromDetail()">${buttonLabel}</button>
+        <button class="btn-primary event-detail-start-btn" onclick="${onclickHandler}">${buttonLabel}</button>
       </div>
     `;
   }
@@ -3454,17 +3464,7 @@ class SimonEduApp {
 
   async startEventFromDetail() {
     if (!this.currentUser || !this.currentEventDetail) return;
-    const regionInput = document.getElementById('eventDetailRegion');
-    const nameInput = document.getElementById('eventDetailName');
-    const region = regionInput ? regionInput.value.trim() : '';
-    const name = nameInput ? nameInput.value.trim() : '';
-    if (!region || !name) {
-      alert('지역과 이름을 모두 입력해 주세요.');
-      return;
-    }
     this.currentEvent = this.currentEventDetail;
-    this.currentUser.examRegion = region;
-    this.currentUser.examApplicantName = name;
     this.setEventParticipationStatus(this.currentEventDetail, 'in_progress');
     try {
       await db.collection('event_participants').doc(`${this.currentEventDetail.id}_${this.currentUser.id}`).set({
@@ -3472,24 +3472,15 @@ class SimonEduApp {
         eventTitle: this.currentEventDetail.title || '',
         userId: this.currentUser.id,
         username: this.currentUser.username || '',
-        name,
-        region,
+        name: this.currentUser.name || '',
+        region: this.currentUser.examRegion || '',
         startedAt: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
         status: 'in_progress'
       }, { merge: true });
     } catch (err) {
       console.error('Event participant save error:', err);
     }
-    if (this.currentEventDetail.eventType === 'mission_exam') {
-      this.switchView('exam');
-      setTimeout(() => {
-        const regionEl = document.getElementById('examInlineRegion');
-        const nameEl = document.getElementById('examInlineName');
-        if (regionEl) regionEl.value = region;
-        if (nameEl) nameEl.value = name;
-      }, 80);
-      return;
-    }
+    
     if (this.currentEventDetail.eventType === 'special_challenge') {
       this.startChallenge();
       return;
@@ -4646,8 +4637,7 @@ class SimonEduApp {
   clickEventAnnounceJoin() {
     if (!this.currentEvent) return;
     this.closeModal('modalEventAnnouncement');
-    this.currentEventDetail = this.currentEvent;
-    this.switchView('eventDetail');
+    this.openEventFromHome(this.currentEvent.id);
   }
 
   hideCurrentEventForToday() {
@@ -6050,243 +6040,538 @@ class SimonEduApp {
   // 사명자 시험 시스템
   // ============================================================
 
-  // 사명자 시험용 문제 데이터 (관리자 설정 범위에서 랜덤 출제)
-  _getExamQuestionBank() {
-    const settings = this.globalSettings || {};
-    const verses = this._getVerseRange(
-      settings.examStartChapter || 1,
-      settings.examStartVerse || 1,
-      settings.examEndChapter || 22,
-      settings.examEndVerse || 21
-    );
-    if (verses.length === 0) return [];
-    
-    // Combine all verses into a single question
-    const combinedText = verses.map(v => v.text).join(' ');
-    const blanked = combinedText.split(' ').filter(Boolean).map(() => '____').join(' ');
-    const reference = verses.length > 1 
-      ? `요한계시록 ${verses[0].chapter}장 ${verses[0].verse}절 ~ ${verses[verses.length-1].chapter}장 ${verses[verses.length-1].verse}절`
-      : `요한계시록 ${verses[0].chapter}장 ${verses[0].verse}절`;
-      
-    return [{
-      id: `exam_combined`,
-      reference,
-      question: `${reference} 전체 말씀을 암송해 입력하세요.`,
-      blanked,
-      answer: combinedText
-    }];
+  _getExamVerses(eventItem) {
+    const startChapter = eventItem?.examStartChapter || eventItem?.startChapter || this.globalSettings?.examStartChapter || 1;
+    const startVerse = eventItem?.examStartVerse || eventItem?.startVerse || this.globalSettings?.examStartVerse || 1;
+    const endChapter = eventItem?.examEndChapter || eventItem?.endChapter || this.globalSettings?.examEndChapter || 1;
+    const endVerse = eventItem?.examEndVerse || eventItem?.endVerse || this.globalSettings?.examEndVerse || 20;
+    return this._getVerseRange(startChapter, startVerse, endChapter, endVerse);
   }
 
-  openExamJoinForm() {
+  startMissionExamFlow() {
     if (!this.currentUser) {
       alert('로그인 후 사명자 시험에 응시할 수 있습니다.');
       this.switchView('auth');
       return;
     }
-    const nameInput = document.getElementById('examJoinName');
-    const regionInput = document.getElementById('examJoinRegion');
-    const inlineNameInput = document.getElementById('examInlineName');
-    const inlineRegionInput = document.getElementById('examInlineRegion');
-    if (nameInput) nameInput.value = this.currentUser.name || '';
-    if (regionInput) regionInput.value = this.currentUser.examRegion || '';
-    if (inlineNameInput) inlineNameInput.value = this.currentUser.examApplicantName || this.currentUser.name || '';
-    if (inlineRegionInput) inlineRegionInput.value = this.currentUser.examRegion || '';
-    this.openModal('modalExamJoin');
+    
+    // Set active event as currentEvent if not set
+    if (!this.currentEvent && this.activeEvents) {
+      this.currentEvent = this.activeEvents.find(evt => evt.eventType === 'mission_exam');
+    }
+    if (!this.currentEvent) {
+      alert('현재 진행 중인 사명자 시험 이벤트가 없습니다.');
+      return;
+    }
+
+    // Determine target verses
+    this.examVerses = this._getExamVerses(this.currentEvent);
+    if (this.examVerses.length === 0) {
+      alert('시험 성구 범위가 비어 있습니다.');
+      return;
+    }
+
+    // Check if user already has completed exam
+    const submission = this.currentUser.examSubmission || null;
+    const attemptCount = submission ? (submission.attemptCount || 0) : 0;
+    
+    if (attemptCount > 0) {
+      this.examStep = 'retake';
+    } else {
+      const hasSavedInfo = (this.currentUser.examRegion || '').trim() && (this.currentUser.examApplicantName || '').trim();
+      if (hasSavedInfo) {
+        this.examStep = 'confirm_info';
+        this.examRegion = this.currentUser.examRegion.trim();
+        this.examName = this.currentUser.examApplicantName.trim();
+      } else {
+        this.examStep = 'info';
+        this.examRegion = (this.currentUser.examRegion || '').trim();
+        this.examName = (this.currentUser.examApplicantName || this.currentUser.name || '').trim();
+      }
+    }
+    this.examAutoSave = true;
+    
+    this.switchView('exam');
   }
 
-  submitExamJoinForm() {
-    const regionInput = document.getElementById('examInlineRegion') || document.getElementById('examJoinRegion');
-    const nameInput = document.getElementById('examInlineName') || document.getElementById('examJoinName');
+  renderExamView() {
+    const container = document.getElementById('examViewDynamicContainer');
+    if (!container) return;
+
+    if (!this.currentUser) return;
+
+    if (this.examStep === 'info') {
+      container.innerHTML = `
+        <div class="page-header-bar" style="max-width:600px; margin: 1rem auto 0 auto; padding: 0 1rem; display: flex; align-items: center; justify-content: space-between;">
+          <button class="btn-header-back" onclick="app.completeExamAndGoHome()" aria-label="뒤로가기">
+            <span class="material-icons-round">arrow_back</span>
+          </button>
+          <h1 style="font-family: var(--font-kr); font-weight: 800; font-size: 1.25rem;">응시자 정보 입력</h1>
+          <div style="width: 40px;"></div>
+        </div>
+
+        <div class="exam-card glass-panel" style="max-width:600px; margin: 1.5rem auto; padding: 2rem; font-family: var(--font-kr);">
+          <p style="font-size: 0.95rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem; text-align: center; font-weight: 500;">
+            시험 결과 등록을 위해 최초 1회만 입력해주세요.
+          </p>
+          
+          <div class="form-group" style="margin-bottom: 1.25rem;">
+            <label for="examRegionInput" style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary); display: block; margin-bottom: 0.5rem;">지역 (필수)</label>
+            <input type="text" id="examRegionInput" class="input-field" placeholder="예) 서울 강동, 부산 해운대, 인천 부평" value="${this.escapeHtml(this.examRegion || '')}">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label for="examNameInput" style="font-size: 0.9rem; font-weight: 700; color: var(--text-primary); display: block; margin-bottom: 0.5rem;">이름 (필수)</label>
+            <input type="text" id="examNameInput" class="input-field" placeholder="이름을 입력해주세요" value="${this.escapeHtml(this.examName || '')}">
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 2rem;">
+            <input type="checkbox" id="examAutoSaveCheckbox" ${this.examAutoSave !== false ? 'checked' : ''} style="width: 18px; height: 18px; accent-color: var(--accent-amber);">
+            <label for="examAutoSaveCheckbox" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; cursor: pointer;">
+              다음 시험부터 자동 사용 <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">(설정에서 변경 가능)</span>
+            </label>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 0.75rem;">
+            <button onclick="app.completeExamAndGoHome()" class="btn-secondary" style="height: 50px; border-radius: 10px; font-weight: 700;">취소</button>
+            <button onclick="app.saveExamInfoAndStart()" class="btn-primary" style="height: 50px; border-radius: 10px; font-weight: 800; background: linear-gradient(135deg, var(--accent-amber), #b45309); border: none; color: white;">저장 후 시작</button>
+          </div>
+        </div>
+      `;
+    } else if (this.examStep === 'confirm_info') {
+      container.innerHTML = `
+        <div class="page-header-bar" style="max-width:600px; margin: 1rem auto 0 auto; padding: 0 1rem; display: flex; align-items: center; justify-content: space-between;">
+          <button class="btn-header-back" onclick="app.completeExamAndGoHome()" aria-label="뒤로가기">
+            <span class="material-icons-round">arrow_back</span>
+          </button>
+          <h1 style="font-family: var(--font-kr); font-weight: 800; font-size: 1.25rem;">응시자 정보 확인</h1>
+          <div style="width: 40px;"></div>
+        </div>
+
+        <div class="exam-card glass-panel" style="max-width:600px; margin: 1.5rem auto; padding: 2rem; font-family: var(--font-kr); text-align: center;">
+          <p style="font-size: 0.95rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 2rem; font-weight: 500;">
+            저장된 응시자 정보로 시험을 시작합니다.
+          </p>
+
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); border-radius: 12px; padding: 1.5rem; margin-bottom: 2.5rem; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 0.75rem;">
+              <span style="font-size: 0.9rem; color: var(--text-muted); font-weight: 600;">지역</span>
+              <span style="font-size: 1.05rem; color: var(--text-primary); font-weight: 700;">${this.escapeHtml(this.examRegion)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.9rem; color: var(--text-muted); font-weight: 600;">이름</span>
+              <span style="font-size: 1.05rem; color: var(--text-primary); font-weight: 700;">${this.escapeHtml(this.examName)}</span>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 0.75rem;">
+            <button onclick="app.editExamInfo()" class="btn-secondary" style="height: 50px; border-radius: 10px; font-weight: 700;">정보 수정</button>
+            <button onclick="app.startMissionExamGameplay()" class="btn-primary" style="height: 50px; border-radius: 10px; font-weight: 800; background: linear-gradient(135deg, var(--accent-amber), #b45309); border: none; color: white;">시험 시작하기</button>
+          </div>
+        </div>
+      `;
+    } else if (this.examStep === 'test') {
+      const currentVerse = this.examVerses[this.examCurrentIndex];
+      container.innerHTML = `
+        <div class="page-header-bar" style="max-width:860px; margin: 1rem auto 0 auto; padding: 0 1rem; display: flex; align-items: center; justify-content: space-between;">
+          <button class="btn-header-back" onclick="app.confirmExitExam()" aria-label="뒤로가기">
+            <span class="material-icons-round">arrow_back</span>
+          </button>
+          <h1 style="font-family: var(--font-kr); font-weight: 800; font-size: 1.25rem;">사명자 시험 - 전문 모드</h1>
+          <div style="width: 40px;"></div>
+        </div>
+
+        <div class="exam-card glass-panel" style="max-width:860px; margin: 1.5rem auto 2rem auto; padding: 2rem; font-family: var(--font-kr);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <span style="font-size: 1.1rem; font-weight: 800; color: var(--accent-amber);">${this.examCurrentIndex + 1} / ${this.examVerses.length}절</span>
+            <span style="display: flex; align-items: center; gap: 0.25rem; font-size: 0.85rem; font-weight: 700; color: #16a34a;">
+              <span class="material-icons-round" style="font-size: 1.1rem;">check_circle</span> 저장됨
+            </span>
+          </div>
+
+          <div style="height: 6px; background: var(--glass-border); border-radius: 999px; margin-bottom: 2rem; overflow: hidden;">
+            <div style="height: 100%; width: ${((this.examCurrentIndex + 1) / this.examVerses.length) * 100}%; background: linear-gradient(90deg, var(--accent-amber), var(--accent-emerald)); transition: width 0.3s;"></div>
+          </div>
+
+          <div style="margin-bottom: 1.5rem;">
+            <h2 style="font-size: 1.3rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem;">
+              요한계시록 ${currentVerse.chapter}장 ${currentVerse.verse}절
+            </h2>
+            <p style="font-size: 0.9rem; color: var(--text-secondary); font-weight: 600;">
+              본문은 표시되지 않습니다. 암송한 내용을 입력해주세요.
+            </p>
+          </div>
+
+          <!-- Word Guides Container -->
+          ${this.getWordGuideHtml(currentVerse.text)}
+
+          <!-- User Input Area -->
+          <textarea id="examVerseAnswerTextarea" class="blank-input"
+            style="width: 100%; min-height: 120px; padding: 1.25rem; font-size: 1.05rem; line-height: 1.65; border-radius: 12px; margin-bottom: 1rem; resize: vertical; font-family: var(--font-kr); background: rgba(0,0,0,0.15);"
+            placeholder="여기에 암송한 구절을 입력하세요..." autocomplete="off"
+            oninput="app.updateExamCharacterCount()" onkeyup="app.updateExamCharacterCount()" onchange="app.updateExamCharacterCount()" onblur="app.updateExamCharacterCount()">${this.escapeHtml(this.examAnswers[this.examCurrentIndex]?.userTypedText || '')}</textarea>
+
+          <div class="exam-char-counter">
+            <span>
+              글자 수: <strong id="examCharCount">0</strong>자
+            </span>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem;">
+            ${this.examCameFromReview ? `
+              <button onclick="app.cancelEditAndReturnToReview()" class="btn-secondary" style="flex: 1; height: 50px; border-radius: 10px; font-weight: 700;">취소</button>
+              <button onclick="app.saveAndReturnToReview()" class="btn-primary" style="flex: 2; height: 50px; border-radius: 10px; font-weight: 800; background: linear-gradient(135deg, var(--accent-amber), #b45309); border: none; color: white;">저장 후 검토하기</button>
+            ` : `
+              <button onclick="app.prevMissionExamVerse()" class="btn-secondary" style="flex: 1; height: 50px; border-radius: 10px; font-weight: 700; ${this.examCurrentIndex === 0 ? 'opacity: 0.4; pointer-events: none;' : ''}">이전 절</button>
+              <button onclick="app.saveAndNextMissionExamVerse()" class="btn-primary" style="flex: 2; height: 50px; border-radius: 10px; font-weight: 800; background: linear-gradient(135deg, var(--accent-amber), #b45309); border: none; color: white;">
+                ${this.examCurrentIndex === this.examVerses.length - 1 ? '저장 후 검토하기' : '저장 후 다음 절'}
+              </button>
+            `}
+          </div>
+        </div>
+      `;
+      this.updateExamCharacterCount();
+      const textarea = document.getElementById('examVerseAnswerTextarea');
+      if (textarea) {
+        textarea.focus();
+        setTimeout(() => this.updateExamCharacterCount(), 0);
+      }
+    } else if (this.examStep === 'review') {
+      const answeredCount = this.examAnswers.filter(a => (a?.userTypedText || '').trim().length > 0).length;
+      container.innerHTML = `
+        <div class="page-header-bar" style="max-width:600px; margin: 1rem auto 0 auto; padding: 0 1rem; display: flex; align-items: center; justify-content: space-between;">
+          <button class="btn-header-back" onclick="app.goBackToTestVerse()" aria-label="뒤로가기">
+            <span class="material-icons-round">arrow_back</span>
+          </button>
+          <h1 style="font-family: var(--font-kr); font-weight: 800; font-size: 1.25rem;">제출 전 전체 검토</h1>
+          <div style="width: 40px;"></div>
+        </div>
+
+        <div class="exam-card glass-panel exam-review-card" style="max-width:640px; margin: 1.5rem auto; font-family: var(--font-kr);">
+          <div class="exam-review-summary">
+            <span>작성한 답안</span>
+            <strong><em>${answeredCount}</em> / ${this.examVerses.length}절</strong>
+          </div>
+
+          <div class="exam-review-list">
+            ${this.examVerses.map((v, idx) => {
+              const answer = this.examAnswers[idx];
+              const typed = (answer?.userTypedText || '').trim();
+              const hasAnswer = typed.length > 0;
+              const preview = hasAnswer ? typed : '아직 작성하지 않았습니다.';
+              const charCount = Array.from(typed).length;
+              
+              return `
+                <button onclick="app.jumpToExamVerse(${idx})" class="exam-review-answer ${hasAnswer ? 'done' : 'empty'}" type="button">
+                  <span class="exam-review-answer-num">${idx + 1}</span>
+                  <span class="exam-review-answer-body">
+                    <strong>요한계시록 ${v.chapter}장 ${v.verse}절</strong>
+                    <span>${this.escapeHtml(preview)}</span>
+                  </span>
+                  <span class="exam-review-answer-meta">
+                    <em>${hasAnswer ? '작성 완료' : '미작성'}</em>
+                    <small>${charCount}자</small>
+                  </span>
+                  <span class="material-icons-round exam-review-edit-icon">edit</span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+
+          <p class="exam-review-help">수정할 절을 누르면 해당 절만 다시 작성할 수 있습니다.</p>
+
+          <div class="exam-review-actions">
+            <button onclick="app.goBackToTestVerse()" class="btn-secondary" style="height: 50px; border-radius: 10px; font-weight: 700;">현재 절 수정</button>
+            <button onclick="app.submitMissionExam()" class="btn-primary" style="height: 50px; border-radius: 10px; font-weight: 800; background: linear-gradient(135deg, var(--accent-amber), #b45309); border: none; color: white;">최종 제출하기</button>
+          </div>
+        </div>
+      `;
+    } else if (this.examStep === 'result') {
+      const isPassed = this.examScore >= 80;
+      container.innerHTML = `
+        <div class="page-header-bar" style="max-width:600px; margin: 1rem auto 0 auto; padding: 0 1rem; display: flex; align-items: center; justify-content: space-between;">
+          <button class="btn-header-back" onclick="app.completeExamAndGoHome()" aria-label="뒤로가기">
+            <span class="material-icons-round">arrow_back</span>
+          </button>
+          <h1 style="font-family: var(--font-kr); font-weight: 800; font-size: 1.25rem;">시험 결과</h1>
+          <div style="width: 40px;"></div>
+        </div>
+
+        <div class="exam-card glass-panel" style="max-width:600px; margin: 1.5rem auto 2rem auto; padding: 2rem; font-family: var(--font-kr); text-align: center;">
+          
+          <span class="material-icons-round" style="font-size: 5rem; color: var(--accent-amber); margin-bottom: 1rem; display: block; filter: drop-shadow(0 0 12px rgba(245,158,11,0.3));">
+            ${isPassed ? 'emoji_events' : 'info'}
+          </span>
+          
+          <h2 style="font-size: 1.6rem; font-weight: 800; color: ${isPassed ? '#22c55e' : '#f43f5e'}; margin-bottom: 0.5rem;">
+            ${isPassed ? '합격!' : '불합격'}
+          </h2>
+          <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 2rem; font-weight: 500;">
+            ${isPassed ? '수고하셨습니다. 끝까지 완주하셨습니다.' : '아쉽습니다. 조금만 더 노력해 보세요!'}
+          </p>
+
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 12px; padding: 1.5rem; display: flex; justify-content: space-around; align-items: center; margin-bottom: 2rem;">
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; font-weight: 600;">점수</div>
+              <div style="font-size: 2.2rem; font-weight: 900; color: var(--accent-amber);">${this.examScore}점 <span style="font-size: 1.1rem; color: var(--text-muted); font-weight: normal;">/ 100점</span></div>
+            </div>
+            <div style="width: 1px; height: 50px; background: var(--glass-border);"></div>
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; font-weight: 600;">정답률</div>
+              <div style="font-size: 2.2rem; font-weight: 900; color: var(--accent-blue);">${this.examScore}%</div>
+            </div>
+          </div>
+
+          <div style="background: rgba(0,0,0,0.1); border-radius: 12px; padding: 1.25rem; text-align: left; font-size: 0.85rem; line-height: 1.8; margin-bottom: 2rem;">
+            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted); font-weight: 600;">제출일</span><strong style="color: var(--text-primary);">${this.escapeHtml(this.examSubmittedAt)}</strong></div>
+            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted); font-weight: 600;">응시자</span><strong style="color: var(--text-primary);">${this.escapeHtml(this.examRegion)} / ${this.escapeHtml(this.examName)}</strong></div>
+            <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted); font-weight: 600;">획득 포인트</span><strong style="color: var(--accent-amber);">+${this.examEarnedPoints}P</strong></div>
+          </div>
+
+          <details style="text-align: left; margin-bottom: 2rem; background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); border-radius: 12px; padding: 1rem;">
+            <summary style="cursor: pointer; font-weight: 700; color: var(--accent-purple); padding: 0.25rem 0; font-size: 0.95rem; display: flex; align-items: center; gap: 0.25rem;">
+              <span class="material-icons-round" style="font-size: 1.15rem;">playlist_add_check</span> 결과 상세 보기
+            </summary>
+            <div style="margin-top: 1rem; max-height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem;">
+              ${this.examAnswers.map((ans, idx) => `
+                <div style="background: rgba(0,0,0,0.15); border-radius: 8px; padding: 0.85rem; border-left: 4px solid ${ans.accuracy >= 80 ? '#22c55e' : '#f43f5e'};">
+                  <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.45rem; display: flex; justify-content: space-between;">
+                    <span>${idx + 1}. 요한계시록 ${ans.verse.chapter}장 ${ans.verse.verse}절</span>
+                    <span style="color: var(--accent-amber);">${ans.accuracy}% 일치</span>
+                  </div>
+                  <div style="font-size: 0.85rem; line-height: 1.5; margin-bottom: 0.45rem; color: var(--text-secondary);">
+                    <strong>입력:</strong> ${this.escapeHtml(ans.userTypedText || '(미입력)')}
+                  </div>
+                  <div style="font-size: 0.85rem; line-height: 1.5; color: var(--text-muted);">
+                    <strong>비교:</strong> ${ans.html}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </details>
+
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <button onclick="app.triggerExamRetake()" class="btn-primary" style="height: 50px; border-radius: 10px; font-weight: 800; background: linear-gradient(135deg, var(--accent-amber), #b45309); border: none; color: white;">다시 시험 보기</button>
+            <button onclick="app.completeExamAndGoHome()" class="btn-secondary" style="height: 50px; border-radius: 10px; font-weight: 700;">홈으로 이동</button>
+          </div>
+        </div>
+      `;
+    } else if (this.examStep === 'retake') {
+      container.innerHTML = `
+        <div class="page-header-bar" style="max-width:600px; margin: 1rem auto 0 auto; padding: 0 1rem; display: flex; align-items: center; justify-content: space-between;">
+          <button onclick="app.cancelRetake()" class="btn-header-back" aria-label="뒤로가기">
+            <span class="material-icons-round">arrow_back</span>
+          </button>
+          <h1 style="font-family: var(--font-kr); font-weight: 800; font-size: 1.25rem;">재응시 안내</h1>
+          <div style="width: 40px;"></div>
+        </div>
+
+        <div class="exam-card glass-panel" style="max-width:600px; margin: 1.5rem auto 2rem auto; padding: 2.5rem 2rem; font-family: var(--font-kr); text-align: center;">
+          
+          <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(245, 158, 11, 0.15); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem auto;">
+            <span class="material-icons-round" style="font-size: 3rem; color: var(--accent-amber); animation: spin 10s linear infinite;">autorenew</span>
+          </div>
+
+          <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.75rem;">
+            언제든지 다시<br>도전할 수 있습니다!
+          </h2>
+          
+          <p style="font-size: 0.95rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 2.5rem; word-break: keep-all; font-weight: 500; padding: 0 1rem;">
+            이전 기록은 결과에 영향을 주지 않습니다.<br>
+            더 좋은 점수에 도전해보세요.
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <button onclick="app.confirmExamRetake()" class="btn-primary" style="height: 50px; border-radius: 10px; font-weight: 800; background: linear-gradient(135deg, var(--accent-amber), #b45309); border: none; color: white;">다시 시험 보기</button>
+            <button onclick="app.cancelRetake()" class="btn-secondary" style="height: 50px; border-radius: 10px; font-weight: 700;">나중에 하기</button>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  getWordGuideHtml(correctText) {
+    const words = correctText.trim().split(/\s+/).filter(Boolean);
+    const guideHtml = words.map(word => {
+      const cleanWord = word.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "").trim();
+      const length = cleanWord.length;
+      if (length === 0) return '';
+      let boxes = '';
+      for (let i = 0; i < length; i++) {
+        boxes += `<span class="char-box-guide"></span>`;
+      }
+      return `<div class="word-box-group">${boxes}</div>`;
+    }).filter(Boolean).join(' ');
+    return `<div class="exam-word-guides-container">${guideHtml}</div>`;
+  }
+
+  saveExamInfoAndStart() {
+    const regionInput = document.getElementById('examRegionInput');
+    const nameInput = document.getElementById('examNameInput');
+    const autoSaveCheckbox = document.getElementById('examAutoSaveCheckbox');
+    
     const region = regionInput ? regionInput.value.trim() : '';
     const name = nameInput ? nameInput.value.trim() : '';
+    const autoSave = autoSaveCheckbox ? autoSaveCheckbox.checked : true;
+
     if (!region || !name) {
       alert('지역과 이름을 모두 입력해 주세요.');
       if (!region && regionInput) regionInput.focus();
       else if (!name && nameInput) nameInput.focus();
       return;
     }
-    this.currentExamApplicant = { region, name };
-    this.closeModal('modalExamJoin');
-    this.startExam();
-  }
 
-  renderExamView() {
-    const container = document.getElementById('examView');
-    if (!container) return;
+    this.examRegion = region;
+    this.examName = name;
+    this.examAutoSave = autoSave;
 
-    if (!this.currentUser) return;
-
-    // \uc81c\ucd9c \uc774\ub825 \uac00\uc838\uc640\uc11c \uc2dc\ud5d8 \ubdf0 \uc5c5\ub370\uc774\ud2b8
-    const submission = this.currentUser.examSubmission || null;
-    const bestScore = submission ? (submission.score || 0) : 0;
-    const attemptCount = submission ? (submission.attemptCount || 0) : 0;
-
-    const scoreEl = document.getElementById('examHighestScore');
-    const attemptsEl = document.getElementById('examAttemptsCount');
-    if (scoreEl) scoreEl.textContent = bestScore;
-    if (attemptsEl) attemptsEl.textContent = attemptCount;
-    const inlineNameInput = document.getElementById('examInlineName');
-    const inlineRegionInput = document.getElementById('examInlineRegion');
-    if (inlineNameInput && !inlineNameInput.value) inlineNameInput.value = this.currentUser.examApplicantName || this.currentUser.name || '';
-    if (inlineRegionInput && !inlineRegionInput.value) inlineRegionInput.value = this.currentUser.examRegion || '';
-    this.bindExamJoinButton();
-  }
-
-  bindExamJoinButton() {
-    const btn = document.getElementById('btnOpenExamJoin');
-    if (!btn || btn.dataset.bound === '1') return;
-    btn.dataset.bound = '1';
-    btn.removeAttribute('onclick');
-    btn.addEventListener('click', (event) => {
-      event.preventDefault();
-      this.submitExamJoinForm();
-    });
-  }
-
-  startExam() {
-    if (!this.currentUser) return;
-    const container = document.getElementById('examView');
-    // \uc6d0\ubcf8 \ub9c8\ud06c\uc5c5 \uc800\uc7a5 (\uc2dc\ud5d8 \ud6c4 \ubcf5\uc6d0\uc6a9)
-    if (container && !this._examIntroHtml) {
-      this._examIntroHtml = container.innerHTML;
+    if (autoSave && !this.currentUser.isTrial) {
+      this.currentUser.examRegion = region;
+      this.currentUser.examApplicantName = name;
+      db.collection('users').doc(this.currentUser.id).update({
+        examRegion: region,
+        examApplicantName: name
+      }).catch(err => console.error('Error saving exam info to user profile:', err));
     }
-    const bank = this._getExamQuestionBank();
-    if (bank.length === 0) {
-      alert('관리자가 설정한 사명자 시험 성구 범위에 문제가 있습니다.');
-      return;
-    }
-    this.currentDifficulty = 'master';
+
+    this.startMissionExamGameplay();
+  }
+
+  editExamInfo() {
+    this.examStep = 'info';
+    this.renderExamView();
+  }
+
+  startMissionExamGameplay() {
+    this.examStep = 'test';
+    this.examCurrentIndex = 0;
     this.isExamMode = true;
-    // \ub79c\ub364 10\ubb38\ud56d \uc120\ud0dd
-    const shuffled = [...bank].sort(() => Math.random() - 0.5);
-    this.examQuestions = shuffled.slice(0, Math.min(10, shuffled.length));
-    this.currentExamQuestionIndex = 0;
-    this.examCorrectCount = 0;
-    this.examAnswers = [];
+    
+    // Initialize answers array with empty entries matching verses length
+    this.examAnswers = Array.from({ length: this.examVerses.length }, (_, idx) => ({
+      verse: this.examVerses[idx],
+      userTypedText: '',
+      accuracy: 0,
+      html: ''
+    }));
 
-    this._renderExamQuestion();
+    this.renderExamView();
   }
 
-  _restoreExamIntro() {
-    const container = document.getElementById('examView');
-    if (!container) return;
-    if (this._examIntroHtml) {
-      container.innerHTML = this._examIntroHtml;
-      this._examIntroHtml = null; // \ub2e4\uc74c\uc5d0 \ub2e4\uc2dc \uc800\uc7a5\ud558\ub3c4\ub85d \ub9ac\uc14b
+  saveAndNextMissionExamVerse() {
+    const textarea = document.getElementById('examVerseAnswerTextarea');
+    const typedText = textarea ? textarea.value.trim() : '';
+    
+    // Grade the active verse and save
+    const currentVerse = this.examVerses[this.examCurrentIndex];
+    const comparison = this.compareTextWords(currentVerse.text, typedText);
+    
+    this.examAnswers[this.examCurrentIndex] = {
+      verse: currentVerse,
+      userTypedText: typedText,
+      accuracy: comparison.accuracy,
+      html: comparison.html
+    };
+
+    if (this.examCurrentIndex === this.examVerses.length - 1) {
+      this.examStep = 'review';
+    } else {
+      this.examCurrentIndex++;
     }
-    this.renderExamView(); // \uc810\uc218\ub4f1 \ub370\uc774\ud130 \uc5c5\ub370\uc774\ud2b8
-    this.bindExamJoinButton();
+    this.renderExamView();
   }
 
-  _renderExamQuestion() {
-    const container = document.getElementById('examView');
-    if (!container) return;
+  prevMissionExamVerse() {
+    if (this.examCurrentIndex > 0) {
+      const textarea = document.getElementById('examVerseAnswerTextarea');
+      const typedText = textarea ? textarea.value.trim() : '';
+      
+      // Save current progress before navigating back
+      const currentVerse = this.examVerses[this.examCurrentIndex];
+      const comparison = this.compareTextWords(currentVerse.text, typedText);
+      this.examAnswers[this.examCurrentIndex] = {
+        ...this.examAnswers[this.examCurrentIndex],
+        userTypedText: typedText,
+        accuracy: comparison.accuracy,
+        html: comparison.html
+      };
 
-    const idx = this.currentExamQuestionIndex;
-    const total = this.examQuestions.length;
-
-    if (idx >= total) {
-      this._finishExam();
-      return;
-    }
-
-    const q = this.examQuestions[idx];
-    const pct = Math.round(((idx + 1) / total) * 100);
-
-    container.innerHTML = `
-      <div class="page-header-bar" style="max-width:860px;margin:1rem auto 0 auto;padding:0 1rem;">
-        <button class="btn-header-back" onclick="app.handleBackNavigation()" aria-label="뒤로가기">
-          <span class="material-icons-round">arrow_back</span>
-        </button>
-        <h1>사명자 시험</h1>
-        <div style="width: 40px;"></div>
-      </div>
-      <div class="exam-question-card glass-panel" style="max-width:860px;margin:1rem auto 2rem auto;padding:2rem;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;">
-          <span style="font-size:1.15rem;font-weight:800;color:var(--accent-amber);">${idx+1} / ${total} 문제</span>
-          <span style="font-size:0.85rem;font-weight:700;color:var(--text-secondary);">사명자 시험 · 마스터</span>
-        </div>
-        <div style="height:7px;background:var(--glass-border);border-radius:999px;margin-bottom:1.75rem;overflow:hidden;">
-          <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--accent-amber),var(--accent-emerald));transition:width 0.3s;"></div>
-        </div>
-
-        <div style="margin-bottom:1.25rem;">
-          <div style="font-size:1.05rem;font-weight:800;color:var(--text-primary);margin-bottom:0.45rem;">
-            Q. ${q.reference}
-          </div>
-          <div style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">
-            마스터 전문 암송: 아래 빈칸 전체에 해당하는 말씀을 입력하세요.
-          </div>
-        </div>
-
-        <div style="font-size:1.25rem;font-weight:800;line-height:1.75;margin-bottom:1.25rem;color:var(--text-primary);word-break:keep-all;">
-          ${q.blanked}
-        </div>
-
-        <textarea id="examAnswerInput" class="blank-input"
-          style="width:100%;min-height:120px;padding:1rem 1.1rem;font-size:1rem;line-height:1.65;border-radius:12px;margin-bottom:1rem;resize:vertical;font-family:var(--font-kr);"
-          placeholder="전체 말씀을 입력하세요..." autocomplete="off"></textarea>
-
-        <div style="display:flex;gap:0.75rem;">
-          <button onclick="app.submitExamAnswer()" class="btn-primary"
-            style="flex:1;padding:0.9rem;font-size:0.95rem;font-weight:800;border-radius:12px;background:linear-gradient(135deg,var(--accent-amber),var(--accent-emerald));color:#fff;border:none;cursor:pointer;">
-            제출
-          </button>
-          <button onclick="app.skipExamAnswer()" class="btn-secondary"
-            style="padding:0.9rem 1.25rem;font-size:0.9rem;font-weight:700;border-radius:12px;background:var(--glass-bg);border:1px solid var(--glass-border);cursor:pointer;color:var(--text-secondary);">
-            모름
-          </button>
-        </div>
-      </div>
-    `;
-
-    const input = document.getElementById('examAnswerInput');
-    if (input) {
-      input.focus();
-      input.addEventListener('keydown', (e) => {
-        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-          e.preventDefault();
-          this.submitExamAnswer();
-        }
-      });
+      this.examCurrentIndex--;
+      this.renderExamView();
     }
   }
 
-  _normalizeExamAnswer(value) {
-    return String(value || '')
-      .replace(/\s+/g, '')
-      .replace(/[.,!?;:'"“”‘’(){}\[\]<>·…~\-_/\\]/g, '')
-      .toLowerCase();
+  jumpToExamVerse(idx) {
+    if (idx >= 0 && idx < this.examVerses.length) {
+      this.examStep = 'test';
+      this.examCurrentIndex = idx;
+      this.examCameFromReview = true;
+      this.renderExamView();
+    }
   }
 
-  submitExamAnswer() {
-    const input = document.getElementById('examAnswerInput');
-    if (!input) return;
-    const q = this.examQuestions[this.currentExamQuestionIndex];
-    const userVal = input.value.trim();
-    const correctVal = q.answer.trim();
-    const isCorrect = this._normalizeExamAnswer(userVal) === this._normalizeExamAnswer(correctVal);
-
-    this.examAnswers.push({ question: q.question, correct: correctVal, userAnswer: userVal, isCorrect });
-    if (isCorrect) this.examCorrectCount++;
-
-    this.currentExamQuestionIndex++;
-    this._renderExamQuestion();
+  updateExamCharacterCount() {
+    const textarea = document.getElementById('examVerseAnswerTextarea');
+    const charCountSpan = document.getElementById('examCharCount');
+    if (textarea && charCountSpan) {
+      const text = textarea.value || '';
+      charCountSpan.textContent = Array.from(text.trim()).length;
+    }
   }
 
-  skipExamAnswer() {
-    const q = this.examQuestions[this.currentExamQuestionIndex];
-    this.examAnswers.push({ question: q.question, correct: q.answer, userAnswer: '(미입력)', isCorrect: false });
-    this.currentExamQuestionIndex++;
-    this._renderExamQuestion();
+  saveAndReturnToReview() {
+    const textarea = document.getElementById('examVerseAnswerTextarea');
+    const typedText = textarea ? textarea.value.trim() : '';
+    
+    // Grade the active verse and save
+    const currentVerse = this.examVerses[this.examCurrentIndex];
+    const comparison = this.compareTextWords(currentVerse.text, typedText);
+    
+    this.examAnswers[this.examCurrentIndex] = {
+      verse: currentVerse,
+      userTypedText: typedText,
+      accuracy: comparison.accuracy,
+      html: comparison.html
+    };
+
+    this.examStep = 'review';
+    this.examCameFromReview = false;
+    this.renderExamView();
   }
 
-  async _finishExam() {
-    const total = this.examQuestions.length;
-    const correct = this.examCorrectCount;
-    const score = Math.round((correct / total) * 100);
-    const applicantRegion = (this.currentExamApplicant?.region || '').trim();
-    const applicantName = (this.currentExamApplicant?.name || this.currentUser.name || '').trim();
+  cancelEditAndReturnToReview() {
+    this.examStep = 'review';
+    this.examCameFromReview = false;
+    this.renderExamView();
+  }
+
+  goBackToTestVerse() {
+    this.examStep = 'test';
+    this.examCameFromReview = true;
+    this.renderExamView();
+  }
+
+  confirmExitExam() {
+    if (confirm('시험을 종료하시겠습니까? 현재까지 입력한 답안은 저장되지 않습니다.')) {
+      this.completeExamAndGoHome();
+    }
+  }
+
+  async submitMissionExam() {
+    // Check if any verse is unwritten
+    const unwrittenCount = this.examAnswers.filter(a => (a?.userTypedText || '').trim().length === 0).length;
+    if (unwrittenCount > 0) {
+      if (!confirm(`아직 작성하지 않은 문항이 ${unwrittenCount}개 있습니다. 최종 제출하시겠습니까?`)) {
+        return;
+      }
+    }
+
+    const total = this.examAnswers.length;
+    const totalAccuracySum = this.examAnswers.reduce((sum, a) => sum + (a?.accuracy || 0), 0);
+    const score = Math.round(totalAccuracySum / total);
+    
+    const applicantRegion = this.examRegion.trim();
+    const applicantName = this.examName.trim();
     const submittedAt = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
     const examDocKey = this._getMissionExamSubmissionKey(applicantRegion, applicantName);
 
@@ -6518,62 +6803,6 @@ class SimonEduApp {
     }
   }
 
-  _getMissionExamSubmissionKey(region, name) {
-    const cleanRegion = String(region || '').trim().replace(/\s+/g, ' ');
-    const cleanName = String(name || '').trim().replace(/\s+/g, ' ');
-    if (!cleanRegion || !cleanName) return '';
-    return `${cleanRegion}__${cleanName}`.toLowerCase().replace(/[\/#?\[\]]/g, '_');
-  }
-
-  completeExamAndGoHome() {
-    const container = document.getElementById('examView');
-    if (container && this._examIntroHtml) {
-      container.innerHTML = this._examIntroHtml;
-      this._examIntroHtml = null;
-    }
-    this.isExamMode = false;
-    this.examQuestions = [];
-    this.examAnswers = [];
-    this.currentExamQuestionIndex = 0;
-    this.examCorrectCount = 0;
-    this.currentExamApplicant = null;
-    this.switchView('dashboard');
-  }
-
-  restartExamFromResult() {
-    const container = document.getElementById('examView');
-    if (container && this._examIntroHtml) {
-      container.innerHTML = this._examIntroHtml;
-      this._examIntroHtml = null;
-    }
-    this.isExamMode = false;
-    this.examQuestions = [];
-    this.examAnswers = [];
-    this.currentExamQuestionIndex = 0;
-    this.examCorrectCount = 0;
-    this.switchView('exam');
-    setTimeout(() => this.submitExamJoinForm(), 80);
-  }
-
-  backToEventDetailFromResult() {
-    const container = document.getElementById('examView');
-    if (container && this._examIntroHtml) {
-      container.innerHTML = this._examIntroHtml;
-      this._examIntroHtml = null;
-    }
-    this.isExamMode = false;
-    this.examQuestions = [];
-    this.examAnswers = [];
-    this.currentExamQuestionIndex = 0;
-    this.examCorrectCount = 0;
-    if (this.currentEvent || this.currentEventDetail) {
-      this.currentEventDetail = this.currentEventDetail || this.currentEvent;
-      this.switchView('eventDetail');
-    } else {
-      this.switchView('events');
-    }
-  }
-
   // ============================================================
 
   clearIntervals() {
@@ -6605,6 +6834,14 @@ class SimonEduApp {
       // Trigger CSS reflow
       modal.offsetHeight;
       modal.classList.add('active');
+      document.body.classList.add('modal-open');
+      
+      if (modalId === 'modalEventAnnouncement') {
+        document.body.classList.add('hide-bottom-nav');
+        this.postNativeBottomNavHidden(true);
+        setTimeout(() => this.postNativeBottomNavHidden(true), 80);
+      }
+      
       this.syncNativeRouteChromeForModal(modalId, true);
     }
   }
@@ -6615,13 +6852,44 @@ class SimonEduApp {
       modal.classList.remove('active');
       setTimeout(() => {
         modal.style.display = 'none';
+        const hasActiveModal = Array.from(document.querySelectorAll('.modal-overlay')).some(el => el.classList.contains('active'));
+        document.body.classList.toggle('modal-open', hasActiveModal);
+        
+        if (modalId === 'modalEventAnnouncement') {
+          const shouldHide = ['game', 'exam', 'auth', 'journeyChapterDetail', 'journeyVerseSelect', 'journeyVerseStudy', 'journeyResult', 'eventDetail', 'noticeDetail'].includes(this.currentViewName);
+          document.body.classList.toggle('hide-bottom-nav', shouldHide);
+          this.postNativeBottomNavHidden(shouldHide);
+        }
+        
         this.syncNativeRouteChromeForModal(modalId, false);
       }, 300);
     }
   }
 
+  postNativeBottomNavHidden(hidden) {
+    if (!this.isMobileApp || !window.MobileAppChannel) return;
+    window.MobileAppChannel.postMessage(JSON.stringify({
+      event: 'hide_bottom_nav',
+      hidden
+    }));
+  }
+
   syncNativeRouteChromeForModal(modalId, hidden) {
     if (!this.isMobileApp || !window.MobileAppChannel) return;
+    
+    if (modalId === 'modalEventAnnouncement') {
+      let actualHidden = hidden;
+      if (!hidden) {
+        const shouldHide = ['game', 'exam', 'auth', 'journeyChapterDetail', 'journeyVerseSelect', 'journeyVerseStudy', 'journeyResult', 'eventDetail', 'noticeDetail'].includes(this.currentViewName);
+        actualHidden = shouldHide;
+      }
+      window.MobileAppChannel.postMessage(JSON.stringify({
+        event: 'hide_bottom_nav',
+        hidden: actualHidden
+      }));
+      return;
+    }
+    
     if (!document.body.classList.contains('native-route-active')) return;
     if (!['modalChapterVerses'].includes(modalId)) return;
     window.MobileAppChannel.postMessage(JSON.stringify({
