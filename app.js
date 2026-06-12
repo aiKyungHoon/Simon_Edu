@@ -1837,15 +1837,17 @@ class SimonEduApp {
     const isExamTab = this.journeyTab === 'exam';
 
     // Show/Hide headers and sections based on tab
-    const headerCard = document.querySelector('.journey-header-card-modern');
-    const rewardsSec = document.querySelector('.journey-rewards-section-modern');
+    const headerCard = document.querySelector('.journey-header-card-new');
+    const metricsGrid = document.getElementById('journeyMetricsGrid');
+    const bannerCard = document.getElementById('journeyBannerCard');
     const examPrepArea = document.getElementById('journeyExamPrepArea');
     const examPrepBottom = document.getElementById('journeyExamPrepBottomArea');
     const stickyBottom = document.querySelector('.journey-sticky-bottom');
 
     if (isExamTab) {
       if (headerCard) headerCard.style.display = 'none';
-      if (rewardsSec) rewardsSec.style.display = 'none';
+      if (metricsGrid) metricsGrid.style.display = 'none';
+      if (bannerCard) bannerCard.style.display = 'none';
       if (examPrepArea) examPrepArea.style.display = 'block';
       if (examPrepBottom) {
         examPrepBottom.style.display = 'block';
@@ -1860,19 +1862,14 @@ class SimonEduApp {
       if (stickyBottom) stickyBottom.style.display = 'none';
     } else {
       if (headerCard) headerCard.style.display = 'flex';
-      if (rewardsSec) rewardsSec.style.display = 'block';
+      if (metricsGrid) metricsGrid.style.display = 'grid';
+      if (bannerCard) bannerCard.style.display = 'flex';
       if (examPrepArea) examPrepArea.style.display = 'none';
       if (examPrepBottom) examPrepBottom.style.display = 'none';
       if (stickyBottom) stickyBottom.style.display = 'block';
     }
 
-    // Update Circle Progress
-    const circleFill = document.getElementById('journeyCircleFill');
-    if (circleFill) {
-      // Circumference is 226.19
-      const offset = 226.19 * (1 - progressPercent / 100);
-      circleFill.style.strokeDashoffset = offset;
-    }
+    // Update Header Text Values
     const curChapterEl = document.getElementById('journeyCurChapter');
     if (curChapterEl) {
       curChapterEl.textContent = completedChapterCount;
@@ -1882,69 +1879,84 @@ class SimonEduApp {
       pctEl.textContent = `${progressPercent}%`;
     }
 
-    // Determine next target chapter
-    const nextTargetEl = document.getElementById('journeyNextTarget');
-    if (nextTargetEl) {
-      if (completedChapterCount >= journeyTotalChapters) {
-        nextTargetEl.textContent = '축하합니다! 전장 완독 완료!';
-      } else {
-        // Find first incomplete chapter
-        let nextTargetChapter = 1;
-        for (let ch = 1; ch <= journeyTotalChapters; ch++) {
-          const chVerses = bibleData.filter(v => v.chapter === ch);
-          const firstIdx = bibleData.findIndex(v => v.chapter === ch);
-          const lastIdx = firstIdx + chVerses.length - 1;
-          if (curIdx <= lastIdx) {
-            nextTargetChapter = ch;
-            break;
-          }
-        }
-        nextTargetEl.textContent = `다음 목표: ${nextTargetChapter}장 완독`;
+    // Render Segmented Notch Progress Bar
+    const progressContainer = document.getElementById('segmentedProgress');
+    if (progressContainer) {
+      let pillsHtml = '';
+      for (let i = 1; i <= journeyTotalChapters; i++) {
+        const isFilled = i <= completedChapterCount;
+        pillsHtml += `<div class="segmented-progress-pill ${isFilled ? 'filled' : ''}"></div>`;
       }
+      progressContainer.innerHTML = pillsHtml;
     }
 
-    // Render Rewards Scroll Cards (spec updated: +1500P for 15, +5000P for 22)
-    const rewardsScroll = document.getElementById('journeyRewardsScroll');
-    if (rewardsScroll) {
-      const rewards = [
-        { chapter: 1, points: 200 },
-        { chapter: 5, points: 500 },
-        { chapter: 10, points: 1000 },
-        { chapter: 15, points: 1500 },
-        { chapter: 22, points: 5000, title: '22장 완독', label: '특별 칭호' }
-      ];
+    // Render 3 Metric Cards Grid
+    if (metricsGrid && !isExamTab) {
+      // Metric Card 1: Weekly Goal (동적 구간 계산)
+      const targetGoal = Math.min(22, Math.ceil((completedChapterCount + 1) / 5) * 5);
+      const goalStart = Math.floor(completedChapterCount / 5) * 5;
+      const goalTargetCount = targetGoal - goalStart;
+      const goalCurrentCount = Math.min(goalTargetCount, completedChapterCount - goalStart);
+      const goalPercent = goalTargetCount > 0 ? Math.round((goalCurrentCount / goalTargetCount) * 100) : 100;
       
-      rewardsScroll.innerHTML = rewards.map(reward => {
-        const claimed = (this.currentUser.journeyRewardsClaimed || []).includes(reward.chapter);
-        const unlocked = completedChapterCount >= reward.chapter;
-        const titleText = reward.title || `${reward.chapter}장 완독`;
-        const rewardText = reward.label ? `+${reward.points.toLocaleString()}P & ${reward.label}` : `+${reward.points.toLocaleString()}P`;
-        
-        let buttonState = '';
-        if (claimed) {
-          buttonState = '<button class="btn-claim claimed" disabled>완료</button>';
-        } else if (unlocked) {
-          buttonState = `<button class="btn-claim unlocked" onclick="app.claimJourneyReward(${reward.chapter})">받기</button>`;
-        } else {
-          buttonState = '<button class="btn-claim locked" disabled>잠김</button>';
-        }
+      const goalValueText = completedChapterCount >= 22 ? '전체 완독' : `${targetGoal}장 완독`;
+      const goalProgressText = `${goalCurrentCount} / ${goalTargetCount}`;
+      
+      // Metric Card 2: Streak (연속 암송)
+      const streakCount = this.currentUser.consecutiveCheckIns || 0;
+      const streakSubText = streakCount > 0 ? '연속 달성 중!' : '암송 시작하기';
+      
+      // Metric Card 3: Completion Reward (완주 보상)
+      const rewardValueText = '5,000P + 뱃지';
+      const rewardSubText = '모든 장 완주 시';
 
-        return `
-          <div class="journey-reward-card-item ${unlocked ? 'unlocked' : ''} ${claimed ? 'claimed' : ''}">
-            <div class="reward-medal">
-              <span class="material-icons-round">emoji_events</span>
-            </div>
-            <div class="reward-details">
-              <strong>${titleText}</strong>
-              <span>${rewardText}</span>
-            </div>
-            ${buttonState}
+      metricsGrid.innerHTML = `
+        <!-- Card 1: 이번 주 목표 -->
+        <div class="journey-metric-card goal" onclick="app.openModal('modalJourneyInfo')">
+          <div class="journey-metric-icon-badge">
+            <span class="material-icons-round" style="font-size: 1.2rem;">track_changes</span>
           </div>
-        `;
-      }).join('');
+          <span class="journey-metric-label">이번 주 목표</span>
+          <span class="journey-metric-value">${goalValueText}</span>
+          <span class="journey-metric-sub">${goalProgressText}</span>
+          <div class="journey-metric-progress-wrapper">
+            <div class="journey-metric-progress-fill" style="width: ${goalPercent}%"></div>
+          </div>
+        </div>
+        
+        <!-- Card 2: 연속 암송 -->
+        <div class="journey-metric-card streak" onclick="app.switchView('attendance')">
+          <div class="journey-metric-icon-badge">
+            <span class="material-icons-round" style="font-size: 1.2rem;">local_fire_department</span>
+          </div>
+          <span class="journey-metric-label">연속 암송</span>
+          <span class="journey-metric-value">${streakCount}일 🔥</span>
+          <span class="journey-metric-sub">${streakSubText}</span>
+        </div>
+        
+        <!-- Card 3: 완주 보상 -->
+        <div class="journey-metric-card reward" onclick="app.openModal('modalJourneyInfo')">
+          <div class="journey-metric-icon-badge">
+            <span class="material-icons-round" style="font-size: 1.2rem;">redeem</span>
+          </div>
+          <span class="journey-metric-label">완주 보상</span>
+          <span class="journey-metric-value">${rewardValueText}</span>
+          <span class="journey-metric-sub">${rewardSubText}</span>
+        </div>
+      `;
     }
 
-    // Render Chapters Grid
+    // Update Pill Tab Labels
+    const tabAll = document.getElementById('journeyTabAll');
+    if (tabAll) {
+      tabAll.textContent = `전체 (22)`;
+    }
+    const tabCompleted = document.getElementById('journeyTabCompleted');
+    if (tabCompleted) {
+      tabCompleted.textContent = `완독 (${completedChapterCount})`;
+    }
+
+    // Render Chapters Grid / Timeline
     const chaptersGrid = document.getElementById('journeyChaptersGrid');
     if (chaptersGrid) {
       const chapterList = [];
@@ -1982,26 +1994,18 @@ class SimonEduApp {
 
       if (chapterList.length === 0) {
         chaptersGrid.innerHTML = `
-          <div class="journey-empty-state" style="grid-column: 1 / -1; padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+          <div class="journey-empty-state" style="grid-column: 1 / -1; padding: 3rem 2rem; text-align: center; color: var(--text-muted); font-size: 0.9rem; width: 100%;">
             <span class="material-icons-round" style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.5;">hourglass_empty</span>
             <p>${isExamTab ? '검색 결과에 해당하는 장이 없습니다.' : '완독한 장이 아직 없습니다.'}</p>
           </div>
         `;
       } else {
         if (isExamTab) {
-          chaptersGrid.classList.add('exam-mode');
-        } else {
-          chaptersGrid.classList.remove('exam-mode');
-        }
-        chaptersGrid.innerHTML = chapterList.map(item => {
-          let cardClass = '';
-          let statusText = '';
-          let badgeHtml = '';
-          
-          if (isExamTab) {
-            // Exam Prep Tab Mode: all chapters unlocked, clickable
+          chaptersGrid.className = 'journey-chapters-grid exam-mode';
+          chaptersGrid.innerHTML = chapterList.map(item => {
             const isHighlighted = item.chapter >= this.examRange.start && item.chapter <= this.examRange.end;
             const isSelected = this.activeJourneyChapter === item.chapter;
+            let cardClass = '';
             
             if (isSelected) cardClass = 'exam-selected';
             else if (isHighlighted) cardClass = 'exam-highlight';
@@ -2027,46 +2031,121 @@ class SimonEduApp {
                 <div class="exam-card-label">${item.chapter}장</div>
               </div>
             `;
-          }
-
-          // Sequential / Completed modes:
-          if (item.isCompleted) {
-            cardClass = 'completed';
-            statusText = '완독';
-            badgeHtml = '<span class="status-icon"><span class="material-icons-round">check_circle</span></span>';
-          } else if (item.isOngoing) {
-            cardClass = 'ongoing';
-            let completedVerses = 0;
-            for (let i = item.firstIdx; i <= item.lastIdx; i++) {
-              if (i < curIdx) completedVerses++;
+          }).join('');
+        } else {
+          // Normal Tabs: Render Vertical Timeline
+          chaptersGrid.className = 'journey-timeline-container';
+          
+          // Determine the first uncompleted chapter (ongoing or waiting) to highlight
+          const nextTargetCh = chapterList.find(item => !item.isCompleted)?.chapter || 999;
+          
+          const timelineItemsHtml = chapterList.map(item => {
+            const isNextTarget = item.chapter === nextTargetCh;
+            
+            // Classes
+            const timelineCircleClass = item.isCompleted ? 'completed' : (item.isOngoing ? 'ongoing' : (isNextTarget ? 'waiting-highlight' : 'waiting'));
+            const timelineCardClass = item.isCompleted ? 'completed' : (item.isOngoing ? 'ongoing' : (isNextTarget ? 'waiting-highlight' : 'waiting'));
+            
+            // Get first verse text of this chapter for subtitle snippet
+            const firstVerseObj = bibleData.find(v => v.chapter === item.chapter);
+            const snippet = firstVerseObj ? firstVerseObj.text : '';
+            const subTitleText = snippet.length > 35 ? snippet.substring(0, 35) + '...' : snippet;
+            
+            // Milestone Rewards claimed checks (1, 5, 10, 15, 22)
+            const milestones = [1, 5, 10, 15, 22];
+            let rewardBadgeHtml = '';
+            if (milestones.includes(item.chapter)) {
+              const claimed = (this.currentUser.journeyRewardsClaimed || []).includes(item.chapter);
+              const unlocked = completedChapterCount >= item.chapter;
+              if (unlocked && !claimed) {
+                rewardBadgeHtml = `
+                  <div style="margin-top: 0.35rem;">
+                    <button class="btn-timeline-reward-claim" onclick="event.stopPropagation(); app.claimJourneyReward(${item.chapter})">🎁 보상 받기</button>
+                  </div>
+                `;
+              } else if (claimed) {
+                rewardBadgeHtml = `
+                  <div style="margin-top: 0.35rem;">
+                    <span class="timeline-reward-claimed-badge">🎁 보상 완료</span>
+                  </div>
+                `;
+              } else {
+                const rewardsPoints = { 1: 200, 5: 500, 10: 1000, 15: 1500, 22: 5000 };
+                rewardBadgeHtml = `
+                  <div style="margin-top: 0.35rem; font-size: 0.65rem; color: #94a3b8; font-weight: 600;">
+                    🎁 완독 시 +${rewardsPoints[item.chapter]}P
+                  </div>
+                `;
+              }
             }
-            const pct = Math.round((completedVerses / item.versesCount) * 100);
-            statusText = `진행중 ${pct}%`;
-            badgeHtml = `<span class="status-pct">${pct}%</span>`;
-          } else {
-            cardClass = 'waiting';
-            statusText = '대기중';
-            badgeHtml = '<span class="status-icon"><span class="material-icons-round">lock</span></span>';
-          }
 
-          let ongoingButton = '';
-          if (item.isOngoing) {
-            ongoingButton = `<button class="btn-journey-continue-small" style="margin-top: 0.5rem; background: #e28a07; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 6px; font-size: 0.7rem; font-weight: bold; cursor: pointer; width: 100%;">이어하기</button>`;
-          }
+            // Side controls
+            let cardSideHtml = '';
+            if (item.isCompleted) {
+              cardSideHtml = `
+                <div class="timeline-card-side">
+                  <span class="timeline-status-badge completed">완료</span>
+                  <span class="material-icons-round" style="color: #10b981; font-size: 1.3rem;">check_circle</span>
+                </div>
+              `;
+            } else if (item.isOngoing) {
+              let completedVerses = 0;
+              for (let i = item.firstIdx; i <= item.lastIdx; i++) {
+                if (i < curIdx) completedVerses++;
+              }
+              const pct = Math.round((completedVerses / item.versesCount) * 100);
+              cardSideHtml = `
+                <div class="timeline-card-side">
+                  <span class="timeline-status-badge ongoing">진행중 ${pct}%</span>
+                  <button class="btn-timeline-continue" onclick="event.stopPropagation(); app.clickChapterCard(${item.chapter}, false)">이어하기</button>
+                </div>
+              `;
+            } else {
+              cardSideHtml = `
+                <div class="timeline-card-side">
+                  <span class="timeline-status-badge waiting">대기중</span>
+                  <span class="material-icons-round" style="color: #cbd5e1; font-size: 1.15rem;">lock</span>
+                </div>
+              `;
+            }
 
-          return `
-            <div class="chapter-card-grid-item ${cardClass}" onclick="app.clickChapterCard(${item.chapter}, false)">
-              <div class="chapter-card-header">
-                <span class="chapter-label">${item.chapter}장</span>
-                ${badgeHtml}
+            // Ongoing Progress Bar inside card
+            let ongoingProgressBar = '';
+            if (item.isOngoing) {
+              let completedVerses = 0;
+              for (let i = item.firstIdx; i <= item.lastIdx; i++) {
+                if (i < curIdx) completedVerses++;
+              }
+              const pct = Math.round((completedVerses / item.versesCount) * 100);
+              ongoingProgressBar = `
+                <div class="timeline-card-progress-bar-wrapper">
+                  <div class="timeline-card-progress-bar-fill" style="width: ${pct}%"></div>
+                </div>
+              `;
+            }
+
+            return `
+              <div class="timeline-item">
+                <div class="timeline-left">
+                  <div class="timeline-circle ${timelineCircleClass}">${item.chapter}</div>
+                </div>
+                <div class="timeline-right">
+                  <div class="timeline-card ${timelineCardClass}" onclick="app.clickChapterCard(${item.chapter}, false)">
+                    <div class="timeline-card-main">
+                      <span class="timeline-card-title">요한계시록 ${item.chapter}장</span>
+                      <span class="timeline-card-subtitle">${subTitleText}</span>
+                      ${ongoingProgressBar}
+                      ${rewardBadgeHtml}
+                    </div>
+                    ${cardSideHtml}
+                  </div>
+                </div>
               </div>
-              <div class="chapter-card-footer">
-                <span>${statusText}</span>
-                ${ongoingButton}
-              </div>
-            </div>
-          `;
-        }).join('');
+            `;
+          }).join('');
+
+          chaptersGrid.innerHTML = `<div class="journey-timeline-list">${timelineItemsHtml}</div>`;
+        }
       }
     }
 
