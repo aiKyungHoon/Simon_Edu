@@ -1756,11 +1756,11 @@ class SimonEduApp {
         } else {
           circleClass = 'locked';
           iconHtml = '<span class="material-icons-round">lock</span>';
-          statusText = '잠김';
+          statusText = '대기중';
         }
 
         return `
-          <div class="home-journey-chapter-item ${circleClass}" onclick="app.clickChapterCard(${item.chapter}, ${item.isLocked})">
+          <div class="home-journey-chapter-item ${circleClass}" onclick="app.clickChapterCard(${item.chapter}, false)">
             <span class="chapter-num">${item.chapter}장</span>
             <div class="chapter-circle">
               ${iconHtml}
@@ -2044,8 +2044,8 @@ class SimonEduApp {
             statusText = `진행중 ${pct}%`;
             badgeHtml = `<span class="status-pct">${pct}%</span>`;
           } else {
-            cardClass = 'locked';
-            statusText = '잠김';
+            cardClass = 'waiting';
+            statusText = '대기중';
             badgeHtml = '<span class="status-icon"><span class="material-icons-round">lock</span></span>';
           }
 
@@ -2055,7 +2055,7 @@ class SimonEduApp {
           }
 
           return `
-            <div class="chapter-card-grid-item ${cardClass}" onclick="app.clickChapterCard(${item.chapter}, ${item.isLocked})">
+            <div class="chapter-card-grid-item ${cardClass}" onclick="app.clickChapterCard(${item.chapter}, false)">
               <div class="chapter-card-header">
                 <span class="chapter-label">${item.chapter}장</span>
                 ${badgeHtml}
@@ -2279,11 +2279,11 @@ class SimonEduApp {
     }
     
     // Update Old Layout stats too
-    const statusText = curIdx > lastIndex ? '완료' : (curIdx >= firstIndex ? '진행 중' : '잠김');
+    const statusText = curIdx > lastIndex ? '완료' : (curIdx >= firstIndex ? '진행 중' : '대기중');
     const statusPill = document.getElementById('chapterStatusPill');
     if (statusPill) {
       statusPill.textContent = statusText;
-      statusPill.className = 'chapter-status-pill ' + (curIdx > lastIndex ? 'completed' : (curIdx >= firstIndex ? 'ongoing' : 'locked'));
+      statusPill.className = 'chapter-status-pill ' + (curIdx > lastIndex ? 'completed' : (curIdx >= firstIndex ? 'ongoing' : 'waiting'));
     }
     
     const oldProgress = document.getElementById('chapterProgressPercent');
@@ -2309,7 +2309,7 @@ class SimonEduApp {
         const isCompleted = idx < curIdx;
         const isOngoing = idx === curIdx;
         const isExamPractice = this.journeyTab === 'exam';
-        const statusClass = isCompleted ? 'completed' : (isOngoing ? 'ongoing' : (isExamPractice ? 'practice' : 'locked'));
+        const statusClass = isCompleted ? 'completed' : (isOngoing ? 'ongoing' : (isExamPractice ? 'practice' : 'ready'));
         
         let statusBadge = '';
         if (isCompleted) {
@@ -2319,11 +2319,11 @@ class SimonEduApp {
         } else if (isExamPractice) {
           statusBadge = '<span class="verse-badge practice">연습</span>';
         } else {
-          statusBadge = '<span class="verse-badge locked"><span class="material-icons-round" style="font-size: 0.95rem;">lock</span></span>';
+          statusBadge = '<span class="verse-badge ready" style="background:#fafaf8; color:#94a3b8; border:1px solid #ebebe9; padding: 2px 6px; border-radius:4px; font-size: 0.75rem; font-weight:bold;">대기중</span>';
         }
         
         return `
-          <button class="verse-list-row ${statusClass}" ${isCompleted || isOngoing || isExamPractice ? `onclick="app.openVerseStudy(${idx})"` : 'disabled'}>
+          <button class="verse-list-row ${statusClass}" onclick="app.openVerseStudy(${idx})">
             <div class="verse-row-left">
               <span class="verse-num">${v.verse}절</span>
               <span class="verse-snippet">${this.escapeHtml(v.text.substring(0, 25))}...</span>
@@ -2339,10 +2339,6 @@ class SimonEduApp {
   }
 
   clickChapterCard(chapter, isLocked) {
-    if (isLocked) {
-      this.showToast('아직 도달하지 않은 장입니다. 순서대로 학습해주세요.');
-      return;
-    }
     
     if (this.requestNativeScreen('journeyChapterDetail', {
       title: `${chapter}장`,
@@ -2445,13 +2441,12 @@ class SimonEduApp {
           statusBadge = '<span class="verse-badge practice" style="background:#e0f2fe; color:#0369a1; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-weight:bold;">연습</span>';
           rowClass += ' practice';
         } else {
-          statusBadge = '<span class="verse-badge locked" style="color:#94a3b8;"><span class="material-icons-round" style="font-size: 0.95rem;">lock</span></span>';
-          rowClass += ' locked';
+          statusBadge = '<span class="verse-badge ready" style="background:#fafaf8; color:#94a3b8; border:1px solid #ebebe9; padding:2px 6px; border-radius:4px; font-size: 0.75rem; font-weight:bold;">대기중</span>';
+          rowClass += ' ready';
         }
         
-        const isLocked = !isCompleted && !isOngoing && !isExamPractice;
-        const onClickAttr = isLocked ? '' : `onclick="app.closeModal('modalChapterVerses'); app.openVerseStudy(${idx});"`;
-        const disabledAttr = isLocked ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : '';
+        const onClickAttr = `onclick="app.closeModal('modalChapterVerses'); app.openVerseStudy(${idx});"`;
+        const disabledAttr = '';
         
         return `
           <div class="${rowClass}" ${onClickAttr} ${disabledAttr} style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0.5rem; border-bottom: 1px solid #f2e7d5; cursor: pointer;">
@@ -2631,7 +2626,7 @@ class SimonEduApp {
     const nextBtn = document.getElementById('btnNextVerse');
     const chapterLastIndex = chapterFirstIndex + bibleData.filter(val => val.chapter === v.chapter).length - 1;
     if (nextBtn) {
-      if (idx < chapterLastIndex && (idx < curIdx || this.journeyTab === 'exam')) {
+      if (idx < chapterLastIndex) {
         nextBtn.disabled = false;
         nextBtn.style.opacity = '1';
       } else {
@@ -2648,11 +2643,7 @@ class SimonEduApp {
       const v = bibleData[nextIdx];
       const currentChapter = bibleData[this.activeJourneyVerseIndex].chapter;
       if (v.chapter === currentChapter) {
-        if (nextIdx <= (this.currentUser.currentVerseIndex || 0) || this.journeyTab === 'exam') {
-          this.openVerseStudy(nextIdx);
-        } else {
-          this.showToast('아직 도달하지 않은 절입니다.');
-        }
+        this.openVerseStudy(nextIdx);
       }
     }
   }

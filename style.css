@@ -4748,6 +4748,18 @@ body.mobile-app.logged-in #dashboardView .home-friend-activity-section {
   box-shadow: none;
 }
 
+.chapter-card-grid-item.waiting {
+  background: #fffdfc;
+  border-color: #ecd9bc;
+  opacity: 0.95;
+  cursor: pointer;
+}
+
+.chapter-card-grid-item.waiting:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.08);
+}
+
 .chapter-card-header {
   display: flex;
   justify-content: space-between;
@@ -4885,6 +4897,11 @@ body.mobile-app.logged-in #dashboardView .home-friend-activity-section {
 
 .chapter-status-pill.locked {
   background: #f3efe2;
+  color: var(--text-muted);
+}
+
+.chapter-status-pill.waiting {
+  background: #f5f4f0;
   color: var(--text-muted);
 }
 
