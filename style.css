@@ -6553,7 +6553,7 @@ body.mobile-app #rankingView .dashboard-single-container {
 
 /* Event Banner Styling for Dark Blue / Indigo Theme */
 .event-banner-card {
-  background: linear-gradient(135deg, #0b223c, #16365a) !important;
+  background: linear-gradient(135deg, #0b223c, #16365a);
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   box-shadow: 0 4px 16px rgba(15, 43, 72, 0.15) !important;
   color: #ffffff !important;
@@ -6642,7 +6642,7 @@ body.mobile-app.logged-in #dashboardView .event-banner-track .event-banner-card 
   flex: 0 0 100% !important;
   scroll-snap-align: start !important;
   border-radius: 16px !important;
-  background: linear-gradient(135deg, #10283f 0%, #163a5f 100%) !important;
+  background: linear-gradient(135deg, #10283f 0%, #163a5f 100%);
   border: 1px solid rgba(184, 134, 11, 0.35) !important;
   box-shadow: 0 10px 24px rgba(16, 40, 63, 0.12) !important;
   overflow: hidden !important;
@@ -8180,4 +8180,9 @@ body.mobile-app.logged-in #dashboardView .event-banner-dots span.active {
   .exam-review-actions {
     grid-template-columns: 1fr;
   }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

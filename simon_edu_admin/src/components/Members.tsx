@@ -222,6 +222,37 @@ export default function Members({ users, adminEmail }: MembersProps) {
     }
   };
 
+  const downloadCSV = () => {
+    const headers = ['아이디', '이름', '이메일', '역할', '포인트', '연속출석일수', '마지막출석일', '현재말씀인덱스', '현재말씀성구', '상태'];
+    const rows = filteredUsers.map(u => [
+      u.username,
+      u.name || '',
+      u.email,
+      getRoleLabel(u.role),
+      u.points,
+      u.consecutiveCheckIns,
+      u.lastCheckInDate || '출석 없음',
+      u.currentVerseIndex,
+      getVerseText(u.currentVerseIndex),
+      u.status || 'active'
+    ]);
+    
+    // UTF-8 BOM to display Korean characters properly in Excel
+    const csvContent = "\uFEFF" + [headers, ...rows]
+      .map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+      
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `simon_edu_members_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="view-container">
       {/* FILTER BAR */}
@@ -237,7 +268,7 @@ export default function Members({ users, adminEmail }: MembersProps) {
           />
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>권한:</span>
             <select
@@ -276,6 +307,24 @@ export default function Members({ users, adminEmail }: MembersProps) {
               <option value="suspended">정지됨</option>
             </select>
           </div>
+
+          <button
+            onClick={downloadCSV}
+            className="btn-primary"
+            style={{
+              width: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.4rem 1rem',
+              fontSize: '0.85rem',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            <span className="material-icons-round" style={{ fontSize: '1.1rem' }}>download</span>
+            CSV 내보내기
+          </button>
         </div>
       </div>
 
@@ -615,20 +664,20 @@ export default function Members({ users, adminEmail }: MembersProps) {
                   ) : (
                     [...selectedUser.pointsHistory].reverse().map((h) => (
                       <tr key={h.id}>
-                        <td style={{ padding: '0.5rem' }}>{h.title}</td>
-                        <td style={{ padding: '0.5rem' }}>
+                        <td data-label="내용" style={{ padding: '0.5rem' }}>{h.title}</td>
+                        <td data-label="종류" style={{ padding: '0.5rem' }}>
                           <span className={`badge ${h.type || 'signup'}`} style={{ fontSize: '0.65rem' }}>
                             {h.type}
                           </span>
                         </td>
-                        <td style={{
+                        <td data-label="금액" style={{
                           padding: '0.5rem',
                           fontWeight: 'bold',
                           color: h.amount >= 0 ? 'var(--accent-emerald)' : 'var(--accent-rose)'
                         }}>
                           {h.amount >= 0 ? `+${h.amount}` : h.amount} P
                         </td>
-                        <td style={{ padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>{h.date}</td>
+                        <td data-label="일시" style={{ padding: '0.5rem', color: 'var(--text-muted)', fontSize: '0.75rem' }}>{h.date}</td>
                       </tr>
                     ))
                   )}

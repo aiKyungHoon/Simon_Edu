@@ -101,6 +101,8 @@ class SimonEduApp {
     // Crew & Battle Arena states (Battle mode hidden)
     this.hideBattleMode = true;
     this.isExamMode = false;
+    this.examTimerInterval = null;
+    this.examTimeRemaining = 3600;
     this.examQuestions = [];
     this.currentExamQuestionIndex = 0;
     this.examCorrectCount = 0;
@@ -118,6 +120,8 @@ class SimonEduApp {
     this.currentRankingTab = 'all';
     this.currentEventDetail = null;
     this.shownEventAnnouncementIds = [];
+    this.users = [];
+    this.usersLoaded = false;
 
     this.crews = [];
     this.battles = [];
@@ -179,9 +183,22 @@ class SimonEduApp {
         db.collection('users').doc(user.uid).get()
           .then(docSnap => {
             if (docSnap.exists) {
-              this.currentUser = docSnap.data();
+              const userData = docSnap.data();
+              this.currentUser = userData;
+              this.startUserExamSubmissionListener();
+              
+              if (user.email && userData.email !== user.email) {
+                console.log("Syncing Firestore email with Auth email:", user.email);
+                db.collection('users').doc(user.uid).update({ email: user.email })
+                  .then(() => {
+                    this.currentUser.email = user.email;
+                  })
+                  .catch(syncErr => console.warn("Failed to sync email in Firestore:", syncErr));
+              }
+
               document.body.classList.add('logged-in');
               this.renderAppForUser();
+              this.hideLoading();
               
               if (this.isMobileApp && window.MobileAppChannel) {
                 window.MobileAppChannel.postMessage(JSON.stringify({
@@ -192,15 +209,19 @@ class SimonEduApp {
             } else {
               document.body.classList.remove('logged-in');
               this.logout();
+              this.hideLoading();
             }
           })
           .catch(err => {
             console.error("Error loading user profile:", err);
             document.body.classList.remove('logged-in');
             this.logout();
+            this.hideLoading();
           });
       } else {
         this.currentUser = null;
+        this.stopUserExamSubmissionListener();
+        this.currentExamSubmission = null;
         this.stopMissionExamRankingListener();
         this.missionExamSubmissions = [];
         document.body.classList.remove('logged-in');
@@ -225,6 +246,7 @@ class SimonEduApp {
         
         if (autoLogin && savedUser && savedPass) {
           console.log("Attempting automatic login for:", savedUser);
+          this.showLoading('자동 로그인 중...');
           this.performAutoLogin(savedUser, savedPass);
           return;
         }
@@ -278,12 +300,22 @@ class SimonEduApp {
       snapshot.forEach(doc => {
         this.users.push(doc.data());
       });
+      this.usersLoaded = true;
 
       // Update current user details from updated DB array
       if (this.currentUser) {
         const freshUser = this.users.find(u => u.id === this.currentUser.id);
         if (freshUser) {
+          const oldRegion = this.currentUser.examRegion || '';
+          const oldName = this.currentUser.examApplicantName || '';
+          const newRegion = freshUser.examRegion || '';
+          const newName = freshUser.examApplicantName || '';
+          
           this.currentUser = freshUser;
+          
+          if (oldRegion !== newRegion || oldName !== newName) {
+            this.startUserExamSubmissionListener();
+          }
           const navPoints = document.getElementById('navPoints');
           if (navPoints) navPoints.textContent = this.currentUser.points;
           this.renderNotifications();
@@ -887,6 +919,7 @@ class SimonEduApp {
         return;
       }
 
+      this.showLoading('회원가입 중...');
       auth.createUserWithEmailAndPassword(email, password)
         .then((userCredential) => {
           this.playConfetti('signup');
@@ -926,94 +959,98 @@ class SimonEduApp {
         })
         .catch(err => {
           console.error(err);
+          this.hideLoading();
           alert(`회원가입 실패: ${err.message}`);
         });
     } else {
       // Login Flow
       const idLower = usernameId.toLowerCase();
-      const dbUser = this.users.find(u => u.username && u.username.toLowerCase() === idLower);
-      const realEmail = dbUser ? dbUser.email : null;
       const seedInfo = SEED_USERS[idLower];
-
-      // Try real email first. If not found, use virtual email.
-      const firstEmailToTry = realEmail || (seedInfo ? seedInfo.email : null) || `${idLower}@simon.edu`;
-
       const autoLoginChk = document.getElementById('authAutoLogin');
       const shouldSaveAutoLogin = autoLoginChk && autoLoginChk.checked;
 
-      auth.signInWithEmailAndPassword(firstEmailToTry, password)
-        .then(() => {
-          // Success handled by Auth state listener
-          if (shouldSaveAutoLogin) {
-            localStorage.setItem('simon_auto_login', 'true');
-            localStorage.setItem('simon_saved_username', usernameId);
-            localStorage.setItem('simon_saved_password', password);
-          } else {
-            localStorage.removeItem('simon_auto_login');
-            localStorage.removeItem('simon_saved_username');
-            localStorage.removeItem('simon_saved_password');
-          }
-        })
-        .catch(err => {
-          // If we tried realEmail but it failed, try the legacy virtual email in case they aren't migrated in Auth yet
-          if (realEmail && firstEmailToTry === realEmail && 
-              (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
-            const virtualEmail = `${idLower}@simon.edu`;
-            return auth.signInWithEmailAndPassword(virtualEmail, password)
-              .then(() => {
-                if (shouldSaveAutoLogin) {
-                  localStorage.setItem('simon_auto_login', 'true');
-                  localStorage.setItem('simon_saved_username', usernameId);
-                  localStorage.setItem('simon_saved_password', password);
-                } else {
-                  localStorage.removeItem('simon_auto_login');
-                  localStorage.removeItem('simon_saved_username');
-                  localStorage.removeItem('simon_saved_password');
-                }
-                // Success with legacy virtual email! Update Auth email to their real email for future logins.
-                return auth.currentUser.updateEmail(realEmail)
-                  .catch(updateErr => {
-                    console.warn("Auth email migration failed on login:", updateErr);
-                  });
-              })
-              .catch(err2 => {
-                // Wrong password for the virtual email account
-                alert('pwd 가 다릅니다');
-              });
-          }
+      this.showLoading('로그인 중...');
+      
+      this.findUserByUsername(usernameId).then(dbUser => {
+        const realEmail = dbUser ? dbUser.email : null;
+        const firstEmailToTry = realEmail || (seedInfo ? seedInfo.email : null) || `${idLower}@simon.edu`;
 
-          // If it failed and we haven't logged in yet, check for seed user migration
-          if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-            if (seedInfo && password === seedInfo.password) {
-              // Migrate seed user directly using their real email
-              auth.createUserWithEmailAndPassword(seedInfo.email, password)
-                .then(userCredential => {
+        auth.signInWithEmailAndPassword(firstEmailToTry, password)
+          .then(() => {
+            // Success handled by Auth state listener
+            if (shouldSaveAutoLogin) {
+              localStorage.setItem('simon_auto_login', 'true');
+              localStorage.setItem('simon_saved_username', usernameId);
+              localStorage.setItem('simon_saved_password', password);
+            } else {
+              localStorage.removeItem('simon_auto_login');
+              localStorage.removeItem('simon_saved_username');
+              localStorage.removeItem('simon_saved_password');
+            }
+          })
+          .catch(err => {
+            // If we tried realEmail but it failed, try the legacy virtual email in case they aren't migrated in Auth yet
+            if (realEmail && firstEmailToTry === realEmail && 
+                (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
+              const virtualEmail = `${idLower}@simon.edu`;
+              return auth.signInWithEmailAndPassword(virtualEmail, password)
+                .then(() => {
                   if (shouldSaveAutoLogin) {
                     localStorage.setItem('simon_auto_login', 'true');
                     localStorage.setItem('simon_saved_username', usernameId);
                     localStorage.setItem('simon_saved_password', password);
+                  } else {
+                    localStorage.removeItem('simon_auto_login');
+                    localStorage.removeItem('simon_saved_username');
+                    localStorage.removeItem('simon_saved_password');
                   }
-                  const seedData = this.getSeedUserData(usernameId);
-                  seedData.id = userCredential.user.uid;
-                  return db.collection('users').doc(seedData.id).set(seedData);
                 })
-                .catch(signUpErr => {
-                  console.error("Seed user migration failure:", signUpErr);
+                .catch(err2 => {
+                  console.error(err2);
+                  this.hideLoading();
                   alert('pwd 가 다릅니다');
                 });
-              return;
             }
-          }
 
-          console.error(err);
-          // Check if ID exists in users collection or SEED_USERS
-          const idExists = dbUser || seedInfo;
-          if (!idExists) {
-            alert('ID 가 다릅니다');
-          } else {
-            alert('pwd 가 다릅니다');
-          }
-        });
+            // If it failed and we haven't logged in yet, check for seed user migration
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+              if (seedInfo && password === seedInfo.password) {
+                // Migrate seed user directly using their real email
+                auth.createUserWithEmailAndPassword(seedInfo.email, password)
+                  .then(userCredential => {
+                    if (shouldSaveAutoLogin) {
+                      localStorage.setItem('simon_auto_login', 'true');
+                      localStorage.setItem('simon_saved_username', usernameId);
+                      localStorage.setItem('simon_saved_password', password);
+                    }
+                    const seedData = this.getSeedUserData(usernameId);
+                    seedData.id = userCredential.user.uid;
+                    return db.collection('users').doc(seedData.id).set(seedData);
+                  })
+                  .catch(signUpErr => {
+                    console.error("Seed user migration failure:", signUpErr);
+                    this.hideLoading();
+                    alert('pwd 가 다릅니다');
+                  });
+                return;
+              }
+            }
+
+            console.error(err);
+            this.hideLoading();
+            // Check if ID exists in users collection or SEED_USERS
+            const idExists = dbUser || seedInfo;
+            if (!idExists) {
+              alert('ID 가 다릅니다');
+            } else {
+              alert('pwd 가 다릅니다');
+            }
+          });
+      }).catch(err => {
+        console.error("Error looking up user profile:", err);
+        this.hideLoading();
+        alert('로그인 처리 중 오류가 발생했습니다.');
+      });
     }
   }
 
@@ -1065,55 +1102,100 @@ class SimonEduApp {
       });
   }
 
+  async findUserByUsername(usernameId) {
+    const idLower = usernameId.toLowerCase();
+    
+    // 1. First, check local users array if already loaded
+    if (this.usersLoaded && this.users.length > 0) {
+      const dbUser = this.users.find(u => u.username && u.username.toLowerCase() === idLower);
+      if (dbUser) return dbUser;
+    }
+
+    // 2. Query Firestore directly (case-sensitive matching query as fallback)
+    try {
+      const snap = await db.collection('users').where('username', '==', usernameId).get();
+      if (!snap.empty) {
+        return snap.docs[0].data();
+      }
+    } catch (err) {
+      console.warn("Direct username query error:", err);
+    }
+
+    // 3. If local users list is not loaded yet, wait for it to load (up to 3 seconds)
+    if (!this.usersLoaded) {
+      console.log("Users list not loaded yet, waiting...");
+      for (let i = 0; i < 6; i++) { // 6 * 500ms = 3000ms
+        await new Promise(resolve => setTimeout(resolve, 500));
+        if (this.usersLoaded) {
+          const dbUser = this.users.find(u => u.username && u.username.toLowerCase() === idLower);
+          if (dbUser) return dbUser;
+          break;
+        }
+      }
+    }
+
+    return null;
+  }
+
   performAutoLogin(usernameId, password) {
     const idLower = usernameId.toLowerCase();
     
-    db.collection('users').where('username', '==', usernameId).get()
-      .then(querySnapshot => {
-        let realEmail = null;
-        if (!querySnapshot.empty) {
-          realEmail = querySnapshot.docs[0].data().email;
-        }
-        
-        const seedInfo = SEED_USERS[idLower];
-        const firstEmailToTry = realEmail || (seedInfo ? seedInfo.email : null) || `${idLower}@simon.edu`;
+    this.findUserByUsername(usernameId).then(dbUser => {
+      const realEmail = dbUser ? dbUser.email : null;
+      const seedInfo = SEED_USERS[idLower];
+      const firstEmailToTry = realEmail || (seedInfo ? seedInfo.email : null) || `${idLower}@simon.edu`;
 
-        auth.signInWithEmailAndPassword(firstEmailToTry, password)
-          .then(() => {
-            console.log("Automatic login successful.");
-          })
-          .catch(err => {
-            console.error("Auto login failed:", err);
-            if (realEmail && firstEmailToTry === realEmail && 
-                (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
-              const virtualEmail = `${idLower}@simon.edu`;
-              auth.signInWithEmailAndPassword(virtualEmail, password)
-                .then(() => {
-                  console.log("Automatic login successful with legacy email.");
-                  return auth.currentUser.updateEmail(realEmail).catch(updateErr => {
-                    console.warn("Auth email migration failed on auto login:", updateErr);
-                  });
-                })
-                .catch(err2 => {
-                  console.error("Auto login legacy email failed:", err2);
-                  this.clearAutoLoginAndGoToAuth();
-                });
-            } else {
-              this.clearAutoLoginAndGoToAuth();
-            }
-          });
-      })
-      .catch(err => {
-        console.error("Error querying user for auto login:", err);
-        this.clearAutoLoginAndGoToAuth();
-      });
+      auth.signInWithEmailAndPassword(firstEmailToTry, password)
+        .then(() => {
+          console.log("Automatic login successful.");
+        })
+        .catch(err => {
+          console.error("Auto login failed:", err);
+          if (realEmail && firstEmailToTry === realEmail && 
+              (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
+            const virtualEmail = `${idLower}@simon.edu`;
+            auth.signInWithEmailAndPassword(virtualEmail, password)
+              .then(() => {
+                console.log("Automatic login successful with legacy email.");
+              })
+              .catch(err2 => {
+                console.error("Auto login legacy email failed:", err2);
+                this.clearAutoLoginAndGoToAuth();
+              });
+          } else {
+            this.clearAutoLoginAndGoToAuth();
+          }
+        });
+    }).catch(err => {
+      console.error("Error looking up user for auto login:", err);
+      this.clearAutoLoginAndGoToAuth();
+    });
   }
 
   clearAutoLoginAndGoToAuth() {
     localStorage.removeItem('simon_auto_login');
     localStorage.removeItem('simon_saved_username');
     localStorage.removeItem('simon_saved_password');
+    this.hideLoading();
     this.switchView('auth');
+  }
+
+  showLoading(text = '로딩 중...') {
+    const overlay = document.getElementById('globalLoadingOverlay');
+    const txtEl = document.getElementById('globalLoadingText');
+    if (overlay) {
+      overlay.style.display = 'flex';
+    }
+    if (txtEl) {
+      txtEl.textContent = text;
+    }
+  }
+
+  hideLoading() {
+    const overlay = document.getElementById('globalLoadingOverlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
   }
 
   // 4. View Router & Screen Renders
@@ -1125,6 +1207,13 @@ class SimonEduApp {
     if (viewName === 'exam' && !this.hasActiveExamEvent()) {
       alert('현재 진행 중인 사명자 시험 이벤트가 없습니다.');
       viewName = 'dashboard';
+    }
+
+    if (viewName !== 'exam') {
+      this.examScore = null;
+      this.examAnswers = [];
+      this.examVerses = [];
+      this.isExamMode = false;
     }
 
     const singleDashboardViews = ['game', 'exam', 'settings', 'events', 'eventDetail', 'notices', 'journey', 'journeyChapterDetail', 'journeyVerseSelect', 'journeyVerseStudy', 'journeyResult', 'noticeDetail', 'notifications'];
@@ -1176,8 +1265,8 @@ class SimonEduApp {
     }
 
     if (!this.isMobileApp && ['dashboard', 'attendance', 'ranking', 'crew'].includes(viewName)) {
-      // Hide auth, game, and admin views on desktop web
-      ['auth', 'game', 'admin'].forEach(v => {
+      // Hide single-dashboard views, auth, and admin views on desktop web
+      ['auth', 'admin', 'game', 'exam', 'settings', 'events', 'eventDetail', 'notices', 'journey', 'journeyChapterDetail', 'journeyVerseSelect', 'journeyVerseStudy', 'journeyResult', 'noticeDetail', 'notifications'].forEach(v => {
         const el = document.getElementById(v + 'View');
         if (el) el.classList.remove('active');
       });
@@ -1319,7 +1408,7 @@ class SimonEduApp {
     this._nativeRouteBypass = true;
     try {
       if (payload.action === 'startMission') {
-        this.startMission();
+        this.startMission(payload.startVerseIndex);
       } else if (payload.action === 'startTestMode') {
         this.startTestMode();
       } else if (payload.action === 'openNotice') {
@@ -1693,7 +1782,7 @@ class SimonEduApp {
         ${events.slice(0, 5).map((evt, index) => {
           const bannerUrl = this.getEventBannerUrl(evt);
           const bgStyle = bannerUrl
-            ? `background-image: linear-gradient(0deg, rgba(20,20,20,0.72), rgba(20,20,20,0.18)), url('${this.escapeHtml(bannerUrl)}');`
+            ? `background-image: linear-gradient(0deg, rgba(20,20,20,0.72), rgba(20,20,20,0.18)), url('${this.escapeHtml(bannerUrl)}') !important;`
             : '';
           let artHtml = `<span class="material-icons-round">${this.getEventIcon(evt)}</span>`;
           if (!bannerUrl) {
@@ -3585,6 +3674,13 @@ class SimonEduApp {
   }
 
   getEventParticipationStatus(eventItem) {
+    if (eventItem && eventItem.eventType === 'mission_exam') {
+      if (!this.currentUser) return 'available';
+      const submission = this.currentUser.examSubmission;
+      const attempts = Array.isArray(submission?.attempts) ? submission.attempts : [];
+      const hasAttempt = attempts.some(attempt => this._attemptMatchesEvent(attempt, eventItem));
+      return hasAttempt ? 'completed' : 'available';
+    }
     const key = `simon_event_status_${eventItem.id}_${this.currentUser?.id || 'guest'}`;
     return localStorage.getItem(key) || 'available';
   }
@@ -3786,7 +3882,15 @@ class SimonEduApp {
 
   startChallenge() {
     if (!this.currentUser) return;
-    if (!this.globalSettings || (!this.globalSettings.activeChallengeChapter && !this.globalSettings.challengeStartChapter)) return;
+    
+    const activeChallengeEvent = this.activeEvents?.find(evt => evt.eventType === 'special_challenge' && evt.active);
+    const hasActiveEventSetting = activeChallengeEvent && (
+      activeChallengeEvent.challengeStartChapter || 
+      activeChallengeEvent.startChapter || 
+      activeChallengeEvent.examStartChapter
+    );
+
+    if (!hasActiveEventSetting && (!this.globalSettings || (!this.globalSettings.activeChallengeChapter && !this.globalSettings.challengeStartChapter))) return;
 
     const challengeVerses = this._getChallengeVersesFromSettings();
     if (challengeVerses.length === 0) {
@@ -3856,6 +3960,18 @@ class SimonEduApp {
   }
 
   _getChallengeVersesFromSettings() {
+    // Try to load bounds from the active special_challenge event first!
+    const activeChallengeEvent = this.activeEvents?.find(evt => evt.eventType === 'special_challenge' && evt.active);
+    if (activeChallengeEvent) {
+      const startCh = activeChallengeEvent.challengeStartChapter || activeChallengeEvent.startChapter || activeChallengeEvent.examStartChapter;
+      const startVe = activeChallengeEvent.challengeStartVerse || activeChallengeEvent.startVerse || activeChallengeEvent.examStartVerse || 1;
+      const endCh = activeChallengeEvent.challengeEndChapter || activeChallengeEvent.endChapter || activeChallengeEvent.examEndChapter;
+      const endVe = activeChallengeEvent.challengeEndVerse || activeChallengeEvent.endVerse || activeChallengeEvent.examEndVerse || 999;
+      if (startCh && endCh) {
+        return this._getVerseRange(startCh, startVe, endCh, endVe);
+      }
+    }
+
     if (!this.globalSettings) return [];
     if (this.globalSettings.challengeStartChapter && this.globalSettings.challengeEndChapter) {
       return this._getVerseRange(
@@ -4930,6 +5046,12 @@ class SimonEduApp {
     try {
       const participantRef = db.collection('event_participants').doc(`${this.currentEvent.id}_${this.currentUser.id}`);
       await participantRef.set({
+        eventId: this.currentEvent.id,
+        eventTitle: this.currentEvent.title || '',
+        userId: this.currentUser.id,
+        username: this.currentUser.username || '',
+        name: this.currentUser.name || this.currentUser.username || '',
+        region: this.currentUser.examRegion || this.currentUser.region || '',
         score,
         correctCount: this.eventCorrectCount,
         totalCount: this.eventQuestions.length,
@@ -5290,16 +5412,32 @@ class SimonEduApp {
   }
 
   populateTestVerseSelect() {
-    const select = document.getElementById('testVerseSelect');
-    if (!select) return;
-    select.innerHTML = '';
-    const bibleData = window.BIBLE_DATA;
-    bibleData.forEach((verseData, index) => {
-      const opt = document.createElement('option');
-      opt.value = index;
-      opt.textContent = `요한계시록 ${verseData.chapter}장 ${verseData.verse}절`;
-      select.appendChild(opt);
-    });
+    const selectTest = document.getElementById('testVerseSelect');
+    const selectChallenge = document.getElementById('challengeVerseSelect');
+    const bibleData = window.BIBLE_DATA || [];
+    const curIdx = (this.currentUser && this.currentUser.currentVerseIndex) || 0;
+    
+    if (selectTest) {
+      selectTest.innerHTML = '';
+      bibleData.forEach((verseData, index) => {
+        const opt = document.createElement('option');
+        opt.value = index;
+        opt.textContent = `요한계시록 ${verseData.chapter}장 ${verseData.verse}절`;
+        selectTest.appendChild(opt);
+      });
+      selectTest.value = curIdx;
+    }
+
+    if (selectChallenge) {
+      selectChallenge.innerHTML = '';
+      bibleData.forEach((verseData, index) => {
+        const opt = document.createElement('option');
+        opt.value = index;
+        opt.textContent = `요한계시록 ${verseData.chapter}장 ${verseData.verse}절`;
+        selectChallenge.appendChild(opt);
+      });
+      selectChallenge.value = Math.min(curIdx, bibleData.length - 1);
+    }
   }
 
   startTestMode() {
@@ -5327,18 +5465,30 @@ class SimonEduApp {
   }
 
   // 8. Gamified Quiz Engine
-  startMission() {
+  startMission(startVerseIndex) {
     if (!this.currentUser) return;
+
+    if (startVerseIndex === undefined) {
+      const select = document.getElementById('challengeVerseSelect');
+      if (select) {
+        const selectedIdx = parseInt(select.value, 10);
+        if (!isNaN(selectedIdx) && selectedIdx >= 0 && selectedIdx < window.BIBLE_DATA.length) {
+          startVerseIndex = selectedIdx;
+        }
+      }
+    }
+
+    const curIdx = startVerseIndex !== undefined ? startVerseIndex : this.currentUser.currentVerseIndex;
 
     if (this.requestNativeScreen('game', {
       title: '암송 챌린지',
-      action: 'startMission'
+      action: 'startMission',
+      startVerseIndex: curIdx
     })) {
       return;
     }
     
     const bibleData = window.BIBLE_DATA;
-    let curIdx = this.currentUser.currentVerseIndex;
     
     // Loop back to start if finished
     if (curIdx >= bibleData.length) {
@@ -6024,7 +6174,8 @@ class SimonEduApp {
       if (progress.completedCount >= challengeVersesForProgress.length && !progress.claimed) {
         progress.claimed = true;
         isChallengeCompletedThisTurn = true;
-        challengeBonusPointsValue = this.globalSettings.challengeBonusPoints || 50;
+        const activeChallengeEvent = this.activeEvents?.find(evt => evt.eventType === 'special_challenge' && evt.active);
+        challengeBonusPointsValue = activeChallengeEvent?.challengeBonusPoints || activeChallengeEvent?.rewardPoints || this.globalSettings?.challengeBonusPoints || 50;
         
         updateData.points = firebase.firestore.FieldValue.increment(totalAward + challengeBonusPointsValue);
         updateData.faithXP = firebase.firestore.FieldValue.increment(totalAward + challengeBonusPointsValue);
@@ -6210,12 +6361,94 @@ class SimonEduApp {
     return this._getVerseRange(startChapter, startVerse, endChapter, endVerse);
   }
 
+  _attemptMatchesEvent(attempt, eventItem) {
+    if (!attempt) return false;
+    if (!eventItem) return false;
+
+    // 1. Match by eventId if stored
+    if (attempt.eventId && eventItem.id && attempt.eventId === eventItem.id) {
+      return true;
+    }
+
+    // 2. Match by eventTitle if stored
+    if (attempt.eventTitle && eventItem.title && attempt.eventTitle === eventItem.title) {
+      return true;
+    }
+
+    // 3. Fallback: Match by chapter range of the event
+    const startChapter = eventItem.examStartChapter || eventItem.startChapter || this.globalSettings?.examStartChapter || 1;
+    const endChapter = eventItem.examEndChapter || eventItem.endChapter || this.globalSettings?.examEndChapter || 22;
+
+    const firstAnswer = attempt.answers && attempt.answers[0];
+    if (firstAnswer) {
+      const verseObj = firstAnswer.verse;
+      let chapter = 0;
+      if (verseObj && typeof verseObj.chapter === 'number') {
+        chapter = verseObj.chapter;
+      } else {
+        const qText = firstAnswer.question || '';
+        const match = qText.match(/(\d+)장/);
+        if (match) {
+          chapter = parseInt(match[1], 10);
+        }
+      }
+      if (chapter >= startChapter && chapter <= endChapter) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  startUserExamSubmissionListener() {
+    this.stopUserExamSubmissionListener();
+
+    if (!this.currentUser) return;
+    const region = (this.currentUser.examRegion || '').trim();
+    const name = (this.currentUser.examApplicantName || '').trim();
+    const examDocKey = this._getMissionExamSubmissionKey(region, name);
+    if (!examDocKey) return;
+
+    console.log("Starting user exam submission listener for:", examDocKey);
+    this.userExamSubmissionListenerUnsubscribe = db.collection('mission_exam_submissions').doc(examDocKey).onSnapshot(docSnap => {
+      if (docSnap.exists) {
+        this.currentExamSubmission = docSnap.data();
+      } else {
+        this.currentExamSubmission = null;
+      }
+      
+      // Re-render views to update event statuses in real-time
+      const eventsView = document.getElementById('eventsView');
+      if (eventsView && eventsView.classList.contains('active')) {
+        this.renderEventsView();
+      }
+      const dashboard = document.getElementById('dashboard');
+      if (dashboard && dashboard.classList.contains('active')) {
+        this.renderDashboard();
+      }
+    }, err => {
+      console.error("Error listening to user exam submission:", err);
+    });
+  }
+
+  stopUserExamSubmissionListener() {
+    if (this.userExamSubmissionListenerUnsubscribe) {
+      this.userExamSubmissionListenerUnsubscribe();
+      this.userExamSubmissionListenerUnsubscribe = null;
+    }
+  }
+
   startMissionExamFlow() {
+    this.isRetakingExam = false;
     if (!this.currentUser) {
       alert('로그인 후 사명자 시험에 응시할 수 있습니다.');
       this.switchView('auth');
       return;
     }
+
+    // Reset previous exam result state to prevent state leakage
+    this.examScore = null;
+    this.examAnswers = [];
+    this.examVerses = [];
     
     // Set active event as currentEvent if not set
     if (!this.currentEvent && this.activeEvents) {
@@ -6233,11 +6466,12 @@ class SimonEduApp {
       return;
     }
 
-    // Check if user already has completed exam
-    const submission = this.currentUser.examSubmission || null;
-    const attemptCount = submission ? (submission.attemptCount || 0) : 0;
+    // Check if user already has completed this specific exam
+    const submission = this.currentExamSubmission || this.currentUser.examSubmission || null;
+    const attempts = Array.isArray(submission?.attempts) ? submission.attempts : [];
+    const matchingAttemptsCount = attempts.filter(attempt => this._attemptMatchesEvent(attempt, this.currentEvent)).length;
     
-    if (attemptCount > 0) {
+    if (matchingAttemptsCount > 0) {
       this.examStep = 'retake';
     } else {
       const hasSavedInfo = (this.currentUser.examRegion || '').trim() && (this.currentUser.examApplicantName || '').trim();
@@ -6341,7 +6575,10 @@ class SimonEduApp {
             <span class="material-icons-round">arrow_back</span>
           </button>
           <h1 style="font-family: var(--font-kr); font-weight: 800; font-size: 1.25rem;">사명자 시험 - 전문 모드</h1>
-          <div style="width: 40px;"></div>
+          <div id="examTimerDisplay" style="font-family: var(--font-kr); font-weight: 800; font-size: 1rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.3rem;">
+            <span class="material-icons-round" style="font-size: 1.2rem; vertical-align: middle;">timer</span>
+            <span id="examTimerText">60분 00초</span>
+          </div>
         </div>
 
         <div class="exam-card glass-panel" style="max-width:860px; margin: 1.5rem auto 2rem auto; padding: 2rem; font-family: var(--font-kr);">
@@ -6406,7 +6643,10 @@ class SimonEduApp {
             <span class="material-icons-round">arrow_back</span>
           </button>
           <h1 style="font-family: var(--font-kr); font-weight: 800; font-size: 1.25rem;">제출 전 전체 검토</h1>
-          <div style="width: 40px;"></div>
+          <div id="examTimerDisplay" style="font-family: var(--font-kr); font-weight: 800; font-size: 1rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.3rem;">
+            <span class="material-icons-round" style="font-size: 1.2rem; vertical-align: middle;">timer</span>
+            <span id="examTimerText">60분 00초</span>
+          </div>
         </div>
 
         <div class="exam-card glass-panel exam-review-card" style="max-width:640px; margin: 1.5rem auto; font-family: var(--font-kr);">
@@ -6538,17 +6778,133 @@ class SimonEduApp {
             언제든지 다시<br>도전할 수 있습니다!
           </h2>
           
-          <p style="font-size: 0.95rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 2.5rem; word-break: keep-all; font-weight: 500; padding: 0 1rem;">
+          <p style="font-size: 0.95rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 2rem; word-break: keep-all; font-weight: 500; padding: 0 1rem;">
             이전 기록은 결과에 영향을 주지 않습니다.<br>
             더 좋은 점수에 도전해보세요.
           </p>
 
-          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 2rem;">
             <button onclick="app.confirmExamRetake()" class="btn-primary" style="height: 50px; border-radius: 10px; font-weight: 800; background: linear-gradient(135deg, var(--accent-amber), #b45309); border: none; color: white;">다시 시험 보기</button>
             <button onclick="app.cancelRetake()" class="btn-secondary" style="height: 50px; border-radius: 10px; font-weight: 700;">나중에 하기</button>
           </div>
+
+          <!-- 이전 시험 이력 -->
+          ${(() => {
+            const submission = this.currentExamSubmission || this.currentUser.examSubmission;
+            const attempts = Array.isArray(submission?.attempts) ? submission.attempts : [];
+            const matchingAttempts = attempts.filter(attempt => this._attemptMatchesEvent(attempt, this.currentEvent));
+            if (matchingAttempts.length === 0) return '';
+            
+            const reversedAttempts = [...matchingAttempts].reverse();
+            return `
+              <div style="border-top: 1px solid var(--glass-border); padding-top: 1.5rem; text-align: left;">
+                <h3 style="font-size: 1rem; font-weight: 800; color: var(--text-primary); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.4rem;">
+                  <span class="material-icons-round" style="color: var(--accent-amber); font-size: 1.25rem;">history</span>
+                  이전 응시 기록 (${reversedAttempts.length}회)
+                </h3>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 320px; overflow-y: auto; padding-right: 0.25rem;">
+                  ${reversedAttempts.map((attempt, index) => {
+                    const submittedAt = attempt.submittedAt || '-';
+                    const score = attempt.score ?? 0;
+                    const correctCount = attempt.correctCount ?? 0;
+                    const totalCount = attempt.totalCount ?? 0;
+                    const attemptAnswers = attempt.answers || [];
+                    
+                    return `
+                      <details style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); border-radius: 10px; padding: 0.85rem; margin-bottom: 0.5rem; text-align: left;">
+                        <summary style="cursor: pointer; font-weight: 700; color: var(--text-primary); font-size: 0.9rem; outline: none;">
+                          🗓️ ${submittedAt}
+                          <span style="float: right; color: var(--accent-amber); font-weight: 800;">${score}점 <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 500;">(${correctCount}/${totalCount} 정답)</span></span>
+                        </summary>
+                        
+                        <div style="margin-top: 0.85rem; padding-top: 0.85rem; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; flex-direction: column; gap: 0.75rem;">
+                          ${attemptAnswers.map((ans, ansIdx) => {
+                            const accuracy = ans.accuracy ?? 0;
+                            const chapter = ans.verse?.chapter ?? '';
+                            const verse = ans.verse?.verse ?? '';
+                            const questionText = ans.question || (ans.verse ? `요한계시록 ${chapter}장 ${verse}절` : `성구 ${ansIdx + 1}`);
+                            const correctText = ans.correct || ans.verse?.text || '';
+                            const userText = ans.userAnswer || ans.userTypedText || '(미입력)';
+                            const isCorrect = typeof ans.isCorrect === 'boolean' ? ans.isCorrect : accuracy >= 80;
+                            
+                            return `
+                              <div style="background: rgba(0, 0, 0, 0.15); border-radius: 8px; padding: 0.75rem; border-left: 4px solid ${isCorrect ? 'var(--accent-emerald)' : 'var(--accent-rose)'}; font-size: 0.82rem;">
+                                <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 0.4rem; display: flex; justify-content: space-between;">
+                                  <span>${ansIdx + 1}. ${questionText}</span>
+                                  <span style="color: ${isCorrect ? 'var(--accent-emerald)' : 'var(--accent-rose)'}; font-weight: 600;">${accuracy}% 일치</span>
+                                </div>
+                                <div style="color: var(--text-secondary); margin-bottom: 0.3rem; word-break: break-all;">
+                                  <strong style="color: var(--text-muted); font-size: 0.75rem; margin-right: 0.25rem;">내 답:</strong> ${this.escapeHtml(userText)}
+                                </div>
+                                <div style="color: var(--text-secondary); word-break: break-all;">
+                                  <strong style="color: var(--text-muted); font-size: 0.75rem; margin-right: 0.25rem;">정답:</strong> ${this.escapeHtml(correctText)}
+                                </div>
+                              </div>
+                            `;
+                          }).join('')}
+                        </div>
+                      </details>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            `;
+          })()}
         </div>
       `;
+    }
+
+    if (this.examStep === 'test' || this.examStep === 'review') {
+      this.updateExamTimerUi();
+    }
+  }
+
+  startExamTimer() {
+    this.clearExamTimer();
+    this.examTimeRemaining = 3600; // 1 hour = 3600 seconds
+    
+    this.examTimerInterval = setInterval(() => {
+      if (this.examTimeRemaining <= 0) {
+        this.clearExamTimer();
+        alert('시험 시간이 만료되었습니다. 시험이 자동 제출됩니다.');
+        this.submitMissionExam(true); // Bypass confirm dialog
+        return;
+      }
+      
+      this.examTimeRemaining--;
+      this.updateExamTimerUi();
+    }, 1000);
+  }
+
+  clearExamTimer() {
+    if (this.examTimerInterval) {
+      clearInterval(this.examTimerInterval);
+      this.examTimerInterval = null;
+    }
+  }
+
+  updateExamTimerUi() {
+    const minutes = Math.floor(this.examTimeRemaining / 60);
+    const seconds = this.examTimeRemaining % 60;
+    
+    // Format to "MM분 SS초"
+    const displayStr = `${minutes}분 ${seconds.toString().padStart(2, '0')}초`;
+    
+    const timerTextEl = document.getElementById('examTimerText');
+    const timerDisplayEl = document.getElementById('examTimerDisplay');
+    
+    if (timerTextEl) {
+      timerTextEl.textContent = displayStr;
+    }
+    
+    if (timerDisplayEl) {
+      if (this.examTimeRemaining <= 180) { // 3 minutes
+        timerDisplayEl.style.color = '#ef4444';
+        timerDisplayEl.style.animation = 'pulse-active 1.5s infinite';
+      } else {
+        timerDisplayEl.style.color = 'var(--text-primary)';
+        timerDisplayEl.style.animation = 'none';
+      }
     }
   }
 
@@ -6567,7 +6923,7 @@ class SimonEduApp {
     return `<div class="exam-word-guides-container">${guideHtml}</div>`;
   }
 
-  saveExamInfoAndStart() {
+  async saveExamInfoAndStart() {
     const regionInput = document.getElementById('examRegionInput');
     const nameInput = document.getElementById('examNameInput');
     const autoSaveCheckbox = document.getElementById('examAutoSaveCheckbox');
@@ -6587,16 +6943,51 @@ class SimonEduApp {
     this.examName = name;
     this.examAutoSave = autoSave;
 
+    this.showLoading('시험 내역을 확인하는 중...');
+
+    // Fetch from database using the entered region and name
+    const examDocKey = this._getMissionExamSubmissionKey(region, name);
+    let dbSubmission = null;
+    if (examDocKey) {
+      try {
+        const examDoc = await db.collection('mission_exam_submissions').doc(examDocKey).get();
+        if (examDoc.exists) {
+          dbSubmission = examDoc.data();
+        }
+      } catch (err) {
+        console.error('Error fetching submission for entered credentials:', err);
+      }
+    }
+
+    this.hideLoading();
+
+    // Store in memory
+    this.currentExamSubmission = dbSubmission;
+
     if (autoSave && !this.currentUser.isTrial) {
       this.currentUser.examRegion = region;
       this.currentUser.examApplicantName = name;
       db.collection('users').doc(this.currentUser.id).update({
         examRegion: region,
         examApplicantName: name
+      }).then(() => {
+        this.startUserExamSubmissionListener();
       }).catch(err => console.error('Error saving exam info to user profile:', err));
     }
 
-    this.startMissionExamGameplay();
+    // Check if there are any matching attempts for this event in the dbSubmission
+    const attempts = Array.isArray(dbSubmission?.attempts) ? dbSubmission.attempts : [];
+    const matchingAttemptsCount = attempts.filter(attempt => this._attemptMatchesEvent(attempt, this.currentEvent)).length;
+
+    if (this.isRetakingExam) {
+      this.isRetakingExam = false;
+      this.startMissionExamGameplay();
+    } else if (matchingAttemptsCount > 0) {
+      this.examStep = 'retake';
+      this.renderExamView();
+    } else {
+      this.startMissionExamGameplay();
+    }
   }
 
   editExamInfo() {
@@ -6618,6 +7009,7 @@ class SimonEduApp {
     }));
 
     this.renderExamView();
+    this.startExamTimer();
   }
 
   saveAndNextMissionExamVerse() {
@@ -6759,6 +7151,7 @@ class SimonEduApp {
   }
 
   completeExamAndGoHome() {
+    this.clearExamTimer();
     this.isExamMode = false;
     this.examStep = 'info';
     this.examCurrentIndex = 0;
@@ -6770,10 +7163,11 @@ class SimonEduApp {
   }
 
   restartExamFromResult() {
-    this.startMissionExamFlow();
+    this.confirmExamRetake();
   }
 
   backToEventDetailFromResult() {
+    this.clearExamTimer();
     this.isExamMode = false;
     this.examStep = 'info';
     this.examCurrentIndex = 0;
@@ -6790,6 +7184,7 @@ class SimonEduApp {
   }
 
   confirmExamRetake() {
+    this.isRetakingExam = true;
     const hasSavedInfo = (this.currentUser.examRegion || '').trim() && (this.currentUser.examApplicantName || '').trim();
     if (hasSavedInfo) {
       this.examStep = 'confirm_info';
@@ -6819,10 +7214,12 @@ class SimonEduApp {
     return `${cleanRegion}__${cleanName}`.toLowerCase().replace(/[\/#?\[\]]/g, '_');
   }
 
-  async submitMissionExam() {
+  async submitMissionExam(bypassConfirm = false) {
+    this.clearExamTimer();
+    
     // Check if any verse is unwritten
     const unwrittenCount = this.examAnswers.filter(a => (a?.userTypedText || '').trim().length === 0).length;
-    if (unwrittenCount > 0) {
+    if (unwrittenCount > 0 && !bypassConfirm) {
       if (!confirm(`아직 작성하지 않은 문항이 ${unwrittenCount}개 있습니다. 최종 제출하시겠습니까?`)) {
         return;
       }
@@ -6860,7 +7257,7 @@ class SimonEduApp {
     const eventEndDate = this.currentEvent?.endDate || this.currentEventDetail?.endDate || '-';
     const resultAnnouncement = this.currentEvent?.resultDate || this.currentEventDetail?.resultDate || '시험 완료 즉시 확인';
 
-    const container = document.getElementById('examView');
+    const container = document.getElementById('examViewDynamicContainer');
     if (!container) return;
 
     let existingExamDoc = null;
@@ -6875,9 +7272,11 @@ class SimonEduApp {
 
     // 이전 최고 점수 확인: 지역+이름 기준 내역을 우선 사용하고, 없으면 현재 계정 내역을 사용합니다.
     const prevSubmission = existingExamDoc || this.currentUser.examSubmission || null;
-    const prevBestScore = prevSubmission ? (prevSubmission.score || 0) : 0;
-    const prevBestPoints = prevSubmission ? (prevSubmission.pointsEarned || 0) : 0;
-    const prevAttemptCount = prevSubmission ? (prevSubmission.attemptCount || 0) : 0;
+    const prevAttempts = Array.isArray(prevSubmission?.attempts) ? prevSubmission.attempts : [];
+    const prevMatchingAttempts = prevAttempts.filter(attempt => this._attemptMatchesEvent(attempt, this.currentEvent));
+    const prevBestScore = prevMatchingAttempts.reduce((max, a) => Math.max(max, a.score || 0), 0);
+    const prevBestPoints = prevMatchingAttempts.reduce((max, a) => Math.max(max, getPoints(a.score || 0)), 0);
+    const prevAttemptCount = prevMatchingAttempts.length;
 
     const isNewBest = score > prevBestScore;
     const pointDiff = Math.max(0, earnedPoints - prevBestPoints);
@@ -6966,9 +7365,14 @@ class SimonEduApp {
     // Firestore 업데이트
     if (!this.currentUser.isTrial) {
       try {
-        const newAttemptCount = prevAttemptCount + 1;
         const attemptRecord = {
           id: 'attempt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+          eventId: this.currentEvent?.id || '',
+          eventTitle: this.currentEvent?.title || '',
+          startChapter: this.currentEvent?.examStartChapter || this.currentEvent?.startChapter || 1,
+          startVerse: this.currentEvent?.examStartVerse || this.currentEvent?.startVerse || 1,
+          endChapter: this.currentEvent?.examEndChapter || this.currentEvent?.endChapter || 1,
+          endVerse: this.currentEvent?.examEndVerse || this.currentEvent?.endVerse || 1,
           score,
           correctCount: correct,
           totalCount: total,
@@ -6980,13 +7384,17 @@ class SimonEduApp {
           answers: this.examAnswers
         };
         const previousAttempts = Array.isArray(prevSubmission?.attempts) ? prevSubmission.attempts : [];
+        const prevBestScoreOverall = previousAttempts.reduce((max, a) => Math.max(max, a.score || 0), 0);
+        const prevBestPointsOverall = previousAttempts.reduce((max, a) => Math.max(max, getPoints(a.score || 0)), 0);
+        const newAttemptCountOverall = previousAttempts.length + 1;
+
         const newSubmission = {
           region: applicantRegion,
           applicantName,
           regionNameKey: examDocKey,
-          score: Math.max(score, prevBestScore),
-          pointsEarned: Math.max(earnedPoints, prevBestPoints),
-          attemptCount: newAttemptCount,
+          score: Math.max(score, prevBestScoreOverall),
+          pointsEarned: Math.max(earnedPoints, prevBestPointsOverall),
+          attemptCount: newAttemptCountOverall,
           lastAttemptDate: submittedAt,
           lastScore: score,
           lastCorrectCount: correct,
@@ -7022,7 +7430,7 @@ class SimonEduApp {
           const examHistory = {
             id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substr(2,5),
             type: 'exam',
-            title: `사명자 시험 최고점 갱신 (${score}점)`,
+            title: `사명자 시험 최고점 갱신 (${score}점) - ${eventTitle}`,
             amount: pointDiff,
             date: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
           };
@@ -7073,6 +7481,7 @@ class SimonEduApp {
       clearInterval(this.gameTimerInterval);
       this.gameTimerInterval = null;
     }
+    this.clearExamTimer();
   }
 
   // 9. Modal Management
@@ -9931,6 +10340,96 @@ class SimonEduApp {
       }
     }
     return matrix[b.length][a.length];
+  }
+
+  downloadUsersCSV() {
+    if (!this.currentUser || this.currentUser.role !== 'admin') {
+      alert('관리자 권한이 없습니다.');
+      return;
+    }
+    
+    const headers = ['아이디', '이름', '이메일', '역할', '포인트', '연속출석일수', '마지막출석일', '현재말씀인덱스', '현재말씀성구'];
+    const rows = this.users.map(u => {
+      const maxVerse = window.BIBLE_DATA.length;
+      const progressStr = u.currentVerseIndex >= maxVerse ? '완독 완료' : `요한계시록 ${window.BIBLE_DATA[u.currentVerseIndex]?.chapter}장 ${window.BIBLE_DATA[u.currentVerseIndex]?.verse}절`;
+      return [
+        u.username || u.id,
+        u.name || '',
+        u.email || '',
+        (u.role || 'user').toUpperCase(),
+        u.points || 0,
+        u.consecutiveCheckIns || 0,
+        u.lastCheckInDate || '출석 없음',
+        u.currentVerseIndex || 0,
+        progressStr
+      ];
+    });
+    
+    // Add UTF-8 BOM for Excel compatibility
+    const csvContent = "\uFEFF" + [headers, ...rows]
+      .map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+      
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `simon_edu_members_web_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  async downloadExamsCSV() {
+    if (!this.currentUser || this.currentUser.role !== 'admin') {
+      alert('관리자 권한이 없습니다.');
+      return;
+    }
+    
+    try {
+      const snapshot = await db.collection('mission_exam_submissions').get();
+      const submissions = [];
+      snapshot.forEach(doc => {
+        submissions.push({ id: doc.id, ...doc.data() });
+      });
+      
+      // Sort submissions by score desc, attemptCount desc
+      submissions.sort((a, b) => {
+        const scoreDiff = (b.score || 0) - (a.score || 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        return (b.attemptCount || 0) - (a.attemptCount || 0);
+      });
+      
+      const headers = ['지역', '이름', '시험 최고 점수', '최근 시험 점수', '지급 포인트', '최근 응시일', '총 응시횟수'];
+      const rows = submissions.map(r => [
+        r.region || '-',
+        r.applicantName || '-',
+        `${r.score || 0}점`,
+        `${r.lastScore ?? r.score ?? 0}점`,
+        `${r.pointsEarned || 0}P`,
+        r.lastAttemptDate || '-',
+        `${r.attemptCount || 0}회`
+      ]);
+      
+      // Add UTF-8 BOM for Excel
+      const csvContent = "\uFEFF" + [headers, ...rows]
+        .map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+        
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `simon_edu_mission_exams_web_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error(err);
+      alert('시험 데이터 불러오기 실패: ' + err.message);
+    }
   }
 }
 

@@ -17,7 +17,7 @@ import Settings from './components/Settings';
 import Logs from './components/Logs';
 import PushManagement from './components/PushManagement';
 import MissionExam from './components/MissionExam';
-import { canOpenAdmin } from './roles';
+
 
 interface User {
   id: string;
@@ -52,10 +52,18 @@ interface User {
       region?: string;
       applicantName?: string;
       answers?: Array<{
-        question: string;
-        correct: string;
-        userAnswer: string;
-        isCorrect: boolean;
+        question?: string;
+        correct?: string;
+        userAnswer?: string;
+        isCorrect?: boolean;
+        verse?: {
+          chapter: number;
+          verse: number;
+          text: string;
+        };
+        userTypedText?: string;
+        accuracy?: number;
+        html?: string;
       }>;
     }>;
   };
@@ -178,12 +186,28 @@ export default function App() {
           const userDocRef = doc(db, 'users', user.uid);
           const userDoc = await getDoc(userDocRef);
 
-          if (userDoc.exists() && canOpenAdmin(userDoc.data().role)) {
-            setAdminEmail(user.email || 'Admin');
-            setIsAuthenticated(true);
-            setErrorMsg('');
+          if (userDoc.exists()) {
+            const userRole = userDoc.data().role;
+
+            // Fetch dynamic allowed roles from settings
+            const settingsRef = doc(db, 'settings', 'global');
+            const settingsSnap = await getDoc(settingsRef);
+            let allowedRoles: string[] = ['manager', 'admin']; // fallback
+            if (settingsSnap.exists() && Array.isArray(settingsSnap.data().allowedAdminRoles)) {
+              allowedRoles = settingsSnap.data().allowedAdminRoles;
+            }
+
+            if (allowedRoles.includes(userRole)) {
+              setAdminEmail(user.email || 'Admin');
+              setIsAuthenticated(true);
+              setErrorMsg('');
+            } else {
+              setErrorMsg('관리자 권한이 없는 계정입니다.');
+              await signOut(auth);
+              setIsAuthenticated(false);
+            }
           } else {
-            setErrorMsg('관리자 권한이 없는 계정입니다.');
+            setErrorMsg('사용자 정보를 찾을 수 없습니다.');
             await signOut(auth);
             setIsAuthenticated(false);
           }
@@ -275,7 +299,7 @@ export default function App() {
       case 'quizzes':
         return <Quizzes adminEmail={adminEmail} />;
       case 'events':
-        return <Events adminEmail={adminEmail} />;
+        return <Events adminEmail={adminEmail} users={users} />;
       case 'stats':
         return <Stats users={users} />;
       case 'notices':

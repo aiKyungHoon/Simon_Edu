@@ -8,7 +8,7 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.5.39">
+  <link rel="stylesheet" href="style.css?v=1.5.42">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
@@ -16,8 +16,8 @@
     (function() {
       const params = new URLSearchParams(window.location.search);
       const IS_APP_WEBVIEW = params.get('platform') === 'app';
-      const WEB_VER = '1.5.39';
-      const APP_WEB_VER = '1.5.39';
+      const WEB_VER = '1.5.42';
+      const APP_WEB_VER = '1.5.42';
       const VERSION_KEY = IS_APP_WEBVIEW ? 'simon_app_web_version' : 'simon_web_version';
       const ACTIVE_VER = IS_APP_WEBVIEW ? APP_WEB_VER : WEB_VER;
       window.SIMON_CLIENT_TYPE = IS_APP_WEBVIEW ? 'app' : 'web';
@@ -261,7 +261,16 @@
               <span class="material-icons-round">refresh</span>
             </button>
           </div>
-          <select id="testVerseSelect" class="home-test-select" aria-label="복습 구절 선택"></select>
+          <div style="display: flex; gap: 0.75rem; margin-top: 1rem; width: 100%; font-family: var(--font-kr);">
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 0.35rem;">
+              <span style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 700; text-align: left; padding-left: 0.25rem;">챌린지 시작 구절 선택</span>
+              <select id="challengeVerseSelect" style="display: block; width: 100%; height: 42px; padding: 0 0.75rem; border-radius: 10px; border: 1px solid var(--glass-border); background: var(--bg-tertiary); color: var(--text-primary); font-family: var(--font-kr); font-size: 0.82rem; font-weight: 600; cursor: pointer; outline: none; box-sizing: border-box;"></select>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 0.35rem;">
+              <span style="font-size: 0.78rem; color: var(--text-secondary); font-weight: 700; text-align: left; padding-left: 0.25rem;">복습 구절 선택</span>
+              <select id="testVerseSelect" style="display: block; width: 100%; height: 42px; padding: 0 0.75rem; border-radius: 10px; border: 1px solid var(--glass-border); background: var(--bg-tertiary); color: var(--text-primary); font-family: var(--font-kr); font-size: 0.82rem; font-weight: 600; cursor: pointer; outline: none; box-sizing: border-box;"></select>
+            </div>
+          </div>
         </section>
 
         <section class="event-banners-section">
@@ -1124,12 +1133,22 @@
     <!-- 5. Admin View (Dashboard & Simulator) -->
     <div id="adminView" class="view-container">
       <div class="dashboard-card glass-panel" style="margin-bottom: 2rem;">
-        <div class="card-title" style="justify-content: space-between; align-items: center; width: 100%;">
+        <div class="card-title" style="justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 0.75rem;">
           <div style="display: flex; align-items: center; gap: 0.5rem;">
             <span class="material-icons-round" style="color: var(--accent-purple);">admin_panel_settings</span>
             관리자 대시보드
           </div>
-          <button class="btn-logout" onclick="app.switchView('dashboard')" style="background: var(--accent-purple); color: white;">대시보드로 복귀</button>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="btn-primary" onclick="app.downloadUsersCSV()" style="width: auto; height: 38px; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0 1rem; font-size: 0.85rem; background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue)); border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; font-family: var(--font-kr);">
+              <span class="material-icons-round" style="font-size: 1.1rem;">download</span>
+              회원 CSV 다운로드
+            </button>
+            <button class="btn-primary" onclick="app.downloadExamsCSV()" style="width: auto; height: 38px; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0 1rem; font-size: 0.85rem; background: linear-gradient(135deg, var(--accent-emerald), #059669); border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; font-family: var(--font-kr);">
+              <span class="material-icons-round" style="font-size: 1.1rem;">download</span>
+              사명자시험 CSV 다운로드
+            </button>
+            <button class="btn-logout" onclick="app.switchView('dashboard')" style="background: var(--accent-purple); color: white;">대시보드로 복귀</button>
+          </div>
         </div>
         
         <!-- Stat widgets -->
@@ -1318,7 +1337,7 @@
           </div>
 
           <div class="app-version" style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-en); font-weight: 500; letter-spacing: 0.5px; opacity: 0.7;">
-            Version 1.5.39
+            Version 1.5.42
           </div>
         </div>
 
@@ -2963,6 +2982,12 @@
   <!-- Floating point system container -->
   <div class="floating-point-container" id="floatingPointContainer"></div>
 
+  <!-- Global Loading Overlay -->
+  <div id="globalLoadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 99999; align-items: center; justify-content: center; flex-direction: column; gap: 1.25rem; color: white; font-family: var(--font-kr);">
+    <div style="width: 50px; height: 50px; border: 4px solid rgba(255, 255, 255, 0.1); border-top-color: var(--accent-amber); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+    <div id="globalLoadingText" style="font-weight: 700; font-size: 1.15rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5); font-family: var(--font-kr); letter-spacing: -0.3px;">로그인 중...</div>
+  </div>
+
   <!-- Floating Action Button for Crew Creation -->
   <div id="fabCreateCrew" class="fab-btn" onclick="app.openModal('modalCreateCrew')" style="display: none;">
     <span class="material-icons-round">group_add</span>
@@ -2980,6 +3005,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <script src="bible_data.js?v=1.5.2"></script>
-  <script src="app.js?v=1.5.39"></script>
+  <script src="app.js?v=1.5.42"></script>
 </body>
 </html>

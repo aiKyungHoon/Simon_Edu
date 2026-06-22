@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '../firebase';
+import { ROLE_OPTIONS } from '../roles';
 
 interface SystemSettings {
   signUpPoints: number;
@@ -11,6 +12,7 @@ interface SystemSettings {
   privacyPolicyUrl: string;
   termsUrl: string;
   appVersion: string;
+  allowedAdminRoles?: string[];
 }
 
 interface SettingsProps {
@@ -26,7 +28,8 @@ export default function Settings({ adminEmail }: SettingsProps) {
     bonus30Days: 200,
     privacyPolicyUrl: 'https://simon-edu-bible-game.firebaseapp.com/privacy',
     termsUrl: 'https://simon-edu-bible-game.firebaseapp.com/privacy',
-    appVersion: '1.0.2'
+    appVersion: '1.0.2',
+    allowedAdminRoles: ['manager', 'admin']
   });
   
   const [loading, setLoading] = useState(true);
@@ -41,6 +44,7 @@ export default function Settings({ adminEmail }: SettingsProps) {
   const [privacyPolicyUrl, setPrivacyPolicyUrl] = useState('');
   const [termsUrl, setTermsUrl] = useState('');
   const [appVersion, setAppVersion] = useState('1.0.2');
+  const [allowedAdminRoles, setAllowedAdminRoles] = useState<string[]>(['manager', 'admin']);
 
   // Load settings from Firestore `settings/global`
   useEffect(() => {
@@ -61,6 +65,7 @@ export default function Settings({ adminEmail }: SettingsProps) {
           setPrivacyPolicyUrl(data.privacyPolicyUrl);
           setTermsUrl(data.termsUrl || '');
           setAppVersion(data.appVersion || '1.0.2');
+          setAllowedAdminRoles(data.allowedAdminRoles || ['manager', 'admin']);
         } else {
           // Initialize form with default states
           setPrivacyPolicyUrl(settings.privacyPolicyUrl);
@@ -88,7 +93,8 @@ export default function Settings({ adminEmail }: SettingsProps) {
       bonus30Days: Number(bonus30Days),
       privacyPolicyUrl,
       termsUrl,
-      appVersion
+      appVersion,
+      allowedAdminRoles
     };
 
     try {
@@ -99,7 +105,7 @@ export default function Settings({ adminEmail }: SettingsProps) {
       await addDoc(collection(db, 'logs'), {
         adminEmail,
         type: 'settings_update',
-        details: '전역 시스템 설정 수정 (포인트 규칙 및 법적 문서 링크 고도화)',
+        details: '전역 시스템 설정 및 관리자 로그인 권한 설정 수정',
         targetUserId: 'global_settings',
         targetUserName: '전역 시스템 설정',
         timestamp: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
@@ -204,6 +210,57 @@ export default function Settings({ adminEmail }: SettingsProps) {
                   />
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* ADMIN LOGIN PERMISSIONS */}
+          <div className="glass-panel">
+            <h2 className="card-title" style={{ marginBottom: '1.25rem', color: 'var(--text-primary)' }}>
+              <span className="material-icons-round">security</span>
+              관리자 페이지 로그인 권한 설정
+            </h2>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+              체크된 권한(직분)을 가진 사용자만 관리자 페이지에 로그인할 수 있습니다. <strong>관리자(admin) 권한은 안전을 위해 항상 활성화 상태로 고정됩니다.</strong>
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.75rem' }}>
+              {ROLE_OPTIONS.filter(opt => opt.value !== 'user').map((option) => {
+                const isChecked = allowedAdminRoles.includes(option.value);
+                const isAlwaysAllowed = option.value === 'admin';
+                return (
+                  <label
+                    key={option.value}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      background: isAlwaysAllowed ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.4)',
+                      border: '1px solid var(--glass-border)',
+                      borderRadius: '8px',
+                      padding: '0.6rem 0.8rem',
+                      cursor: isAlwaysAllowed ? 'not-allowed' : 'pointer',
+                      userSelect: 'none',
+                      fontSize: '0.85rem',
+                      opacity: isAlwaysAllowed ? 0.7 : 1,
+                      fontWeight: isAlwaysAllowed ? 700 : 500
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked || isAlwaysAllowed}
+                      disabled={isAlwaysAllowed}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setAllowedAdminRoles((prev) => [...new Set([...prev, option.value])]);
+                        } else {
+                          setAllowedAdminRoles((prev) => prev.filter((r) => r !== option.value));
+                        }
+                      }}
+                      style={{ width: '16px', height: '16px', cursor: isAlwaysAllowed ? 'not-allowed' : 'pointer' }}
+                    />
+                    {option.label}
+                  </label>
+                );
+              })}
             </div>
           </div>
 

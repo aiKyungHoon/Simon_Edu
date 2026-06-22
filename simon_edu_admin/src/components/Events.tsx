@@ -22,13 +22,27 @@ interface EventItem {
   targetUsers?: string[];
   targetRoles?: string[];
   pushOnCreate?: boolean;
+  examStartChapter?: number;
+  examStartVerse?: number;
+  examEndChapter?: number;
+  examEndVerse?: number;
+  challengeStartChapter?: number;
+  challengeStartVerse?: number;
+  challengeEndChapter?: number;
+  challengeEndVerse?: number;
+  startChapter?: number;
+  startVerse?: number;
+  endChapter?: number;
+  endVerse?: number;
+  challengeBonusPoints?: number;
 }
 
 interface EventsProps {
   adminEmail: string;
+  users?: any[];
 }
 
-export default function Events({ adminEmail }: EventsProps) {
+export default function Events({ adminEmail, users = [] }: EventsProps) {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -57,6 +71,129 @@ export default function Events({ adminEmail }: EventsProps) {
   const [challengeStartKey, setChallengeStartKey] = useState('7:1');
   const [challengeEndKey, setChallengeEndKey] = useState('7:17');
   const [challengeBonusPoints, setChallengeBonusPoints] = useState(50);
+
+  // Participants modal states
+  const [showParticipantsModal, setShowParticipantsModal] = useState(false);
+  const [participantsModalEvent, setParticipantsModalEvent] = useState<EventItem | null>(null);
+  const [participantsList, setParticipantsList] = useState<any[]>([]);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
+
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [participants, setParticipants] = useState<any[]>([]);
+
+  useEffect(() => {
+    const qSub = query(collection(db, 'mission_exam_submissions'));
+    const unsubSub = onSnapshot(qSub, (snap) => {
+      const list: any[] = [];
+      snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+      setSubmissions(list);
+    });
+
+    const qPart = query(collection(db, 'event_participants'));
+    const unsubPart = onSnapshot(qPart, (snap) => {
+      const list: any[] = [];
+      snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+      setParticipants(list);
+    });
+
+    return () => {
+      unsubSub();
+      unsubPart();
+    };
+  }, []);
+
+  const getEventParticipantsCount = (event: EventItem) => {
+    if (event.eventType === 'mission_exam') {
+      let count = 0;
+      submissions.forEach(submission => {
+        const attempts = submission.attempts || [];
+        const hasMatch = attempts.some((attempt: any) => {
+          if (attempt.eventId && attempt.eventId === event.id) return true;
+          if (attempt.eventTitle && attempt.eventTitle === event.title) return true;
+          
+          const startChapter = event.examStartChapter || event.startChapter || 1;
+          const endChapter = event.examEndChapter || event.endChapter || 22;
+          const firstAns = attempt.answers && attempt.answers[0];
+          if (firstAns) {
+            const ch = firstAns.verse?.chapter || (firstAns.question ? parseInt(firstAns.question.match(/(\d+)장/)?.[1] || '0') : 0);
+            if (ch >= startChapter && ch <= endChapter) return true;
+          }
+          return false;
+        });
+        if (hasMatch) count++;
+      });
+      return count;
+    } else {
+      return participants.filter(p => p.id.startsWith(`${event.id}_`) && p.status === 'completed').length;
+    }
+  };
+
+  const openParticipantsModal = (event: EventItem) => {
+    setParticipantsModalEvent(event);
+    setShowParticipantsModal(true);
+    setLoadingParticipants(true);
+    setParticipantsList([]);
+
+    const list: any[] = [];
+    if (event.eventType === 'mission_exam') {
+      submissions.forEach((submission) => {
+        const attempts = submission.attempts || [];
+        const matchingAttempts = attempts.filter((attempt: any) => {
+          if (attempt.eventId && attempt.eventId === event.id) return true;
+          if (attempt.eventTitle && attempt.eventTitle === event.title) return true;
+          
+          const startChapter = event.examStartChapter || event.startChapter || 1;
+          const endChapter = event.examEndChapter || event.endChapter || 22;
+          const firstAns = attempt.answers && attempt.answers[0];
+          if (firstAns) {
+            const ch = firstAns.verse?.chapter || (firstAns.question ? parseInt(firstAns.question.match(/(\d+)장/)?.[1] || '0') : 0);
+            if (ch >= startChapter && ch <= endChapter) return true;
+          }
+          return false;
+        });
+        
+        if (matchingAttempts.length > 0) {
+          const bestScore = matchingAttempts.reduce((max: number, a: any) => Math.max(max, a.score || 0), 0);
+          const lastAttempt = matchingAttempts[matchingAttempts.length - 1];
+          
+          list.push({
+            region: submission.region || lastAttempt.region || '-',
+            name: submission.applicantName || lastAttempt.applicantName || '-',
+            score: `${bestScore}점`,
+            date: lastAttempt.submittedAt || '-',
+            attemptCount: matchingAttempts.length
+          });
+        }
+      });
+    } else {
+      const eventParts = participants.filter(p => p.id.startsWith(`${event.id}_`));
+      eventParts.forEach((part) => {
+        const docId = part.id;
+        const userId = docId.substring(event.id.length + 1);
+        
+        const userObj = users.find(u => u.id === userId);
+        const name = part.name || (userObj ? (userObj.name || userObj.username) : '알 수 없음');
+        const region = part.region || (userObj ? (userObj.examRegion || userObj.region || '-') : '-');
+        
+        list.push({
+          region,
+          name,
+          score: `${part.score ?? 100}점`,
+          date: part.completedAt || part.startedAt || '-',
+          attemptCount: 1
+        });
+      });
+    }
+    
+    list.sort((a, b) => {
+      const scoreA = parseInt(a.score) || 0;
+      const scoreB = parseInt(b.score) || 0;
+      return scoreB - scoreA;
+    });
+    
+    setParticipantsList(list);
+    setLoadingParticipants(false);
+  };
 
   const verseOptions = BIBLE_DATA_RAW.map((verse: any) => ({
     key: `${verse.chapter}:${verse.verse}`,
@@ -205,7 +342,7 @@ export default function Events({ adminEmail }: EventsProps) {
     setShowModal(true);
   };
 
-  const openEditModal = (event: EventItem) => {
+  const openEditModal = async (event: EventItem) => {
     setEditingEvent(event);
     setEventType(event.eventType || 'general_event');
     setTitle(event.title);
@@ -220,7 +357,38 @@ export default function Events({ adminEmail }: EventsProps) {
     setTargetRoles(event.targetRoles && event.targetRoles.length > 0 ? event.targetRoles : [...PUBLISH_ROLES]);
     setPushOnCreate(event.pushOnCreate !== false);
     setShowHomePopup(event.popup === true);
-    loadMissionSettings();
+
+    await loadMissionSettings();
+
+    if (event.eventType === 'mission_exam') {
+      const startCh = event.examStartChapter || event.startChapter;
+      const startVe = event.examStartVerse || event.startVerse;
+      const endCh = event.examEndChapter || event.endChapter;
+      const endVe = event.examEndVerse || event.endVerse;
+      if (startCh !== undefined && startVe !== undefined) {
+        setExamStartKey(`${startCh}:${startVe}`);
+      }
+      if (endCh !== undefined && endVe !== undefined) {
+        setExamEndKey(`${endCh}:${endVe}`);
+      }
+      if (event.rewardPoints !== undefined) {
+        setExamMaxPoints(event.rewardPoints);
+      }
+    } else if (event.eventType === 'special_challenge') {
+      const startCh = event.challengeStartChapter || event.startChapter;
+      const startVe = event.challengeStartVerse || event.startVerse;
+      const endCh = event.challengeEndChapter || event.endChapter;
+      const endVe = event.challengeEndVerse || event.endVerse;
+      if (startCh !== undefined && startVe !== undefined) {
+        setChallengeStartKey(`${startCh}:${startVe}`);
+      }
+      if (endCh !== undefined && endVe !== undefined) {
+        setChallengeEndKey(`${endCh}:${endVe}`);
+      }
+      if (event.challengeBonusPoints !== undefined) {
+        setChallengeBonusPoints(event.challengeBonusPoints);
+      }
+    }
     setShowModal(true);
   };
 
@@ -330,7 +498,12 @@ export default function Events({ adminEmail }: EventsProps) {
         setImagePreviewUrl(uploadedImageUrl);
       }
 
-      const eventData = {
+      const examStart = parseVerseKey(examStartKey);
+      const examEnd = parseVerseKey(examEndKey);
+      const challengeStart = parseVerseKey(challengeStartKey);
+      const challengeEnd = parseVerseKey(challengeEndKey);
+
+      const eventData: any = {
         eventType,
         title,
         description,
@@ -347,6 +520,27 @@ export default function Events({ adminEmail }: EventsProps) {
         pushOnCreate,
         updatedAt: new Date().getTime(),
       };
+
+      if (eventType === 'mission_exam') {
+        eventData.examStartChapter = examStart.chapter;
+        eventData.examStartVerse = examStart.verse;
+        eventData.examEndChapter = examEnd.chapter;
+        eventData.examEndVerse = examEnd.verse;
+        eventData.startChapter = examStart.chapter;
+        eventData.startVerse = examStart.verse;
+        eventData.endChapter = examEnd.chapter;
+        eventData.endVerse = examEnd.verse;
+      } else if (eventType === 'special_challenge') {
+        eventData.challengeStartChapter = challengeStart.chapter;
+        eventData.challengeStartVerse = challengeStart.verse;
+        eventData.challengeEndChapter = challengeEnd.chapter;
+        eventData.challengeEndVerse = challengeEnd.verse;
+        eventData.startChapter = challengeStart.chapter;
+        eventData.startVerse = challengeStart.verse;
+        eventData.endChapter = challengeEnd.chapter;
+        eventData.endVerse = challengeEnd.verse;
+        eventData.challengeBonusPoints = Number(challengeBonusPoints);
+      }
 
       await saveMissionSettingsForEvent();
 
@@ -492,7 +686,22 @@ export default function Events({ adminEmail }: EventsProps) {
               {/* Date & Participants info */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', borderTop: '1px solid var(--glass-border)', paddingTop: '0.75rem' }}>
                 <span>📅 {event.startDate} ~ {event.endDate}</span>
-                <span style={{ fontWeight: 'bold', color: 'var(--accent-blue)' }}>👥 {event.participantsCount || 0}명 달성</span>
+                <button
+                  onClick={() => openParticipantsModal(event)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    color: 'var(--accent-blue)',
+                    textDecoration: 'underline',
+                    fontSize: '0.75rem'
+                  }}
+                  title="참여 현황 보기"
+                >
+                  👥 {getEventParticipantsCount(event)}명 달성
+                </button>
               </div>
 
               {/* Actions */}
@@ -530,8 +739,8 @@ export default function Events({ adminEmail }: EventsProps) {
       {/* CREATE & EDIT DIALOG MODAL */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="glass-panel modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-            <div className="card-header-row" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
+          <div className="glass-panel modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
+            <div className="card-header-row" style={{ borderBottom: '1px solid var(--glass-border)', padding: '1.25rem 1.5rem 1rem 1.5rem', marginBottom: 0, flexShrink: 0 }}>
               <h2 className="card-title">
                 <span className="material-icons-round">event</span>
                 {editingEvent ? '이벤트 수정' : '새 이벤트 등록'}
@@ -541,7 +750,7 @@ export default function Events({ adminEmail }: EventsProps) {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <form onSubmit={handleSubmit} className="custom-scroll" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto', flex: 1, padding: '1.25rem 1.5rem' }}>
               <div className="form-group">
                 <label>등록 유형</label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '0.5rem' }}>
@@ -828,6 +1037,103 @@ export default function Events({ adminEmail }: EventsProps) {
                 {submitting ? '저장 처리 중...' : '이벤트 저장하기'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 참여 현황 모달 */}
+      {showParticipantsModal && participantsModalEvent && (
+        <div className="modal-overlay" onClick={() => setShowParticipantsModal(false)}>
+          <div className="modal-content glass-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', width: '90%' }}>
+            <div className="card-header-row" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '1rem', marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                <span className="material-icons-round" style={{ color: 'var(--accent-blue)' }}>groups</span>
+                {participantsModalEvent.title} 참여 현황
+                <span style={{ fontSize: '0.85rem', padding: '0.2rem 0.5rem', borderRadius: '12px', background: 'rgba(59,130,246,0.1)', color: 'var(--accent-blue)', fontWeight: 800 }}>
+                  총 {participantsList.length}명
+                </span>
+              </h2>
+              <button className="btn-icon-action" onClick={() => setShowParticipantsModal(false)}>
+                <span className="material-icons-round">close</span>
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+              <button
+                className="btn-secondary"
+                disabled={participantsList.length === 0}
+                onClick={() => {
+                  const headers = ['번호', '지역', '이름', '점수', '완료 일시'];
+                  const csvRows = participantsList.map((p, idx) => [
+                    idx + 1,
+                    p.region,
+                    p.name,
+                    p.score,
+                    p.date
+                  ]);
+                  const csvContent = "\uFEFF" + [headers, ...csvRows]
+                    .map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+                    .join('\n');
+                  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.setAttribute('href', url);
+                  link.setAttribute('download', `${participantsModalEvent.title}_참여현황.csv`);
+                  link.click();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.4rem 1rem',
+                  fontSize: '0.85rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer'
+                }}
+              >
+                <span className="material-icons-round" style={{ fontSize: '1.1rem' }}>download</span>
+                CSV 내보내기
+              </button>
+            </div>
+
+            <div className="table-container" style={{ maxHeight: '50vh', overflowY: 'auto', margin: 0 }}>
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '60px' }}>번호</th>
+                    <th>지역</th>
+                    <th>이름</th>
+                    <th>점수</th>
+                    <th>완료 일시</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingParticipants ? (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                        참여 내역을 조회하는 중입니다...
+                      </td>
+                    </tr>
+                  ) : participantsList.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                        아직 참여 내역이 없습니다.
+                      </td>
+                    </tr>
+                  ) : (
+                    participantsList.map((p, idx) => (
+                      <tr key={idx}>
+                        <td data-label="번호">{idx + 1}</td>
+                        <td data-label="지역" style={{ fontWeight: 700 }}>{p.region}</td>
+                        <td data-label="이름" style={{ fontWeight: 700 }}>{p.name}</td>
+                        <td data-label="점수" style={{ fontWeight: 800, color: 'var(--accent-purple)' }}>{p.score}</td>
+                        <td data-label="완료 일시">{p.date}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
