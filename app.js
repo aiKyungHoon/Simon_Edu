@@ -15,6 +15,22 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
+// Configure Firestore settings to enable auto-detection of long polling for proxy/firewall/WebView compatibility
+try {
+  db.settings({
+    experimentalAutoDetectLongPolling: true
+  });
+} catch (e) {
+  console.warn("Firestore settings long polling configuration failed:", e);
+}
+
+// Enable Firestore offline persistence (with experimentalForceOwningTab to prevent lock conflicts with other tabs/WebViews)
+window.firestorePersistencePromise = db.enablePersistence({ experimentalForceOwningTab: true })
+  .catch(err => {
+    console.warn("Firestore offline persistence enabling failed:", err);
+  });
+
+
 // Pre-configured passwords for transitioning mock seed data to Auth
 const SEED_USERS = {
   admin: {
@@ -97,6 +113,7 @@ class SimonEduApp {
     this.studyCurrentOptions = [];
     this.studyCorrectOptionIndex = null;
     this.studyDictationAccuracy = 0;
+    this.studyAutoAdvanceTimer = null;
 
     // Crew & Battle Arena states (Battle mode hidden)
     this.hideBattleMode = true;
@@ -174,49 +191,136 @@ class SimonEduApp {
       document.body.classList.add('mobile-app');
     }
 
+    // Initialize application database and auth after persistence is ready
+    this.initApp();
+
+    // Pre-fill saved username and auto-login checkbox
+    const savedUser = localStorage.getItem('simon_saved_username');
+    if (savedUser) {
+      const idInput = document.getElementById('authUsernameId');
+      if (idInput) idInput.value = savedUser;
+    }
+    const autoLogin = localStorage.getItem('simon_auto_login') === 'true';
+    if (autoLogin) {
+      const autoChk = document.getElementById('authAutoLogin');
+      if (autoChk) autoChk.checked = true;
+    }
+
+    this.handleDirectPathRouting();
+  }
+
+  async initApp() {
+    try {
+      await window.firestorePersistencePromise;
+    } catch (e) {
+      console.warn("Persistence promise initialization error:", e);
+    }
+
     // Initialize database listener
     this.initDatabase();
 
     // Set up Auth state change listener
     auth.onAuthStateChanged(user => {
       if (user) {
-        db.collection('users').doc(user.uid).get()
+        const docRef = db.collection('users').doc(user.uid);
+        
+        // 1. Try to fetch from Firestore local IndexedDB cache first for instant load
+        docRef.get({ source: 'cache' })
           .then(docSnap => {
             if (docSnap.exists) {
+              console.log("Profile loaded instantly from Firestore IndexedDB cache.");
               const userData = docSnap.data();
               this.currentUser = userData;
+              localStorage.setItem('simon_cached_user_profile', JSON.stringify(userData));
               this.startUserExamSubmissionListener();
-              
-              if (user.email && userData.email !== user.email) {
-                console.log("Syncing Firestore email with Auth email:", user.email);
-                db.collection('users').doc(user.uid).update({ email: user.email })
-                  .then(() => {
-                    this.currentUser.email = user.email;
-                  })
-                  .catch(syncErr => console.warn("Failed to sync email in Firestore:", syncErr));
-              }
-
               document.body.classList.add('logged-in');
               this.renderAppForUser();
               this.hideLoading();
+            }
+            
+            // 2. Fetch/refresh from Firestore server in the background
+            return docRef.get({ source: 'server' });
+          })
+          .then(serverSnap => {
+            if (serverSnap.exists) {
+              console.log("Profile refreshed from server.");
+              const userData = serverSnap.data();
+              this.currentUser = userData;
+              localStorage.setItem('simon_cached_user_profile', JSON.stringify(userData));
+              this.renderAppForUser();
               
-              if (this.isMobileApp && window.MobileAppChannel) {
-                window.MobileAppChannel.postMessage(JSON.stringify({
-                  event: 'login',
-                  role: this.currentUser.role || 'user'
-                }));
+              if (user.email && userData.email !== user.email) {
+                docRef.update({ email: user.email })
+                  .then(() => {
+                    this.currentUser.email = user.email;
+                    localStorage.setItem('simon_cached_user_profile', JSON.stringify(this.currentUser));
+                  })
+                  .catch(syncErr => console.warn("Failed to sync email in Firestore:", syncErr));
               }
-            } else {
-              document.body.classList.remove('logged-in');
-              this.logout();
-              this.hideLoading();
             }
           })
           .catch(err => {
-            console.error("Error loading user profile:", err);
-            document.body.classList.remove('logged-in');
-            this.logout();
-            this.hideLoading();
+            console.warn("Firestore cache get failed or network error. Loading fallback...", err);
+            
+            // If the cache load failed and we don't have the user profile loaded, try server directly
+            if (!this.currentUser) {
+              docRef.get({ source: 'server' })
+                .then(serverSnap => {
+                  if (serverSnap.exists) {
+                    const userData = serverSnap.data();
+                    this.currentUser = userData;
+                    localStorage.setItem('simon_cached_user_profile', JSON.stringify(userData));
+                    this.startUserExamSubmissionListener();
+                    document.body.classList.add('logged-in');
+                    this.renderAppForUser();
+                    this.hideLoading();
+                  } else {
+                    // Document explicitly does not exist on server (deleted user)
+                    this.logout();
+                  }
+                })
+                .catch(serverErr => {
+                  console.error("Server profile fetch failed, using localStorage fallback:", serverErr);
+                  
+                  // Final fallback 1: try localStorage
+                  const cachedProfileStr = localStorage.getItem('simon_cached_user_profile');
+                  if (cachedProfileStr) {
+                    try {
+                      const userData = JSON.parse(cachedProfileStr);
+                      console.log("Loaded profile from localStorage fallback:", userData);
+                      this.currentUser = userData;
+                      this.startUserExamSubmissionListener();
+                      document.body.classList.add('logged-in');
+                      this.renderAppForUser();
+                      this.hideLoading();
+                      this.showToast("네트워크 연결이 불안정하여 오프라인 모드로 전환합니다.");
+                      return;
+                    } catch (parseErr) {
+                      console.error("Failed to parse cached profile:", parseErr);
+                    }
+                  }
+                  
+                  // Final fallback 2: Create a basic offline fallback profile using stored username
+                  console.log("Creating basic offline fallback profile.");
+                  const savedUser = localStorage.getItem('simon_saved_username') || '사용자';
+                  const isSavedAdmin = savedUser === '임과장' || savedUser === 'admin' || savedUser === '시몬';
+                  
+                  this.currentUser = {
+                    id: user.uid,
+                    name: savedUser,
+                    email: user.email || '',
+                    role: isSavedAdmin ? 'admin' : 'user',
+                    points: 0,
+                    completedVerseIndices: [],
+                    isOfflineFallback: true
+                  };
+                  this.startUserExamSubmissionListener();
+                  document.body.classList.add('logged-in');
+                  this.renderAppForUser();
+                  this.hideLoading();
+                  this.showToast("네트워크 연결이 불안정하여 오프라인 모드로 로그인합니다.");
+                });
+            }
           });
       } else {
         this.currentUser = null;
@@ -256,20 +360,6 @@ class SimonEduApp {
         }
       }
     });
-
-    // Pre-fill saved username and auto-login checkbox
-    const savedUser = localStorage.getItem('simon_saved_username');
-    if (savedUser) {
-      const idInput = document.getElementById('authUsernameId');
-      if (idInput) idInput.value = savedUser;
-    }
-    const autoLogin = localStorage.getItem('simon_auto_login') === 'true';
-    if (autoLogin) {
-      const autoChk = document.getElementById('authAutoLogin');
-      if (autoChk) autoChk.checked = true;
-    }
-
-    this.handleDirectPathRouting();
   }
 
   get isMobileApp() {
@@ -312,6 +402,7 @@ class SimonEduApp {
           const newName = freshUser.examApplicantName || '';
           
           this.currentUser = freshUser;
+          localStorage.setItem('simon_cached_user_profile', JSON.stringify(freshUser));
           
           if (oldRegion !== newRegion || oldName !== newName) {
             this.startUserExamSubmissionListener();
@@ -1058,12 +1149,13 @@ class SimonEduApp {
     localStorage.removeItem('simon_auto_login');
     localStorage.removeItem('simon_saved_password');
 
-    if (this.currentUser && this.currentUser.isTrial) {
+    const localCleanup = () => {
       this.currentUser = null;
       this.isTrialMode = false;
       this.stopMissionExamRankingListener();
       this.missionExamSubmissions = [];
       document.body.classList.remove('logged-in');
+      
       const authForm = document.getElementById('authForm');
       if (authForm) {
         authForm.reset();
@@ -1071,34 +1163,28 @@ class SimonEduApp {
         const savedUser = localStorage.getItem('simon_saved_username');
         if (idInput && savedUser) idInput.value = savedUser;
       }
+      
       const userNav = document.getElementById('userNav');
       if (userNav) userNav.style.display = 'none';
       const btnNavAdmin = document.getElementById('btnNavAdmin');
       if (btnNavAdmin) btnNavAdmin.style.display = 'none';
+      
+      this.hideLoading();
       this.switchView('auth');
+    };
+
+    if (this.currentUser && this.currentUser.isTrial) {
+      localCleanup();
       return;
     }
 
     auth.signOut()
       .then(() => {
-        this.currentUser = null;
-        this.stopMissionExamRankingListener();
-        this.missionExamSubmissions = [];
-        const authForm = document.getElementById('authForm');
-        if (authForm) {
-          authForm.reset();
-          const idInput = document.getElementById('authUsernameId');
-          const savedUser = localStorage.getItem('simon_saved_username');
-          if (idInput && savedUser) idInput.value = savedUser;
-        }
-        const userNav = document.getElementById('userNav');
-        if (userNav) userNav.style.display = 'none';
-        const btnNavAdmin = document.getElementById('btnNavAdmin');
-        if (btnNavAdmin) btnNavAdmin.style.display = 'none';
-        this.switchView('auth');
+        localCleanup();
       })
       .catch(err => {
-        console.error("Sign out error:", err);
+        console.error("Sign out error, performing local cleanup:", err);
+        localCleanup();
       });
   }
 
@@ -1200,6 +1286,10 @@ class SimonEduApp {
 
   // 4. View Router & Screen Renders
   switchView(viewName) {
+    if (this.studyAutoAdvanceTimer) {
+      clearTimeout(this.studyAutoAdvanceTimer);
+      this.studyAutoAdvanceTimer = null;
+    }
     this.currentViewName = viewName;
     if (this.hideBattleMode && viewName === 'crew') {
       viewName = 'dashboard';
@@ -1218,7 +1308,9 @@ class SimonEduApp {
 
     const singleDashboardViews = ['game', 'exam', 'settings', 'events', 'eventDetail', 'notices', 'journey', 'journeyChapterDetail', 'journeyVerseSelect', 'journeyVerseStudy', 'journeyResult', 'noticeDetail', 'notifications'];
     document.body.classList.toggle('single-dashboard-view', singleDashboardViews.includes(viewName));
-    document.body.classList.toggle('hide-bottom-nav', ['game', 'exam', 'auth', 'journeyChapterDetail', 'journeyVerseSelect', 'journeyVerseStudy', 'journeyResult', 'eventDetail', 'noticeDetail'].includes(viewName));
+    const shouldHideBottomNav = ['game', 'exam', 'auth', 'journeyChapterDetail', 'journeyVerseSelect', 'journeyVerseStudy', 'journeyResult', 'eventDetail', 'noticeDetail'].includes(viewName);
+    document.body.classList.toggle('hide-bottom-nav', shouldHideBottomNav);
+    this.postNativeBottomNavHidden(shouldHideBottomNav);
 
     if (this.currentUser && this.currentUser.isTrial) {
       if (viewName === 'ranking' || viewName === 'crew') {
@@ -2620,6 +2712,81 @@ class SimonEduApp {
     const summaryTitleEl = document.getElementById('chapterSummaryTitle');
     if (summaryTitleEl) summaryTitleEl.textContent = `${chapter}장 요약`;
     if (summaryTextEl) summaryTextEl.textContent = this.getChapterSummary(chapter);
+
+    // Render the 4 mode progress bars dynamically
+    const modeProgressEl = document.getElementById('chapterDetailModeProgressContainer');
+    if (modeProgressEl) {
+      // 1. Easy mode progress
+      const easyCompletedSet = this.getModeCompletedVerseIndexSet('easy', this.currentUser);
+      let easyCompletedCount = 0;
+      chapterVerses.forEach((v, i) => {
+        if (easyCompletedSet.has(firstIndex + i)) easyCompletedCount++;
+      });
+      const easyPct = chapterVerses.length > 0 ? Math.round((easyCompletedCount / chapterVerses.length) * 100) : 0;
+
+      // 2. Hard mode progress
+      const hardCompletedSet = this.getModeCompletedVerseIndexSet('hard', this.currentUser);
+      let hardCompletedCount = 0;
+      chapterVerses.forEach((v, i) => {
+        if (hardCompletedSet.has(firstIndex + i)) hardCompletedCount++;
+      });
+      const hardPct = chapterVerses.length > 0 ? Math.round((hardCompletedCount / chapterVerses.length) * 100) : 0;
+
+      // 3. Expert mode progress
+      const expertCompletedSet = this.getModeCompletedVerseIndexSet('expert', this.currentUser);
+      let expertCompletedCount = 0;
+      chapterVerses.forEach((v, i) => {
+        if (expertCompletedSet.has(firstIndex + i)) expertCompletedCount++;
+      });
+      const expertPct = chapterVerses.length > 0 ? Math.round((expertCompletedCount / chapterVerses.length) * 100) : 0;
+
+      // 4. Study Exam progress
+      const completedExams = this.currentUser.completedStudyExamChapters || [];
+      const examCompleted = completedExams.includes(chapter);
+      const examPct = examCompleted ? 100 : 0;
+
+      modeProgressEl.innerHTML = `
+        <div class="mode-progress-row" style="text-align: left; font-family: var(--font-kr);">
+          <div style="display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">
+            <span>쉬움 모드 (말씀 보며 학습)</span>
+            <span style="color: #16a34a;">${easyCompletedCount}/${chapterVerses.length}절 (${easyPct}%)</span>
+          </div>
+          <div style="height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
+            <div style="width: ${easyPct}%; height: 100%; background: #16a34a; border-radius: 3px;"></div>
+          </div>
+        </div>
+
+        <div class="mode-progress-row" style="text-align: left; font-family: var(--font-kr);">
+          <div style="display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">
+            <span>어려움 모드 (빈칸 단어 채우기)</span>
+            <span style="color: #d97706;">${hardCompletedCount}/${chapterVerses.length}절 (${hardPct}%)</span>
+          </div>
+          <div style="height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
+            <div style="width: ${hardPct}%; height: 100%; background: #d97706; border-radius: 3px;"></div>
+          </div>
+        </div>
+
+        <div class="mode-progress-row" style="text-align: left; font-family: var(--font-kr);">
+          <div style="display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">
+            <span>전문 모드 (전체 직접 타이핑)</span>
+            <span style="color: #dc2626;">${expertCompletedCount}/${chapterVerses.length}절 (${expertPct}%)</span>
+          </div>
+          <div style="height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
+            <div style="width: ${expertPct}%; height: 100%; background: #dc2626; border-radius: 3px;"></div>
+          </div>
+        </div>
+
+        <div class="mode-progress-row" style="text-align: left; font-family: var(--font-kr);">
+          <div style="display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.25rem;">
+            <span>예상 문제 (학습 평가 시험)</span>
+            <span style="color: #7c3aed;">${examCompleted ? '완료 (100%)' : '미완료 (0%)'}</span>
+          </div>
+          <div style="height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;">
+            <div style="width: ${examPct}%; height: 100%; background: #7c3aed; border-radius: 3px;"></div>
+          </div>
+        </div>
+      `;
+    }
     
     // Render verse list (old layout)
     const verseListEl = document.getElementById('chapterVerseList');
@@ -2827,6 +2994,8 @@ class SimonEduApp {
     if (this.studyMode === 'hard') {
       this.generateHardModeOptions();
     }
+
+    this.studyPrevView = 'journeyChapterDetail';
 
     this.switchView('journeyVerseStudy');
   }
@@ -3311,6 +3480,33 @@ class SimonEduApp {
       const n = Number(idx);
       if (Number.isInteger(n) && n >= 0) completed.add(n);
     });
+    return completed;
+  }
+
+  getModeCompletedVerseIndexSet(mode, user = this.currentUser) {
+    const completed = new Set();
+    let targetArray = [];
+    if (mode === 'easy') targetArray = user?.completedEasyVerseIndices;
+    else if (mode === 'hard') targetArray = user?.completedHardVerseIndices;
+    else if (mode === 'expert') targetArray = user?.completedExpertVerseIndices;
+    
+    if (!targetArray || targetArray.length === 0) {
+      if (mode === 'easy') {
+        const legacyCount = Math.max(0, Number(user?.currentVerseIndex || 0));
+        for (let i = 0; i < legacyCount; i++) {
+          completed.add(i);
+        }
+        (user?.completedVerseIndices || []).forEach(idx => {
+          const n = Number(idx);
+          if (Number.isInteger(n) && n >= 0) completed.add(n);
+        });
+      }
+    } else {
+      targetArray.forEach(idx => {
+        const n = Number(idx);
+        if (Number.isInteger(n) && n >= 0) completed.add(n);
+      });
+    }
     return completed;
   }
 
@@ -9413,11 +9609,7 @@ class SimonEduApp {
 
     // 3. Detail Views: Back Navigation
     if (view === 'journeyVerseStudy') {
-      if (this.studyMode === 'exam') {
-        this.switchView('journeyChapterDetail');
-      } else {
-        this.switchView('journeyVerseSelect');
-      }
+      this.switchView(this.studyPrevView || 'journeyChapterDetail');
       return 'navigated';
     } else if (view === 'journeyVerseSelect') {
       this.switchView('journeyChapterDetail');
@@ -9555,6 +9747,7 @@ class SimonEduApp {
       this.generateHardModeOptions();
     }
     
+    this.studyPrevView = 'journeyVerseSelect';
     this.switchView('journeyVerseStudy');
   }
 
@@ -9591,6 +9784,7 @@ class SimonEduApp {
       }
     }
     
+    this.studyPrevView = 'journeyChapterDetail';
     this.switchView('journeyVerseStudy');
   }
 
@@ -9730,13 +9924,8 @@ class SimonEduApp {
       });
     }
     
-    if (chapter === 1 && questions.length > 0) {
-      const first = questions[0];
-      const rest = questions.slice(1).sort(() => 0.5 - Math.random());
-      this.studyExamQuestions = [first, ...rest];
-    } else {
-      this.studyExamQuestions = questions.sort(() => 0.5 - Math.random());
-    }
+    this.shuffleArray(questions);
+    this.studyExamQuestions = questions;
   }
 
   renderStudyMode() {
@@ -10038,6 +10227,8 @@ class SimonEduApp {
     if (btnAction) {
       btnAction.disabled = false;
     }
+
+    this.checkStudyAnswer();
   }
 
   checkStudyAnswer() {
@@ -10062,8 +10253,16 @@ class SimonEduApp {
       if (selectedIdx === correctIdx) {
         this.markVerseAsCompleted(true);
         this.showToast('정답입니다! 👏');
+        if (this.studyAutoAdvanceTimer) clearTimeout(this.studyAutoAdvanceTimer);
+        this.studyAutoAdvanceTimer = setTimeout(() => {
+          this.nextStudyVerse();
+        }, 1200);
       } else {
         this.showToast('오답입니다. 😢');
+        if (this.studyAutoAdvanceTimer) clearTimeout(this.studyAutoAdvanceTimer);
+        this.studyAutoAdvanceTimer = setTimeout(() => {
+          this.nextStudyVerse();
+        }, 2000);
       }
       
       const btnAction = document.getElementById('btnStudyAction');
@@ -10085,6 +10284,10 @@ class SimonEduApp {
       if (comparison.accuracy >= 80) {
         this.markVerseAsCompleted(true);
         this.showToast('암송 완료! 👏');
+        if (this.studyAutoAdvanceTimer) clearTimeout(this.studyAutoAdvanceTimer);
+        this.studyAutoAdvanceTimer = setTimeout(() => {
+          this.nextStudyVerse();
+        }, 1200);
       } else {
         this.showToast(`일치율 ${comparison.accuracy}%로 암송 기준(80%)에 미달했습니다.`);
       }
@@ -10114,8 +10317,16 @@ class SimonEduApp {
         if (!this.studyExamCorrectCount) this.studyExamCorrectCount = 0;
         this.studyExamCorrectCount++;
         this.showToast('정답입니다! 👏');
+        if (this.studyAutoAdvanceTimer) clearTimeout(this.studyAutoAdvanceTimer);
+        this.studyAutoAdvanceTimer = setTimeout(() => {
+          this.nextStudyVerse();
+        }, 1200);
       } else {
         this.showToast('오답입니다. 😢');
+        if (this.studyAutoAdvanceTimer) clearTimeout(this.studyAutoAdvanceTimer);
+        this.studyAutoAdvanceTimer = setTimeout(() => {
+          this.nextStudyVerse();
+        }, 2000);
       }
       
       this.renderStudyMode();
@@ -10123,6 +10334,11 @@ class SimonEduApp {
   }
 
   nextStudyVerse() {
+    if (this.studyAutoAdvanceTimer) {
+      clearTimeout(this.studyAutoAdvanceTimer);
+      this.studyAutoAdvanceTimer = null;
+    }
+
     if (this.studyMode === 'exam') {
       if (this.studyExamCurrentIndex >= 9) {
         this.showStudyExamResult();
@@ -10135,8 +10351,15 @@ class SimonEduApp {
       this.renderStudyMode();
     } else {
       if (this.studyCurrentIndex >= this.studyVerses.length - 1) {
-        this.showToast('🎉 해당 장의 모든 구절 학습을 완료했습니다!');
-        this.switchView('journeyChapterDetail');
+        if (this.activeJourneyChapter < 22) {
+          const nextChapter = this.activeJourneyChapter + 1;
+          this.showToast(`🎉 ${this.activeJourneyChapter}장 학습 완료! 다음 장(${nextChapter}장)으로 이동합니다.`);
+          this.activeJourneyChapter = nextChapter;
+          this.switchView('journeyChapterDetail');
+        } else {
+          this.showToast('🎉 요한계시록의 모든 장 학습을 완료했습니다!');
+          this.switchView('journeyChapterDetail');
+        }
         return;
       }
       this.studyCurrentIndex++;
@@ -10207,17 +10430,30 @@ class SimonEduApp {
   markVerseAsCompleted(silent = false) {
     if (!this.currentUser) return;
     const idx = this.activeJourneyVerseIndex;
-    const completedSet = this.getCompletedVerseIndexSet(this.currentUser);
-    if (completedSet.has(idx)) {
+    const mode = this.studyMode || 'easy';
+    
+    let targetField = '';
+    if (mode === 'easy') targetField = 'completedEasyVerseIndices';
+    else if (mode === 'hard') targetField = 'completedHardVerseIndices';
+    else if (mode === 'expert') targetField = 'completedExpertVerseIndices';
+
+    const modeCompletedSet = this.getModeCompletedVerseIndexSet(mode, this.currentUser);
+    if (modeCompletedSet.has(idx)) {
       if (!silent) this.showToast('이미 완료된 구절입니다.');
       return;
     }
     
     this.currentUser.completedVerseIndices = Array.from(new Set([...(this.currentUser.completedVerseIndices || []), idx]));
+    if (targetField) {
+      this.currentUser[targetField] = Array.from(new Set([...(this.currentUser[targetField] || []), idx]));
+    }
     
     let updateData = {
       completedVerseIndices: firebase.firestore.FieldValue.arrayUnion(idx)
     };
+    if (targetField) {
+      updateData[targetField] = firebase.firestore.FieldValue.arrayUnion(idx);
+    }
     
     if (!silent) {
       this.showToast('✓ 암송이 완료되었습니다!');
@@ -10227,10 +10463,22 @@ class SimonEduApp {
       db.collection('users').doc(this.currentUser.id).update(updateData).then(() => {
         this.renderStudyMode();
         this.renderChapterDetail();
+        if (mode === 'easy') {
+          if (this.studyAutoAdvanceTimer) clearTimeout(this.studyAutoAdvanceTimer);
+          this.studyAutoAdvanceTimer = setTimeout(() => {
+            this.nextStudyVerse();
+          }, 1200);
+        }
       });
     } else {
       this.renderStudyMode();
       this.renderChapterDetail();
+      if (mode === 'easy') {
+        if (this.studyAutoAdvanceTimer) clearTimeout(this.studyAutoAdvanceTimer);
+        this.studyAutoAdvanceTimer = setTimeout(() => {
+          this.nextStudyVerse();
+        }, 1200);
+      }
     }
   }
 
@@ -10239,22 +10487,79 @@ class SimonEduApp {
       this.showToast('이 기기에서는 음성 합성을 지원하지 않습니다.');
       return;
     }
-    window.speechSynthesis.cancel();
     
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ko-KR';
-    utterance.rate = 1.0;
-    
-    const voices = window.speechSynthesis.getVoices();
-    const koVoice = voices.find(v => v.lang.startsWith('ko'));
-    if (koVoice) utterance.voice = koVoice;
-    
-    window.speechSynthesis.speak(utterance);
+    try {
+      window.speechSynthesis.cancel();
+      
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'ko-KR';
+      utterance.rate = 0.95; // Slightly slower for better clarity on Android
+      utterance.pitch = 1.0;
+      
+      // Store globally to prevent garbage collection on Android WebView
+      window.currentUtterance = utterance;
+      
+      let voices = window.speechSynthesis.getVoices();
+      const doSpeak = () => {
+        voices = window.speechSynthesis.getVoices();
+        const koVoice = voices.find(v => v.lang.startsWith('ko') || v.lang.includes('KO'));
+        if (koVoice) {
+          utterance.voice = koVoice;
+        }
+        
+        utterance.onend = () => {
+          window.currentUtterance = null;
+        };
+        utterance.onerror = (e) => {
+          console.error("SpeechSynthesis error:", e);
+          window.currentUtterance = null;
+        };
+        
+        window.speechSynthesis.speak(utterance);
+      };
+
+      if (voices.length === 0) {
+        window.speechSynthesis.onvoiceschanged = () => {
+          doSpeak();
+          window.speechSynthesis.onvoiceschanged = null;
+        };
+        window.speechSynthesis.getVoices(); // Trigger load
+        setTimeout(() => {
+          if (!window.speechSynthesis.speaking) {
+            window.speechSynthesis.speak(utterance);
+          }
+        }, 350);
+      } else {
+        doSpeak();
+      }
+    } catch (err) {
+      console.error("speakText error:", err);
+      this.showToast("음성 재생 중 오류가 발생했습니다.");
+    }
   }
 
   showStudyExamResult() {
     const controlsEl = document.getElementById('studyModeControls');
     if (!controlsEl) return;
+
+    const chapter = this.activeJourneyChapter;
+    if (this.currentUser) {
+      if (!this.currentUser.completedStudyExamChapters) {
+        this.currentUser.completedStudyExamChapters = [];
+      }
+      if (!this.currentUser.completedStudyExamChapters.includes(chapter)) {
+        this.currentUser.completedStudyExamChapters.push(chapter);
+        if (!this.currentUser.isTrial) {
+          db.collection('users').doc(this.currentUser.id).update({
+            completedStudyExamChapters: firebase.firestore.FieldValue.arrayUnion(chapter)
+          }).then(() => {
+            this.renderChapterDetail();
+          });
+        } else {
+          this.renderChapterDetail();
+        }
+      }
+    }
     
     const refEl = document.getElementById('studyVerseRef');
     if (refEl) refEl.textContent = `요한계시록 ${this.activeJourneyChapter}장 예상 문제 완료`;
@@ -10340,6 +10645,14 @@ class SimonEduApp {
       }
     }
     return matrix[b.length][a.length];
+  }
+
+  shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
   }
 
   downloadUsersCSV() {

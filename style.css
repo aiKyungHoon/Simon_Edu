@@ -3000,6 +3000,12 @@ body.mobile-app .settings-app-card {
   transition: transform 0.3s ease;
 }
 
+@media (max-width: 900px) {
+  body.logged-in:not(.hide-bottom-nav) .bottom-nav {
+    display: flex;
+  }
+}
+
 body.mobile-app.logged-in:not(.hide-bottom-nav) .bottom-nav {
   display: none;
 }
