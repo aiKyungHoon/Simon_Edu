@@ -69,12 +69,18 @@ export default function Members({ users, adminEmail }: MembersProps) {
     }
   };
 
-  // Search & Filter
+  // Search & Filter (Supports multiple keywords split by spaces, commas, or slashes)
   const filteredUsers = users.filter((u) => {
-    const matchesSearch =
-      u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (u.name && u.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchTerms = searchTerm.trim().toLowerCase().split(/[\s,/;]+/).filter(t => t.length > 0);
+    
+    let matchesSearch = true;
+    if (searchTerms.length > 0) {
+      matchesSearch = searchTerms.some(term => 
+        u.username.toLowerCase().includes(term) ||
+        (u.name && u.name.toLowerCase().includes(term)) ||
+        u.email.toLowerCase().includes(term)
+      );
+    }
       
     const matchesRole = roleFilter === 'all' || u.role === roleFilter;
     const userStatus = u.status || 'active';
@@ -262,7 +268,7 @@ export default function Members({ users, adminEmail }: MembersProps) {
           <input
             type="text"
             className="input-field"
-            placeholder="아이디, 이름, 이메일 검색..."
+            placeholder="아이디, 이름, 이메일 다중 검색 (쉼표/공백 구분)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
