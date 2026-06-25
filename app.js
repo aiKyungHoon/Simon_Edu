@@ -4674,7 +4674,7 @@ class SimonEduApp {
         }).join('');
 
         carouselHtml = `
-          <div class="ranking-mission-banner-carousel" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+          <div class="ranking-mission-banner-carousel" ontouchstart="app.handleTouchStart(event)" ontouchend="app.handleTouchEnd(event)" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; margin-bottom: 1rem; user-select: none;">
             <div style="display: flex; align-items: center; width: 100%; gap: 0.5rem;">
               <button onclick="app.prevRankingMissionEvent()" class="carousel-arrow-btn" style="
                 background: rgba(255, 255, 255, 0.85);
@@ -5058,6 +5058,26 @@ class SimonEduApp {
     let nextIdx = currentIdx + 1;
     if (nextIdx >= missionEvents.length) nextIdx = 0;
     this.changeRankingMissionEvent(missionEvents[nextIdx].id);
+  }
+
+  handleTouchStart(e) {
+    if (e.touches && e.touches.length > 0) {
+      this.touchStartX = e.touches[0].clientX;
+    }
+  }
+
+  handleTouchEnd(e) {
+    if (e.changedTouches && e.changedTouches.length > 0) {
+      const touchEndX = e.changedTouches[0].clientX;
+      const diffX = touchEndX - this.touchStartX;
+      if (Math.abs(diffX) > 50) {
+        if (diffX > 0) {
+          this.prevRankingMissionEvent();
+        } else {
+          this.nextRankingMissionEvent();
+        }
+      }
+    }
   }
 
   // 6. Points system

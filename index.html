@@ -8,7 +8,7 @@
   <!-- Google Material Icons for UI -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=1.5.55">
+  <link rel="stylesheet" href="style.css?v=1.5.56">
   <!-- Canvas Confetti Library -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- Safari & Version Cache Busting Script -->
@@ -16,8 +16,8 @@
     (function() {
       const params = new URLSearchParams(window.location.search);
       const IS_APP_WEBVIEW = params.get('platform') === 'app';
-      const WEB_VER = '1.5.55';
-      const APP_WEB_VER = '1.5.55';
+      const WEB_VER = '1.5.56';
+      const APP_WEB_VER = '1.5.56';
       const VERSION_KEY = IS_APP_WEBVIEW ? 'simon_app_web_version' : 'simon_web_version';
       const ACTIVE_VER = IS_APP_WEBVIEW ? APP_WEB_VER : WEB_VER;
       window.SIMON_CLIENT_TYPE = IS_APP_WEBVIEW ? 'app' : 'web';
@@ -1342,7 +1342,7 @@
           </div>
 
           <div class="app-version" style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-en); font-weight: 500; letter-spacing: 0.5px; opacity: 0.7;">
-            Version 1.5.55
+            Version 1.5.56
           </div>
         </div>
 
@@ -3010,6 +3010,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
   <script src="bible_data.js?v=1.5.2"></script>
-  <script src="app.js?v=1.5.55"></script>
+  <script src="app.js?v=1.5.56"></script>
 </body>
 </html>
