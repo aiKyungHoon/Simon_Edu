@@ -310,11 +310,11 @@ export default function MissionExam({ users = [] }: MissionExamProps) {
   const attempts = selectedSubmission?.attempts || [];
 
   const downloadCSV = () => {
-    const headers = ['지역', '장', '이름', '시험 최고 점수', '최근 시험 점수', '지급 포인트', '최근 응시일', '총 응시횟수'];
+    const headers = ['지역', '이름', '장', '시험 최고 점수', '최근 시험 점수', '지급 포인트', '최근 응시일', '총 응시횟수'];
     const csvRows = filteredRows.map(r => [
       r.region || '-',
-      getExamRangeLabel(r),
       r.applicantName || '-',
+      getExamRangeLabel(r),
       `${r.score || 0}점`,
       `${r.lastScore ?? r.score ?? 0}점`,
       `${r.pointsEarned || 0}P`,
@@ -414,8 +414,8 @@ export default function MissionExam({ users = [] }: MissionExamProps) {
             <thead>
               <tr>
                 <th>지역</th>
-                <th>장</th>
                 <th>이름</th>
+                <th>장</th>
                 <th>시험 점수</th>
                 <th>최근 점수</th>
                 <th>지급 기준 포인트</th>
@@ -439,8 +439,8 @@ export default function MissionExam({ users = [] }: MissionExamProps) {
               ) : filteredRows.map((submission) => (
                 <tr key={submission.id}>
                   <td data-label="지역" style={{ fontWeight: 700 }}>{submission.region || '-'}</td>
-                  <td data-label="장" style={{ fontWeight: 600 }}>{getExamRangeLabel(submission)}</td>
                   <td data-label="이름" style={{ fontWeight: 700 }}>{submission.applicantName || '-'}</td>
+                  <td data-label="장" style={{ fontWeight: 600 }}>{getExamRangeLabel(submission)}</td>
                   <td data-label="시험 최고 점수" style={{ fontWeight: 800, color: 'var(--accent-purple)' }}>{submission.score || 0}점</td>
                   <td data-label="최근 점수">{submission.lastScore ?? submission.score ?? 0}점</td>
                   <td data-label="지급 기준 포인트" style={{ color: 'var(--accent-amber)', fontWeight: 700 }}>{submission.pointsEarned || 0}P</td>
