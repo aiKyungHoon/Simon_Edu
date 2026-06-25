@@ -135,6 +135,7 @@ class SimonEduApp {
     this.missionExamListenerUnsubscribe = null;
     this.activeEvents = [];
     this.currentRankingTab = 'all';
+    this.selectedRankingEventId = null;
     this.currentEventDetail = null;
     this.shownEventAnnouncementIds = [];
     this.users = [];
@@ -3590,23 +3591,69 @@ class SimonEduApp {
     }
   }
 
-  getMissionExamRankedRows() {
+  _legacyRowMatchesEvent(row, eventItem) {
+    if (!row || !eventItem) return false;
+    if (row.eventId && eventItem.id && row.eventId === eventItem.id) return true;
+    if (row.eventTitle && eventItem.title && row.eventTitle === eventItem.title) return true;
+    
+    const startChapter = eventItem.examStartChapter || eventItem.startChapter || this.globalSettings?.examStartChapter || 1;
+    const endChapter = eventItem.examEndChapter || eventItem.endChapter || this.globalSettings?.examEndChapter || 22;
+    
+    const rowStart = row.startChapter || row.examStartChapter;
+    if (rowStart !== undefined && rowStart >= startChapter && rowStart <= endChapter) {
+      return true;
+    }
+    return false;
+  }
+
+  getMissionExamRankedRows(eventItem) {
     const rowsByKey = new Map();
     const pushRow = (row) => {
       if (!row) return;
       const applicantName = String(row.applicantName || row.name || row.username || '').trim();
       const region = String(row.region || '').trim();
-      const score = Number(row.score ?? row.bestScore ?? row.lastScore ?? 0);
+      
+      let score = 0;
+      let attemptCount = 0;
+      let updatedAt = null;
+
+      if (eventItem) {
+        const attempts = Array.isArray(row.attempts) ? row.attempts : [];
+        const matchingAttempts = attempts.filter(attempt => this._attemptMatchesEvent(attempt, eventItem));
+        
+        if (matchingAttempts.length === 0) {
+          const rootMatches = this._legacyRowMatchesEvent(row, eventItem);
+          if (rootMatches) {
+            score = Number(row.score ?? row.bestScore ?? row.lastScore ?? 0);
+            attemptCount = Number(row.attemptCount ?? 1);
+            updatedAt = row.updatedAt || row.lastAttemptDate || row.submittedAt;
+          } else {
+            return;
+          }
+        } else {
+          score = matchingAttempts.reduce((max, a) => Math.max(max, a.score || 0), 0);
+          attemptCount = matchingAttempts.length;
+          const sortedAttempts = [...matchingAttempts].sort((a, b) => {
+            return new Date(a.submittedAt || 0).getTime() - new Date(b.submittedAt || 0).getTime();
+          });
+          updatedAt = sortedAttempts[sortedAttempts.length - 1].submittedAt || sortedAttempts[sortedAttempts.length - 1].updatedAt;
+        }
+      } else {
+        score = Number(row.score ?? row.bestScore ?? row.lastScore ?? 0);
+        attemptCount = Number(row.attemptCount ?? row.attempts?.length ?? 0);
+        updatedAt = row.updatedAt || row.lastAttemptDate || row.submittedAt;
+      }
+      
       if (!applicantName && score <= 0) return;
 
-      const key = row.regionNameKey || `${region}_${applicantName}` || row.id || `row_${rowsByKey.size}`;
+      const key = row.regionNameKey || `${region}_${applicantName}`;
       const normalized = {
         ...row,
         applicantName: applicantName || '응시자',
         region,
         score,
-        attemptCount: Number(row.attemptCount ?? row.attempts?.length ?? 0),
-        updatedMillis: this.getMillisFromDateValue(row.updatedAt || row.lastAttemptDate || row.submittedAt),
+        attemptCount,
+        updatedMillis: this.getMillisFromDateValue(updatedAt),
         userId: row.lastUserId || row.userId || row.id
       };
 
@@ -3660,7 +3707,9 @@ class SimonEduApp {
   }
 
   getMissionExamEventForRanking() {
-    return (this.activeEvents || []).find(evt => evt.eventType === 'mission_exam' && this._eventTargetsCurrentUser(evt));
+    const missionEvents = (this.activeEvents || []).filter(evt => evt.eventType === 'mission_exam' && this._eventTargetsCurrentUser(evt));
+    if (missionEvents.length === 0) return null;
+    return missionEvents.find(evt => evt.id === this.selectedRankingEventId) || missionEvents[0];
   }
 
   formatEventDateRange(eventItem) {
@@ -4584,7 +4633,8 @@ class SimonEduApp {
   }
 
   renderMissionExamRankingWidget(list) {
-    const sortedRows = this.getMissionExamRankedRows();
+    const eventItem = this.getMissionExamEventForRanking();
+    const sortedRows = this.getMissionExamRankedRows(eventItem);
     const rankTextEl = document.getElementById('userRankingText');
     const rankPctEl = document.getElementById('userRankingPct');
     const detailsLink = document.querySelector('#rankingView .rank-details-link span');
@@ -4594,16 +4644,67 @@ class SimonEduApp {
       ? sortedRows.find(row => row.userId === this.currentUser.id || row.lastUserId === this.currentUser.id)
       : null;
 
+    const missionEvents = (this.activeEvents || []).filter(evt => evt.eventType === 'mission_exam' && this._eventTargetsCurrentUser(evt));
+    let selectorHtml = '';
+    if (missionEvents.length > 1) {
+      const optionsHtml = missionEvents.map(evt => `
+        <option value="${evt.id}" ${evt.id === eventItem?.id ? 'selected' : ''}>
+          ${this.escapeHtml(evt.title || '사명자 시험')}
+        </option>
+      `).join('');
+      selectorHtml = `
+        <div class="ranking-mission-selector-wrapper" style="margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem; width: 100%;">
+          <span style="font-size: 0.85rem; font-weight: 800; color: #7a6a3f; white-space: nowrap;">시험 선택:</span>
+          <select id="rankingMissionEventSelect" onchange="app.changeRankingMissionEvent(this.value)" style="
+            flex: 1;
+            background: white;
+            border: 1px solid rgba(184, 134, 11, 0.3);
+            color: #222;
+            padding: 0.5rem 0.8rem;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            outline: none;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+            -webkit-appearance: select;
+          ">
+            ${optionsHtml}
+          </select>
+        </div>
+      `;
+    }
+
+    const eventRange = this.formatEventDateRange(eventItem);
+    const eventBannerHtml = eventItem ? `
+      <div class="ranking-mission-banner">
+        <span class="material-icons-round">verified</span>
+        <div>
+          <strong>${this.escapeHtml(eventItem.title || '사명자 시험')}</strong>
+          <p>${eventRange ? this.escapeHtml(eventRange) : '진행 중인 사명자 시험'}</p>
+        </div>
+      </div>
+    ` : '';
+
     if (sortedRows.length === 0) {
       if (rankTextEl) rankTextEl.textContent = '-위';
       if (rankPctEl) rankPctEl.textContent = '사명자 시험 응시 데이터가 아직 없습니다.';
       list.innerHTML = `
-        <div class="ranking-weekly-empty ranking-mission-empty">
+        ${selectorHtml}
+        ${eventBannerHtml}
+        <div class="ranking-weekly-empty ranking-mission-empty" style="margin-top: 1rem;">
           <span class="material-icons-round">assignment_turned_in</span>
           <strong>사명자 시험 랭킹 집계 전입니다.</strong>
           <p>응시 결과가 저장되면 이곳에 사명자 시험 Top 10이 표시됩니다.</p>
         </div>
       `;
+      
+      const modal = document.getElementById('modalAllRankings');
+      if (modal && modal.classList.contains('active')) {
+        const searchInput = document.getElementById('rankingSearchInput');
+        const filterText = searchInput ? searchInput.value : '';
+        this.renderAllRankingsPopupList(filterText);
+      }
       return;
     }
 
@@ -4616,18 +4717,6 @@ class SimonEduApp {
       if (rankTextEl) rankTextEl.textContent = '-위';
       if (rankPctEl) rankPctEl.textContent = '사명자 시험 응시 내역이 없습니다.';
     }
-
-    const eventItem = this.getMissionExamEventForRanking();
-    const eventRange = this.formatEventDateRange(eventItem);
-    const eventBannerHtml = eventItem ? `
-      <div class="ranking-mission-banner">
-        <span class="material-icons-round">verified</span>
-        <div>
-          <strong>${this.escapeHtml(eventItem.title || '사명자 시험')}</strong>
-          <p>${eventRange ? this.escapeHtml(eventRange) : '진행 중인 사명자 시험'}</p>
-        </div>
-      </div>
-    ` : '';
 
     const topThree = sortedRows.slice(0, 3);
     const podiumOrder = [topThree[1], topThree[0], topThree[2]].filter(Boolean);
@@ -4651,6 +4740,7 @@ class SimonEduApp {
     const shouldShowMyFixedRow = myRow && !sortedRows.slice(0, 10).some(row => row === myRow);
 
     list.innerHTML = `
+      ${selectorHtml}
       ${eventBannerHtml}
       <div class="ranking-podium">
         ${topThreeHtml}
@@ -4837,7 +4927,8 @@ class SimonEduApp {
   }
 
   renderMissionExamRankingsPopupList(list, filterText = '') {
-    const sortedRows = this.getMissionExamRankedRows();
+    const eventItem = this.getMissionExamEventForRanking();
+    const sortedRows = this.getMissionExamRankedRows(eventItem);
     const cleanFilter = filterText.trim().toLowerCase();
     const filteredRows = sortedRows.filter(row => {
       const haystack = `${row.applicantName || ''} ${row.region || ''}`.toLowerCase();
@@ -4900,6 +4991,14 @@ class SimonEduApp {
     const searchInput = document.getElementById('rankingSearchInput');
     const filterText = searchInput ? searchInput.value : '';
     this.renderAllRankingsPopupList(filterText);
+  }
+
+  changeRankingMissionEvent(eventId) {
+    this.selectedRankingEventId = eventId;
+    const list = document.querySelector('#rankingView .leaderboard-list');
+    if (list) {
+      this.renderMissionExamRankingWidget(list);
+    }
   }
 
   // 6. Points system
