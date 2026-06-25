@@ -3951,8 +3951,10 @@ class SimonEduApp {
     const roleLabels = {
       user: '일반',
       zone_leader: '구역장',
+      district_leader: '구역장',
       team_leader: '팀장',
       department_head: '임과장',
+      manager: '임과장',
       admin: '관리자',
       missionary: '사명자'
     };
