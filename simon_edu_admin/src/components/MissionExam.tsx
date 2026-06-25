@@ -199,6 +199,7 @@ const groupAttemptsByEvent = (submission: ExamSubmission): ExamSubmission[] => {
 
 export default function MissionExam({ users = [] }: MissionExamProps) {
   const [submissions, setSubmissions] = useState<ExamSubmission[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedSubmission, setSelectedSubmission] = useState<ExamSubmission | null>(null);
   const [selectedRange, setSelectedRange] = useState<string>('all');
@@ -282,9 +283,23 @@ export default function MissionExam({ users = [] }: MissionExamProps) {
   }, [rows]);
 
   const filteredRows = useMemo(() => {
-    if (selectedRange === 'all') return rows;
-    return rows.filter((r) => getExamRangeLabel(r) === selectedRange);
-  }, [rows, selectedRange]);
+    let list = rows;
+    if (selectedRange !== 'all') {
+      list = list.filter((r) => getExamRangeLabel(r) === selectedRange);
+    }
+    
+    const searchTerms = searchTerm.trim().toLowerCase().split(/[\s,/;]+/).filter(t => t.length > 0);
+    if (searchTerms.length > 0) {
+      list = list.filter((r) => {
+        return searchTerms.some(term => {
+          const nameMatch = r.applicantName && r.applicantName.toLowerCase().includes(term);
+          const regionMatch = r.region && r.region.toLowerCase().includes(term);
+          return !!(nameMatch || regionMatch);
+        });
+      });
+    }
+    return list;
+  }, [rows, selectedRange, searchTerm]);
 
   useEffect(() => {
     if (selectedRange !== 'all' && !uniqueRanges.includes(selectedRange)) {
@@ -331,6 +346,22 @@ export default function MissionExam({ users = [] }: MissionExamProps) {
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>지역과 이름 기준으로 최고 점수와 응시횟수, 회차별 제출 내역을 확인합니다.</p>
         </div>
         <div className="mission-exam-controls" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className="search-input-wrapper" style={{ minWidth: '240px' }}>
+            <span className="material-icons-round">search</span>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="이름, 지역 다중 검색 (쉼표/공백)..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                fontSize: '0.85rem',
+                padding: '0.4rem 0.5rem 0.4rem 2.2rem',
+                height: '34px',
+                background: 'rgba(255, 255, 255, 0.65)'
+              }}
+            />
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>장 필터:</span>
             <select
