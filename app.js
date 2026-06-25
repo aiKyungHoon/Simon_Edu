@@ -4645,39 +4645,9 @@ class SimonEduApp {
       : null;
 
     const missionEvents = (this.activeEvents || []).filter(evt => evt.eventType === 'mission_exam' && this._eventTargetsCurrentUser(evt));
-    let selectorHtml = '';
-    if (missionEvents.length > 1) {
-      const optionsHtml = missionEvents.map(evt => `
-        <option value="${evt.id}" ${evt.id === eventItem?.id ? 'selected' : ''}>
-          ${this.escapeHtml(evt.title || '사명자 시험')}
-        </option>
-      `).join('');
-      selectorHtml = `
-        <div class="ranking-mission-selector-wrapper" style="margin-bottom: 0.8rem; display: flex; align-items: center; gap: 0.5rem; width: 100%;">
-          <span style="font-size: 0.85rem; font-weight: 800; color: #7a6a3f; white-space: nowrap;">시험 선택:</span>
-          <select id="rankingMissionEventSelect" onchange="app.changeRankingMissionEvent(this.value)" style="
-            flex: 1;
-            background: white;
-            border: 1px solid rgba(184, 134, 11, 0.3);
-            color: #222;
-            padding: 0.5rem 0.8rem;
-            border-radius: 10px;
-            font-size: 0.85rem;
-            font-weight: 700;
-            outline: none;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.02);
-            -webkit-appearance: select;
-          ">
-            ${optionsHtml}
-          </select>
-        </div>
-      `;
-    }
-
     const eventRange = this.formatEventDateRange(eventItem);
     const eventBannerHtml = eventItem ? `
-      <div class="ranking-mission-banner">
+      <div class="ranking-mission-banner" style="flex: 1; margin: 0;">
         <span class="material-icons-round">verified</span>
         <div>
           <strong>${this.escapeHtml(eventItem.title || '사명자 시험')}</strong>
@@ -4686,12 +4656,84 @@ class SimonEduApp {
       </div>
     ` : '';
 
+    let carouselHtml = '';
+    if (eventItem) {
+      if (missionEvents.length > 1) {
+        const dotsHtml = missionEvents.map((evt, idx) => {
+          const isActive = evt.id === eventItem.id;
+          return `
+            <span onclick="app.changeRankingMissionEvent('${evt.id}')" style="
+              width: ${isActive ? '16px' : '6px'};
+              height: 6px;
+              border-radius: 3px;
+              background: ${isActive ? '#d49a00' : 'rgba(184, 134, 11, 0.3)'};
+              cursor: pointer;
+              transition: all 0.25s ease;
+            "></span>
+          `;
+        }).join('');
+
+        carouselHtml = `
+          <div class="ranking-mission-banner-carousel" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; width: 100%; gap: 0.5rem;">
+              <button onclick="app.prevRankingMissionEvent()" class="carousel-arrow-btn" style="
+                background: rgba(255, 255, 255, 0.85);
+                border: 1px solid rgba(184, 134, 11, 0.2);
+                color: #7a6a3f;
+                width: 38px;
+                height: 38px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+                transition: all 0.2s ease;
+                flex-shrink: 0;
+              ">
+                <span class="material-icons-round" style="font-size: 1.25rem;">chevron_left</span>
+              </button>
+              
+              ${eventBannerHtml}
+              
+              <button onclick="app.nextRankingMissionEvent()" class="carousel-arrow-btn" style="
+                background: rgba(255, 255, 255, 0.85);
+                border: 1px solid rgba(184, 134, 11, 0.2);
+                color: #7a6a3f;
+                width: 38px;
+                height: 38px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+                transition: all 0.2s ease;
+                flex-shrink: 0;
+              ">
+                <span class="material-icons-round" style="font-size: 1.25rem;">chevron_right</span>
+              </button>
+            </div>
+            
+            <div class="carousel-dots" style="display: flex; gap: 0.35rem; justify-content: center; align-items: center; margin-top: 0.1rem;">
+              ${dotsHtml}
+            </div>
+          </div>
+        `;
+      } else {
+        carouselHtml = `
+          <div style="width: 100%; margin-bottom: 1rem;">
+            ${eventBannerHtml}
+          </div>
+        `;
+      }
+    }
+
     if (sortedRows.length === 0) {
       if (rankTextEl) rankTextEl.textContent = '-위';
       if (rankPctEl) rankPctEl.textContent = '사명자 시험 응시 데이터가 아직 없습니다.';
       list.innerHTML = `
-        ${selectorHtml}
-        ${eventBannerHtml}
+        ${carouselHtml}
         <div class="ranking-weekly-empty ranking-mission-empty" style="margin-top: 1rem;">
           <span class="material-icons-round">assignment_turned_in</span>
           <strong>사명자 시험 랭킹 집계 전입니다.</strong>
@@ -4740,8 +4782,7 @@ class SimonEduApp {
     const shouldShowMyFixedRow = myRow && !sortedRows.slice(0, 10).some(row => row === myRow);
 
     list.innerHTML = `
-      ${selectorHtml}
-      ${eventBannerHtml}
+      ${carouselHtml}
       <div class="ranking-podium">
         ${topThreeHtml}
       </div>
@@ -4999,6 +5040,24 @@ class SimonEduApp {
     if (list) {
       this.renderMissionExamRankingWidget(list);
     }
+  }
+
+  prevRankingMissionEvent() {
+    const missionEvents = (this.activeEvents || []).filter(evt => evt.eventType === 'mission_exam' && this._eventTargetsCurrentUser(evt));
+    if (missionEvents.length <= 1) return;
+    const currentIdx = missionEvents.findIndex(evt => evt.id === this.selectedRankingEventId);
+    let prevIdx = currentIdx - 1;
+    if (prevIdx < 0) prevIdx = missionEvents.length - 1;
+    this.changeRankingMissionEvent(missionEvents[prevIdx].id);
+  }
+
+  nextRankingMissionEvent() {
+    const missionEvents = (this.activeEvents || []).filter(evt => evt.eventType === 'mission_exam' && this._eventTargetsCurrentUser(evt));
+    if (missionEvents.length <= 1) return;
+    const currentIdx = missionEvents.findIndex(evt => evt.id === this.selectedRankingEventId);
+    let nextIdx = currentIdx + 1;
+    if (nextIdx >= missionEvents.length) nextIdx = 0;
+    this.changeRankingMissionEvent(missionEvents[nextIdx].id);
   }
 
   // 6. Points system
