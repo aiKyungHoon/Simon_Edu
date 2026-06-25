@@ -345,7 +345,7 @@ export default function MissionExam({ users = [] }: MissionExamProps) {
           <h1 style={{ fontSize: '1.25rem', fontWeight: 800 }}>시몬에듀 사명자 시험</h1>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>지역과 이름 기준으로 최고 점수와 응시횟수, 회차별 제출 내역을 확인합니다.</p>
         </div>
-        <div className="mission-exam-controls" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="mission-exam-controls" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'nowrap', alignItems: 'center' }}>
           <div className="search-input-wrapper" style={{ minWidth: '240px' }}>
             <span className="material-icons-round">search</span>
             <input
@@ -357,7 +357,7 @@ export default function MissionExam({ users = [] }: MissionExamProps) {
               style={{
                 fontSize: '0.85rem',
                 padding: '0.4rem 0.5rem 0.4rem 2.2rem',
-                height: '34px',
+                height: '36px',
                 background: 'rgba(255, 255, 255, 0.65)'
               }}
             />
@@ -375,7 +375,8 @@ export default function MissionExam({ users = [] }: MissionExamProps) {
                 borderRadius: '6px',
                 fontSize: '0.85rem',
                 outline: 'none',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                height: '36px'
               }}
             >
               <option value="all">전체</option>
@@ -384,7 +385,7 @@ export default function MissionExam({ users = [] }: MissionExamProps) {
               ))}
             </select>
           </div>
-          <div className="badge active">응시자 {filteredRows.length}명</div>
+          <div className="badge active" style={{ height: '36px', display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap' }}>응시자 {filteredRows.length}명</div>
           <button
             onClick={downloadCSV}
             className="btn-primary"
@@ -396,7 +397,9 @@ export default function MissionExam({ users = [] }: MissionExamProps) {
               padding: '0.4rem 1rem',
               fontSize: '0.85rem',
               borderRadius: '6px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              height: '36px',
+              whiteSpace: 'nowrap'
             }}
           >
             <span className="material-icons-round" style={{ fontSize: '1.1rem' }}>download</span>
